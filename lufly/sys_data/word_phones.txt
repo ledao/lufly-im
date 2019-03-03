@@ -1,15 +1,3 @@
-nm	ofdw
-μg	ofdw
-μm	ofdw
-‘’	ofbd
-“”	ofbd
-〈〉	ofbd
-《》	ofbd
-「」	ofbd
-『』	ofbd
-【】	ofbd
-〔〕	ofbd
-〖〗	ofbd
 一万	yiwj
 一个	yige
 一些	yixp
@@ -26712,6 +26700,3 @@ nm	ofdw
 龟兹	qqci
 龟头	gvtz
 龟缩	gvso
-（）	ofbd
-［］	ofbd
-｛｝	ofbd
