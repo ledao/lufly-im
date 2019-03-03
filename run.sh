@@ -1,0 +1,1 @@
+lufly/scripts/dump_char_phone_table.py
