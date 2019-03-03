@@ -18,7 +18,7 @@ class CharPhoneTable(BaseModel):
 class CharPhoneShapeTable(BaseModel):
     id = IntegerField(primary_key=True)
     char = FixedCharField(2)
-    phones = FixedCharField(2)
+    phoneshapes = FixedCharField(2)
     priority = IntegerField()
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
@@ -34,7 +34,7 @@ class WordPhoneTable(BaseModel):
 class WordPhoneShapeTable(BaseModel):
     id = IntegerField(primary_key=True)
     word = CharField()
-    phones = CharField()
+    phoneshapes = CharField()
     priority = IntegerField()
     updatedt = DateField("%Y-%m-%d %H:%M:%S")
 
