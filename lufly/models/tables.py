@@ -1,6 +1,6 @@
 from peewee import *
 
-db = SqliteDatabase("/home/ledao/projects/py_workspace/lufly-im/lufly/sys_data/sys_table.sqlitedb")
+db = SqliteDatabase("/home/noname/projects/py_workspace/lufly-im/lufly/sys_data/sys_table.sqlitedb")
 
 class BaseModel(Model):
     class Meta:
@@ -28,7 +28,7 @@ class WordPhoneTable(BaseModel):
     word = CharField()
     phones = CharField()
     priority = IntegerField()
-    updatedt = DateField("%Y-%m-%d %H:%M:%S")
+    updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
 
 class WordPhoneShapeTable(BaseModel):
@@ -36,7 +36,7 @@ class WordPhoneShapeTable(BaseModel):
     word = CharField()
     phoneshapes = CharField()
     priority = IntegerField()
-    updatedt = DateField("%Y-%m-%d %H:%M:%S")
+    updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
 
 def create_tables():
