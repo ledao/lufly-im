@@ -551,6 +551,7 @@
 冬	ds
 冮	gh
 冯	fg
+冯	pk
 冰	bk
 冲	is
 决	jt
@@ -2447,6 +2448,7 @@
 慆	tc
 慈	ci
 慊	qm
+慊	qp
 慌	hl
 慎	uf
 慑	ue
@@ -2892,6 +2894,7 @@
 敩	xt
 敬	jk
 数	uu
+数	uo
 敲	qn
 整	vg
 敷	fu
@@ -3171,6 +3174,7 @@
 架	jx
 枷	jx
 枸	gz
+枸	ju
 枹	bc
 柁	do
 柁	to
@@ -3585,6 +3589,7 @@
 汉	hj
 汊	ia
 汋	qt
+汋	vo
 汐	xi
 汕	uj
 汗	hj
@@ -4108,6 +4113,7 @@
 焉	yj
 焊	hj
 焌	jy
+焌	qu
 焐	wu
 焓	hj
 焕	hr
@@ -4160,6 +4166,7 @@
 熠	yi
 熥	tg
 熨	yy
+熨	yu
 熬	ao
 熵	uh
 熹	xi
@@ -4894,6 +4901,7 @@
 碈	mb
 碉	dn
 碌	lu
+碌	lq
 碍	ai
 碎	sv
 碑	bw
@@ -8256,3 +8264,4 @@
 鿍	gh
 鿎	ta
 鿏	md
+𪨊	ss
