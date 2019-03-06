@@ -1,6 +1,11 @@
+
+import os
+from pathlib import Path
 from peewee import *
 
-db = SqliteDatabase("/home/noname/projects/py_workspace/lufly-im/lufly/sys_data/sys_table.sqlitedb")
+pwd = Path(__file__).parent
+
+db = SqliteDatabase(str(Path(pwd) /  "../sys_data/sys_table.sqlitedb"))
 
 class BaseModel(Model):
     class Meta:
@@ -9,16 +14,24 @@ class BaseModel(Model):
 
 class CharPhoneTable(BaseModel):
     id = IntegerField(primary_key=True)
-    char = FixedCharField(2)
-    phones = FixedCharField(2)
+    char = CharField(2)
+    phones = CharField(2)
+    priority = IntegerField()
+    updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
+
+
+class CharShapeTable(BaseModel):
+    id = IntegerField(primary_key=True)
+    char = CharField(2)
+    shapes = CharField(2)
     priority = IntegerField()
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
 
 class CharPhoneShapeTable(BaseModel):
     id = IntegerField(primary_key=True)
-    char = FixedCharField(2)
-    phoneshapes = FixedCharField(2)
+    char = CharField(2)
+    phoneshapes = CharField(2)
     priority = IntegerField()
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
@@ -42,12 +55,12 @@ class WordPhoneShapeTable(BaseModel):
 def create_tables():
     if not CharPhoneTable.table_exists():
         CharPhoneTable.create_table()
-    if not CharPhoneShapeTable.table_exists():
-        CharPhoneShapeTable.create_table()
+    if not CharShapeTable.table_exists():
+        CharShapeTable.create_table()
     if not WordPhoneTable.table_exists():
         WordPhoneTable.create_table()
-    if not WordPhoneShapeTable.table_exists():
-        WordPhoneShapeTable.create_table()
+    # if not WordPhoneShapeTable.table_exists():
+    #     WordPhoneShapeTable.create_table()
 
 create_tables()
 
