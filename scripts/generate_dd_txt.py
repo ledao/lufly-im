@@ -72,7 +72,7 @@ if __name__ == "__main__":
             print(f"A: {last_char} has no shapes in wordshapetable")
             continue
         else:
-            word_items[f"{item.word}\t{item.phones+char_to_shape[first_char]+char_to_shape[last_char]}"] = 20000
+            word_items[f"{item.word}\t{item.phones+char_to_shape[first_char][0]+char_to_shape[last_char][-1]}"] = 20000
 
     top_single_chars_items = generate_topest_char(char_to_phones, 60000)
 
