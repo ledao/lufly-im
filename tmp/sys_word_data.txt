@@ -195,6 +195,7 @@
 上前	uhqmld#序20000
 上升	uhuglc#序20000
 上午	uhwulg#序20000
+上去	uhquls#序20000
 上古	uhgulk#序20000
 上句	uhjulk#序20000
 上台	uhtdlk#序20000
@@ -304,6 +305,7 @@
 下午	xxwuag#序20000
 下单	xxdjal#序20000
 下厨	xxiuac#序20000
+下去	xxquas#序20000
 下发	xxfaad#序20000
 下句	xxjuak#序20000
 下台	xxtdak#序20000
@@ -404,6 +406,7 @@
 不准	buvyaf#序20000
 不凡	bufjad#序20000
 不到	budcad#序20000
+不去	buquas#序20000
 不变	bubmay#序20000
 不同	butsak#序20000
 不含	buhjak#序20000
@@ -834,6 +837,7 @@
 临产	lbijlp#序20000
 临别	lbbpld#序20000
 临到	lbdcld#序20000
+临去	lbquls#序20000
 临头	lbtzld#序20000
 临帖	lbtplk#序20000
 临床	lbillm#序20000
@@ -921,6 +925,21 @@
 主题	vutidr#序20000
 丽日	liriaa#序20000
 丽江	lijlag#序20000
+举例	julixd#序20000
+举凡	jufjxd#序20000
+举出	juiuxk#序20000
+举办	jubjxd#序20000
+举动	judsxl#序20000
+举国	jugoxy#序20000
+举手	juuzxl#序20000
+举报	jubcxy#序20000
+举措	jucoxo#序20000
+举止	juvixa#序20000
+举着	juvexo#序20000
+举荐	jujmxz#序20000
+举行	juxkxi#序20000
+举证	juvgxv#序20000
+举起	juqixj#序20000
 乃至	ndvivt#序20000
 久仰	jqyhpe#序20000
 久别	jqbppd#序20000
@@ -2066,6 +2085,7 @@
 俗话	suhxrk#序20000
 俗语	suyurk#序20000
 俘虏	fulurl#序20000
+保举	bcjurl#序20000
 保人	bcrfrn#序20000
 保佑	bcyzrk#序20000
 保修	bcxqrp#序20000
@@ -2533,6 +2553,7 @@
 免了	mmledl#序20000
 免于	mmyudl#序20000
 免俗	mmsudk#序20000
+免去	mmquds#序20000
 免征	mmvgdv#序20000
 免得	mmdedc#序20000
 免息	mmxidx#序20000
@@ -3222,6 +3243,7 @@
 减价	jmjxdl#序20000
 减半	jmbjdl#序20000
 减压	jmyadd#序20000
+减去	jmquds#序20000
 减号	jmhcdv#序20000
 减员	jmyrdr#序20000
 减小	jmxndd#序20000
@@ -3334,6 +3356,7 @@
 出动	iudsvl#序20000
 出勤	iuqbvl#序20000
 出卖	iumdvd#序20000
+出去	iuquvs#序20000
 出发	iufavd#序20000
 出口	iukzva#序20000
 出台	iutdvk#序20000
@@ -3543,6 +3566,7 @@
 划转	hxvrgv#序20000
 划过	hxgogc#序20000
 列为	lpwwdd#序20000
+列举	lpjudl#序20000
 列入	lprudn#序20000
 列出	lpiudk#序20000
 列岛	lpdcde#序20000
@@ -3582,6 +3606,7 @@
 刚需	ghxuke#序20000
 创下	ilxxrb#序20000
 创业	ilyera#序20000
+创举	iljurl#序20000
 创优	ilyzry#序20000
 创伤	iluhrl#序20000
 创作	ilzorv#序20000
@@ -3660,6 +3685,7 @@
 别克	bpkeke#序20000
 别再	bpzdkr#序20000
 别动	bpdskl#序20000
+别去	bpquks#序20000
 别号	bphckv#序20000
 别名	bpmkkk#序20000
 别后	bphzkk#序20000
@@ -3789,6 +3815,7 @@
 前兆	qmvcbd#序20000
 前列	qmlpbd#序20000
 前卫	qmwwba#序20000
+前去	qmqubs#序20000
 前台	qmtdbk#序20000
 前后	qmhzbk#序20000
 前哨	qmucbo#序20000
@@ -4596,6 +4623,16 @@
 厮打	sidaid#序20000
 厮杀	siuaim#序20000
 厮混	sihyib#序20000
+去壳	quketj#序20000
+去年	qunmtl#序20000
+去掉	qudntu#序20000
+去日	qurita#序20000
+去死	qusitb#序20000
+去留	qulqtt#序20000
+去皮	qupity#序20000
+去路	qulutk#序20000
+去过	qugotc#序20000
+去除	quiuth#序20000
 县令	xmlkqs#序20000
 县城	xmigqi#序20000
 县官	xmgrqk#序20000
@@ -5767,6 +5804,7 @@
 哨声	ucugkp#序20000
 哨所	ucsokj#序20000
 哨音	ucybko#序20000
+哪吒	nevakq#序20000
 哪怕	napakb#序20000
 哪敢	nagjkw#序20000
 哪有	nayzko#序20000
@@ -6047,6 +6085,7 @@
 回到	hvdckd#序20000
 回升	hvugkc#序20000
 回单	hvdjkl#序20000
+回去	hvquks#序20000
 回合	hvhekk#序20000
 回味	hvwwkw#序20000
 回嘴	hvzvky#序20000
@@ -6629,6 +6668,7 @@
 壕沟	hcgzts#序20000
 士兵	uibkub#序20000
 壮丽	vllidd#序20000
+壮举	vljudl#序20000
 壮大	vldadn#序20000
 壮年	vlnmdl#序20000
 壮族	vlzudu#序20000
@@ -7175,6 +7215,7 @@
 失信	uixbpk#序20000
 失修	uixqpp#序20000
 失准	uivypf#序20000
+失去	uiqups#序20000
 失宠	uiispl#序20000
 失恋	uilmpx#序20000
 失意	uiyipx#序20000
@@ -8921,6 +8962,7 @@
 带出	ddiufk#序20000
 带到	dddcfd#序20000
 带动	dddsfl#序20000
+带去	ddqufs#序20000
 带回	ddhvfk#序20000
 带头	ddtzfd#序20000
 带有	ddyzfo#序20000
@@ -8956,6 +8998,7 @@
 帷幕	wwmujj#序20000
 常人	ihrfxn#序20000
 常务	ihwuxl#序20000
+常去	ihquxs#序20000
 常备	ihbwxt#序20000
 常客	ihkexk#序20000
 常常	ihihxj#序20000
@@ -9108,6 +9151,7 @@
 年龄	nmlkps#序20000
 并不	bkbubd#序20000
 并且	bkqpba#序20000
+并举	bkjubl#序20000
 并于	bkyubl#序20000
 并入	bkrubn#序20000
 并击	bkjibk#序20000
@@ -9314,6 +9358,7 @@
 开办	kdbjad#序20000
 开动	kddsal#序20000
 开卷	kdjrav#序20000
+开去	kdquas#序20000
 开发	kdfaad#序20000
 开口	kdkzaa#序20000
 开启	kdqiak#序20000
@@ -9546,6 +9591,7 @@
 归侨	gvqnll#序20000
 归入	gvruln#序20000
 归功	gvgsll#序20000
+归去	gvquls#序20000
 归口	gvkzla#序20000
 归咎	gvjqlk#序20000
 归国	gvgoly#序20000
@@ -9986,6 +10032,7 @@
 快些	kkxpxe#序20000
 快件	kkjmxn#序20000
 快到	kkdcxd#序20000
+快去	kkquxs#序20000
 快意	kkyixx#序20000
 快感	kkgjxx#序20000
 快慢	kkmjxy#序20000
@@ -11104,6 +11151,7 @@
 抑郁	yiyufe#序20000
 抒怀	uuhkfb#序20000
 抒情	uuqkfo#序20000
+抓举	vxjufl#序20000
 抓人	vxrffn#序20000
 抓住	vxvufv#序20000
 抓到	vxdcfd#序20000
@@ -11287,6 +11335,7 @@
 披萨	pisafi#序20000
 披露	pilufk#序20000
 披风	pifgfx#序20000
+抬举	tdjufl#序20000
 抬价	tdjxfl#序20000
 抬出	tdiufk#序20000
 抬头	tdtzfd#序20000
@@ -11317,6 +11366,7 @@
 抵账	divhfi#序20000
 抵赖	dildfr#序20000
 抵达	didafd#序20000
+抹去	moqufs#序20000
 抹布	mabufj#序20000
 抹掉	modnfu#序20000
 抹杀	mouafm#序20000
@@ -11596,6 +11646,7 @@
 拿下	naxxrb#序20000
 拿出	naiurk#序20000
 拿到	nadcrd#序20000
+拿去	naqurs#序20000
 拿回	nahvrk#序20000
 拿开	nakdrc#序20000
 拿手	nauzrl#序20000
@@ -11817,6 +11868,7 @@
 捉贼	vozwfu#序20000
 捍卫	hjwwfa#序20000
 捎信	ucxbfk#序20000
+捎去	ucqufs#序20000
 捎带	ucddfj#序20000
 捏住	npvufv#序20000
 捏合	nphefk#序20000
@@ -12031,6 +12083,7 @@
 控盘	kspjfm#序20000
 控股	ksgufy#序20000
 控诉	kssufi#序20000
+推举	tvjufl#序20000
 推人	tvrffn#序20000
 推介	tvjpfl#序20000
 推倒	tvdcfd#序20000
@@ -12607,6 +12660,7 @@
 故乡	guxlup#序20000
 故事	guuiul#序20000
 故作	guzouv#序20000
+故去	guquus#序20000
 故国	gugouy#序20000
 故土	gutuua#序20000
 故宫	gugsuk#序20000
@@ -13722,6 +13776,7 @@
 朗朗	lhlhdo#序20000
 朗诵	lhssdy#序20000
 朗读	lhdudd#序20000
+望去	whquws#序20000
 望月	whytwa#序20000
 望着	whvewo#序20000
 望见	whjmwe#序20000
@@ -14022,6 +14077,7 @@
 来到	lddcad#序20000
 来劲	ldjbal#序20000
 来历	ldlial#序20000
+来去	ldquas#序20000
 来吧	ldbaab#序20000
 来啦	ldlaal#序20000
 来回	ldhvak#序20000
@@ -14674,6 +14730,7 @@
 正门	vgmfav#序20000
 正面	vgmmaa#序20000
 正餐	vgcjal#序20000
+此举	cijuvl#序20000
 此乃	cindvp#序20000
 此人	cirfvn#序20000
 此刻	cikevd#序20000
@@ -14731,6 +14788,7 @@
 死光	sigldw#序20000
 死党	sidhde#序20000
 死刑	sixkdd#序20000
+死去	siquds#序20000
 死后	sihzdk#序20000
 死命	simkde#序20000
 死囚	siqqdr#序20000
@@ -15236,6 +15294,7 @@
 没准	mwvydf#序20000
 没动	mwdsdl#序20000
 没劲	mwjbdl#序20000
+没去	mwquds#序20000
 没变	mwbmdy#序20000
 没吃	mwiidq#序20000
 没听	mwtkdj#序20000
@@ -15532,6 +15591,7 @@
 派出	pdiudk#序20000
 派别	pdbpdd#序20000
 派到	pddcdd#序20000
+派去	pdquds#序20000
 派发	pdfadd#序20000
 派员	pdyrdr#序20000
 派头	pdtzdd#序20000
@@ -17508,6 +17568,7 @@
 留言	lqyjpk#序20000
 畜产	xuijwp#序20000
 畜生	iuugwf#序20000
+略去	ltquts#序20000
 略同	lttstk#序20000
 略带	ltddtj#序20000
 略微	ltwwtw#序20000
@@ -17989,6 +18050,7 @@
 省会	ughvus#序20000
 省内	ugnwud#序20000
 省劲	ugjbul#序20000
+省去	ugquus#序20000
 省委	ugwwun#序20000
 省得	ugdeuc#序20000
 省心	ugxbud#序20000
@@ -18198,6 +18260,7 @@
 瞒着	mjveoo#序20000
 瞒骗	mjpmoc#序20000
 瞥见	ppjmde#序20000
+瞧去	qnquos#序20000
 瞧着	qnveoo#序20000
 瞧见	qnjmoe#序20000
 瞩目	vumuoa#序20000
@@ -18564,6 +18627,7 @@
 离任	lirfwr#序20000
 离休	lixqwm#序20000
 离别	libpwd#序20000
+离去	liquws#序20000
 离合	lihewk#序20000
 离婚	lihywo#序20000
 离家	lijxwu#序20000
@@ -18632,6 +18696,7 @@
 种类	vslwhd#序20000
 种菜	vscdhm#序20000
 种马	vsmaha#序20000
+科举	kejuhl#序20000
 科学	kexthz#序20000
 科幻	kehrhv#序20000
 科技	kejihy#序20000
@@ -18765,6 +18830,7 @@
 稿费	gcfwhr#序20000
 稿酬	gcizhv#序20000
 究竟	jqjkbe#序20000
+穷举	qsjubl#序20000
 穷人	qsrfbn#序20000
 穷困	qskybm#序20000
 穷国	qsgoby#序20000
@@ -20151,6 +20217,7 @@
 而不	erbuad#序20000
 而且	erqpaa#序20000
 而今	erjbav#序20000
+而去	erquas#序20000
 而后	erhzak#序20000
 而外	erwdab#序20000
 而定	erdkar#序20000
@@ -20183,6 +20250,7 @@
 耕作	ggzolv#序20000
 耕田	ggtmlu#序20000
 耕耘	ggyyls#序20000
+耗去	hcquls#序20000
 耗尽	hcjbld#序20000
 耗损	hcsylr#序20000
 耗材	hccdlc#序20000
@@ -20544,6 +20612,7 @@
 脱俗	tosuok#序20000
 脱光	toglow#序20000
 脱兔	totuod#序20000
+脱去	toquos#序20000
 脱发	tofaod#序20000
 脱口	tokzoa#序20000
 脱困	tokyom#序20000
@@ -20892,6 +20961,7 @@
 花冠	hxgrcc#序20000
 花剑	hxjmcd#序20000
 花卉	hxhvcc#序20000
+花去	hxqucs#序20000
 花哨	hxucco#序20000
 花园	hxyrce#序20000
 花圃	hxpucf#序20000
@@ -21530,6 +21600,7 @@
 螺旋	loxrir#序20000
 螺纹	lowfiw#序20000
 螺钉	lodkid#序20000
+蟊贼	mczwsu#序20000
 蟋蟀	xiukiu#序20000
 蟑螂	vhlhie#序20000
 蟒蛇	mhueib#序20000
@@ -22921,6 +22992,7 @@
 走到	zzdctd#序20000
 走动	zzdstl#序20000
 走势	zzuitl#序20000
+走去	zzquts#序20000
 走台	zztdtk#序20000
 走向	zzxltk#序20000
 走吧	zzbatb#序20000
@@ -22963,6 +23035,7 @@
 赴约	fuyttu#序20000
 赴美	fumwtd#序20000
 赶上	gjuhta#序20000
+赶去	gjquts#序20000
 赶回	gjhvtk#序20000
 赶在	gjzdtt#序20000
 赶场	gjihtp#序20000
@@ -23092,6 +23165,7 @@
 跌停	dptkzd#序20000
 跌入	dpruzn#序20000
 跌势	dpuizl#序20000
+跌去	dpquzs#序20000
 跌宕	dpdhzu#序20000
 跌幅	dpfuzt#序20000
 跌打	dpdazd#序20000
@@ -23103,6 +23177,7 @@
 跌跤	dpjnzx#序20000
 跑了	pclezl#序20000
 跑动	pcdszl#序20000
+跑去	pcquzs#序20000
 跑来	pcldzn#序20000
 跑步	pcbuzp#序20000
 跑着	pcvezo#序20000
@@ -23500,6 +23575,7 @@
 辜负	gufuur#序20000
 辞了	cileql#序20000
 辞别	cibpqd#序20000
+辞去	ciquqs#序20000
 辞呈	ciigqw#序20000
 辞工	cigsqa#序20000
 辞掉	cidnqu#序20000
@@ -23574,6 +23650,7 @@
 过分	goffzd#序20000
 过剩	gougzd#序20000
 过半	gobjzl#序20000
+过去	goquzs#序20000
 过后	gohzzk#序20000
 过场	goihzp#序20000
 过多	godozx#序20000
@@ -23747,6 +23824,7 @@
 进军	jbjyzi#序20000
 进出	jbiuzk#序20000
 进化	jbhxzb#序20000
+进去	jbquzs#序20000
 进口	jbkzza#序20000
 进场	jbihzp#序20000
 进屋	jbwuzt#序20000
@@ -23918,6 +23996,7 @@
 退出	tviuzk#序20000
 退化	tvhxzb#序20000
 退却	tvqtze#序20000
+退去	tvquzs#序20000
 退后	tvhzzk#序20000
 退回	tvhvzk#序20000
 退场	tvihzp#序20000
@@ -23958,6 +24037,7 @@
 送出	ssiuzk#序20000
 送别	ssbpzd#序20000
 送到	ssdczd#序20000
+送去	ssquzs#序20000
 送命	ssmkze#序20000
 送回	sshvzk#序20000
 送审	ssufzu#序20000
@@ -24021,6 +24101,7 @@
 逆转	nivrzv#序20000
 逆风	nifgzx#序20000
 选中	xrvszl#序20000
+选举	xrjuzl#序20000
 选任	xrrfzr#序20000
 选修	xrxqzp#序20000
 选出	xriuzk#序20000
@@ -25965,6 +26046,7 @@
 飞了	fwlevl#序20000
 飞到	fwdcvd#序20000
 飞升	fwugvc#序20000
+飞去	fwquvs#序20000
 飞天	fwtmvd#序20000
 飞奔	fwbfvc#序20000
 飞往	fwwhvv#序20000
