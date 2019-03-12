@@ -28,26 +28,10 @@ class CharShapeTable(BaseModel):
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
 
-class CharPhoneShapeTable(BaseModel):
-    id = IntegerField(primary_key=True)
-    char = CharField(2)
-    phoneshapes = CharField(2)
-    priority = IntegerField()
-    updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
-
-
 class WordPhoneTable(BaseModel):
     id = IntegerField(primary_key=True)
     word = CharField()
     phones = CharField()
-    priority = IntegerField()
-    updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
-
-
-class WordPhoneShapeTable(BaseModel):
-    id = IntegerField(primary_key=True)
-    word = CharField()
-    phoneshapes = CharField()
     priority = IntegerField()
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
@@ -59,8 +43,7 @@ def create_tables():
         CharShapeTable.create_table()
     if not WordPhoneTable.table_exists():
         WordPhoneTable.create_table()
-    # if not WordPhoneShapeTable.table_exists():
-    #     WordPhoneShapeTable.create_table()
+
 
 create_tables()
 
