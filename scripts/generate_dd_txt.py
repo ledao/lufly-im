@@ -85,20 +85,30 @@ if __name__ == "__main__":
     one_hit_char_items = generate_one_hit_char(60000)
     top_single_chars_items = generate_topest_char(char_to_phones, 60000)
 
+    sys_single_char_data = f"{output_dir}/sys_single_char_data.txt"
+    with open(sys_single_char_data, 'w', encoding='utf8') as fout:
+        fout.write("---config@码表分类=主码-系统码表\n")
+        fout.write("---config@允许编辑=否\n")
+        fout.write(f"---config@码表别名=系统单字\n")
+        for item in char_items.items():
+            fout.write(f"{item[0]}#序{item[1]}\n")
+   
     sys_top_chars_data = f"{output_dir}/sys_top_chars_data.txt"
     with open(sys_top_chars_data, 'w', encoding='utf8') as fout:
+        fout.write("---config@码表分类=主码-1\n")
+        fout.write("---config@允许编辑=否\n")
+        fout.write(f"---config@码表别名=简码单字\n")
         for item in one_hit_char_items.items():
             fout.write(f"{item[0]}#序{item[1]}\n")
         for item in top_single_chars_items.items():
             fout.write(f"{item[0]}#序{item[1]}\n")
 
-    sys_single_char_data = f"{output_dir}/sys_single_char_data.txt"
-    with open(sys_single_char_data, 'w', encoding='utf8') as fout:
-        for item in char_items.items():
-            fout.write(f"{item[0]}#序{item[1]}\n")
-    
+   
     sys_word_data = f"{output_dir}/sys_word_data.txt"
     with open(sys_word_data, 'w', encoding='utf8') as fout:
+        fout.write("---config@码表分类=主码-2\n")
+        fout.write("---config@允许编辑=否\n")
+        fout.write(f"---config@码表别名=系统词组\n")
         for item in word_items.items():
             fout.write(f"{item[0]}#序{item[1]}\n")
 
