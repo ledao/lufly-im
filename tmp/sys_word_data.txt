@@ -1,3 +1,6 @@
+---config@码表分类=主码-2
+---config@允许编辑=否
+---config@码表别名=系统词组
 一万	yiwjap#序20000
 一个	yigeal#序20000
 一些	yixpae#序20000
