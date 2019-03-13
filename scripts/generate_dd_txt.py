@@ -63,7 +63,7 @@ if __name__ == "__main__":
         charphone = f'{item.char}\t{item.phones}'
         
         if item.char not in char_to_shape:
-            print(f"A: {item.char} has no shapes in charphonetable")
+            print(f"A: {item.char} has no shape in charshapetable")
             continue
         else:
             char_items[f"{item.char}\t{item.phones+char_to_shape[item.char]}"] = 40000
@@ -74,7 +74,7 @@ if __name__ == "__main__":
         first_char = item.word[0]
         last_char = item.word[-1]
         if first_char not in char_to_shape:
-            print(f"A: {first_char} has no shapes in wordphonetable")
+            print(f"A: {first_char} has no shapes in wordshapetable")
             continue
         elif last_char not in char_to_shape:
             print(f"A: {last_char} has no shapes in wordshapetable")
