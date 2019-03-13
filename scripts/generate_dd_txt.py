@@ -56,7 +56,7 @@ if __name__ == "__main__":
             char_to_shape[item.char] = item.shapes
     print(f"total {len(char_to_shape)} char shapes")
 
-    for item in CharPhoneTable.select():
+    for item in CharPhoneTable.select().order_by(CharPhoneTable.priority.desc()):
         if item.phones not in char_to_phones[item.char]:
             char_to_phones[item.char].append(item.phones)
 
@@ -68,7 +68,7 @@ if __name__ == "__main__":
         else:
             char_items[f"{item.char}\t{item.phones+char_to_shape[item.char]}"] = 40000
     
-    for item in WordPhoneTable.select():
+    for item in WordPhoneTable.select().order_by(WordPhoneTable.priority.desc()):
         wordphones = f"{item.word}\t{item.phones}"
        
         first_char = item.word[0]
