@@ -1,6 +1,8 @@
 ---config@码表分类=主码-2
 ---config@允许编辑=否
 ---config@码表别名=系统词组
+由于	yzyull#序20000
+好的	hcdenu#序20000
 一万	yiwjap#序20000
 一个	yigeal#序20000
 一些	yixpae#序20000
@@ -17420,7 +17422,6 @@
 田螺	tmlokx#序20000
 田野	tmyekl#序20000
 田间	tmjmko#序20000
-由于	yzyull#序20000
 由头	yztzld#序20000
 由来	yzldln#序20000
 由此	yzcilb#序20000
