@@ -36,6 +36,19 @@ class WordPhoneTable(BaseModel):
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
 
+class FullToTwoTable(BaseModel):
+    id = IntegerField(primary_key=True)
+    full = CharField()
+    two = CharField()
+
+
+class CharFreqTable(BaseModel):
+    id = IntegerField(primary_key=True)
+    char = CharField()
+    freq = CharField()
+    updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
+
+
 def create_tables():
     if not CharPhoneTable.table_exists():
         CharPhoneTable.create_table()
@@ -43,7 +56,10 @@ def create_tables():
         CharShapeTable.create_table()
     if not WordPhoneTable.table_exists():
         WordPhoneTable.create_table()
+    if not FullToTwoTable.table_exists():
+        FullToTwoTable.create_table()
+    if not CharFreqTable.table_exists():
+        CharFreqTable.create_table()
 
 
 create_tables()
-
