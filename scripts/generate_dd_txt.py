@@ -3,6 +3,8 @@ import os, sys
 from pathlib import Path
 from collections import defaultdict
 from lufly.models.tables import CharPhoneTable, CharShapeTable, WordPhoneTable
+from peewee import fn
+
 
 def generate_one_hit_char(priority):
     items = {
@@ -68,7 +70,7 @@ if __name__ == "__main__":
         else:
             char_items[f"{item.char}\t{item.phones+char_to_shape[item.char]}"] = 40000
     
-    for item in WordPhoneTable.select().order_by(WordPhoneTable.priority.desc()):
+    for item in WordPhoneTable.select().order_by(fn.LENGTH(WordPhoneTable.word), WordPhoneTable.priority.desc()):
         wordphones = f"{item.word}\t{item.phones}"
        
         first_char = item.word[0]
