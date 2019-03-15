@@ -1,0 +1,1 @@
+update charphonetable set priority = (select freq from charfreqtable where charfreqtable.char = charphonetable.char limit 1) where exists(select * from charfreqtable where charfreqtable.char = charphonetable.char)
