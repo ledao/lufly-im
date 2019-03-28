@@ -40,7 +40,8 @@ def full_to_double(pinyin, full_to_two):
     return [full_to_two[e[0]]+full_to_two[e[1]] for e in pinyin]
 
 
-if __name__ == "__main__":
+def get_double_dict():
+
     full_to_two = {}
     for item in FullToTwoTable.select():
         if item.full in full_to_two:
@@ -48,7 +49,12 @@ if __name__ == "__main__":
             sys.exit(1)
         else:
             full_to_two[item.full] = item.two
-    
+    return full_to_two
+
+
+if __name__ == "__main__":
+    full_to_two = get_double_dict()
+   
     for item in WordPhoneTable.select():
         word = item.word
         phones = item.phones

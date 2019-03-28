@@ -35,6 +35,9 @@ class WordPhoneTable(BaseModel):
     priority = IntegerField()
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
+    def __str__(self):
+        return f"<{self.id},{self.word},{self.phones},{self.priority},{self.updatedt}>"
+
 
 class FullToTwoTable(BaseModel):
     id = IntegerField(primary_key=True)
