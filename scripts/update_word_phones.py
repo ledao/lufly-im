@@ -3,7 +3,10 @@ from pypinyin import lazy_pinyin
 from lufly.models.tables import db, FullToTwoTable, WordPhoneTable
 
 def split_sy(pinyin: str):
-    if pinyin.startswith("zh"):
+    if pinyin == "sh":
+        s = "sh"
+        y = "i"
+    elif pinyin.startswith("zh"):
         s = "zh"
         y = pinyin[2:]
     elif pinyin.startswith("ch"):
@@ -37,6 +40,8 @@ def split_sy(pinyin: str):
 
 
 def full_to_double(pinyin, full_to_two):
+    # pinyin = list(pinyin)
+    # print(pinyin)
     return [full_to_two[e[0]]+full_to_two[e[1]] for e in pinyin]
 
 
