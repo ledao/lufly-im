@@ -52,6 +52,13 @@ class CharFreqTable(BaseModel):
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
 
+class DelWordPhoneTable(BaseModel):
+    id = IntegerField(primary_key=True)
+    char = CharField()
+    phones = CharField()
+    updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
+
+
 def create_tables():
     if not CharPhoneTable.table_exists():
         CharPhoneTable.create_table()
@@ -63,6 +70,9 @@ def create_tables():
         FullToTwoTable.create_table()
     if not CharFreqTable.table_exists():
         CharFreqTable.create_table()
+    if not DelWordPhoneTable.table_exists():
+        DelWordPhoneTable.create_table()
+
 
 
 create_tables()
