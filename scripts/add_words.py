@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
 from lufly.models.tables import db, CharPhoneTable, CharShapeTable, WordPhoneTable
+from lufly.models.tables import DelWordPhoneTable
 from peewee import fn
 from toolz.curried import *
 from update_word_phones import split_sy, get_double_dict, full_to_double
@@ -18,6 +19,11 @@ if __name__ == "__main__":
     _, words_path = sys.argv
 
     exist_wordphones = pipe(WordPhoneTable.select(),
+        map(lambda e: e.word+e.phones),
+        set
+    )
+
+    exist_wordphones = exist_wordphones | pipe(DelWordPhoneTable.select(),
         map(lambda e: e.word+e.phones),
         set
     )
