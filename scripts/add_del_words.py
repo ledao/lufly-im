@@ -1,7 +1,7 @@
 #encoding=utf8
 import os, sys
 from datetime import datetime
-from lufly.models.tables import db, DelWordPhoneTable
+from tables import db, DelWordPhoneTable
 from toolz.curried import map, filter, pipe, groupby, keymap
 
 
