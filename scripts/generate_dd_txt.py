@@ -2,7 +2,7 @@
 import os, sys
 from pathlib import Path
 from collections import defaultdict
-from lufly.models.tables import CharPhoneTable, CharShapeTable, WordPhoneTable
+from tables import CharPhoneTable, CharShapeTable, WordPhoneTable
 from peewee import fn
 
 
