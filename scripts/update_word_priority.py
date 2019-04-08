@@ -1,6 +1,9 @@
 import sys, os
 from typing import List
-from lufly.models.tables import db, WordPhoneTable, CharFreqTable
+from toolz.curried import pipe, map, concat, filter, groupby, valmap
+from tables import db, WordPhoneTable, CharFreqTable
+from segger import Segger
+
 
 def mean(lst: List[int]) -> int:
     if len(lst) == 0:
@@ -10,17 +13,42 @@ def mean(lst: List[int]) -> int:
     
 
 if __name__ == "__main__":
-    char_freqs = {}
-    for char_freq in CharFreqTable.select():
-        char_freqs[char_freq.char] = int(char_freq.freq)
+    if len(sys.argv) != 2:
+        print(f"Usage: python3 {sys.argv[0]} sents.txt", file=sys.stderr)
+        sys.exit(1)
+    _, sents_path = sys.argv
 
-    
-    # WordPhoneTable.update(priority= mean([char_freqs[e] for e in WordPhoneTable.word])).where(WordPhoneTable.priority == 1).execute()
-    
-    for word in WordPhoneTable.select().where(WordPhoneTable.priority == 1):
-        nums = [char_freqs[e] for e in word.word if e in char_freqs]
-        if len(nums) == 0:
+    exist_words = pipe(WordPhoneTable.select(),
+        map(lambda e: e.word),
+        set
+    )
+    seg = Segger(exist_words, 5)
+
+    with open(sents_path, 'r', encoding='utf8') as fin:
+        word_freq = pipe(fin,
+            map(lambda e: e.strip().replace(" ", "").replace("\t", "")),
+            filter(lambda e: e != "" and not e.startswith("#")),
+            map(lambda e: seg.cut(e)),
+            concat,
+            groupby(lambda e: e),
+            valmap(lambda e: len(e)),
+            dict
+        )
+
+    index = 0
+    for item in WordPhoneTable.select():
+        index += 1
+        if index == 1000:
+            print(item)
+            index = 0
+        word = item.word
+        if word in word_freq:
+            freq = word_freq[word]
+        else:
+            freq = 1
+        if freq == item.priority:
             continue
-        word.priority = int(sum(nums) / len(nums))
-        word.save()
+        else:
+            item.priority = freq
+            item.save()
     print('done')
