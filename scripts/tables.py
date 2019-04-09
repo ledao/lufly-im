@@ -58,6 +58,12 @@ class DelWordTable(BaseModel):
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
 
+class EngWordTable(BaseModel):
+    id = IntegerField(primary_key=True)
+    word = CharField()
+    updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
+
+
 def create_tables():
     if not CharPhoneTable.table_exists():
         CharPhoneTable.create_table()
@@ -71,6 +77,9 @@ def create_tables():
         CharFreqTable.create_table()
     if not DelWordTable.table_exists():
         DelWordTable.create_table()
+    if not EngWordTable.table_exists():
+        EngWordTable.create_table()
+
 
 
 
