@@ -60,7 +60,8 @@ class DelWordTable(BaseModel):
 
 class EngWordTable(BaseModel):
     id = IntegerField(primary_key=True)
-    word = CharField()
+    word = CharField(unique=True)
+    priority = IntegerField()
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
 

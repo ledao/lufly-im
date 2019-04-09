@@ -1,0 +1,4 @@
+kaldi
+wechat
+vscode
+intellij
