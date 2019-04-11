@@ -1,4 +1,5 @@
-import sys, os
+import sys
+import os
 from datetime import datetime
 from lufly.models.tables import db, WordPhoneTable
 
@@ -16,12 +17,13 @@ if __name__ == "__main__":
                 print(f"ERROR line {line} in file {word_phone_path}")
                 continue
             cols = list(map(lambda e: e.strip(), cols))
-            exit_num = WordPhoneTable.select().where(WordPhoneTable.word == cols[0], WordPhoneTable.phones == cols[1]).count()
+            exit_num = WordPhoneTable.select().where(
+                WordPhoneTable.word == cols[0], WordPhoneTable.phones == cols[1]).count()
             if exit_num > 0:
                 print(f"WARNING: word phone already exists, {line}")
                 continue
             else:
-                WordPhoneTable(word=cols[0], phones=cols[1], priority=1, updatedt=datetime.now()).save()
+                WordPhoneTable(word=cols[0], phones=cols[1],
+                               priority=1, updatedt=datetime.now()).save()
     print('done')
     pass
-
