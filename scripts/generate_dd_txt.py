@@ -123,7 +123,7 @@ if __name__ == "__main__":
         fout.write("---config@码表分类=主码-3\n")
         fout.write("---config@允许编辑=否\n")
         fout.write(f"---config@码表别名=系统英文\n")
-        pipe(EngWordTable.select().where(EngWordTable.priority > 0).order_by(fn.LENGTH(EngWordTable.word), EngWordTable.priority),
+        pipe(EngWordTable.select().where(EngWordTable.priority > 100).order_by(fn.LENGTH(EngWordTable.word), EngWordTable.priority),
             filter(lambda e: is_all_alpha(e.word)),
             map(lambda e: e.word+'\t'+e.word+"#序10000"),
             for_each(lambda e: fout.write(e+'\n')),
