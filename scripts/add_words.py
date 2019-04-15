@@ -1,6 +1,7 @@
 # encoding=utf8
 import os
 import sys
+import re
 from typing import List
 from datetime import datetime
 from pathlib import Path
@@ -28,7 +29,7 @@ def for_each(proc, eles):
             proc(k, v)
     else:
         for e in eles:
-            print(e)
+            proc(e)
 
 
 @curry
@@ -41,6 +42,21 @@ def cols_to_item(cols: List[str])->Item:
         raise RuntimeError("cols length not in [1,2]")
 
 
+def contain_alpha(word: str) -> bool:
+    for c in word:
+        if c.lower() in "abcdefghijklmnopqrstuvwxyz":
+            return True
+
+    return False
+
+
+def contain_symbols(word: str) -> bool:
+    if re.match('[1234567890’!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~，。！@#$%^&*………_+}{}]+', word) is None:
+        return False
+    else:
+        return True
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print(f"USAGE: python3 {sys.argv[0]} words.txt", file=sys.stderr)
@@ -48,16 +64,16 @@ if __name__ == "__main__":
 
     _, words_path = sys.argv
 
-    exist_wordphones = set()
-    exist_wordphones = pipe(WordPhoneTable.select(),
-                            map(lambda e: e.word+e.phones),
-                            set
-                            )
+    exist_words = set()
+    exist_words = pipe(WordPhoneTable.select(),
+                       map(lambda e: e.word),
+                       set
+                       )
 
-    exist_wordphones = exist_wordphones | pipe(DelWordTable.select(),
-                                               map(lambda e: e.word),
-                                               set
-                                               )
+    exist_words = exist_words | pipe(DelWordTable.select(),
+                                     map(lambda e: e.word),
+                                     set
+                                     )
 
     with open(words_path, "r", encoding='utf8') as fin:
         ft_dict = get_double_dict()
@@ -65,15 +81,15 @@ if __name__ == "__main__":
         to_add_words = pipe(fin,
                             map(lambda e: e.strip().split('\t')),
                             filter(lambda e: len(e) in (1, 2)),
+                            filter(lambda e: len(e[0]) <= 5),
+                            filter(lambda e: not contain_alpha(
+                                e[0]) and not contain_symbols(e[0])),
+                            filter(lambda e: e[0] not in exist_words),
                             map(cols_to_item),
-                            groupby(lambda e: e),
                             map(lambda e: (
                                 e, map(lambda e: split_sy(e), lazy_pinyin(e.word)))),
                             map(lambda e: attr.evolve(e[0], phones=''.join(
                                 full_to_double(e[1], ft_dict)))),
-                            #filter(lambda e: not exist_word_phones(e[0], e[1])),
-                            filter(lambda e: e.word + \
-                                   e.phones not in exist_wordphones),
                             map(lambda e: WordPhoneTable(word=e.word, phones=e.phones,
                                                          priority=e.priority, updatedt=datetime.now())),
                             )
