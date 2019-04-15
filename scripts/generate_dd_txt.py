@@ -60,7 +60,7 @@ if __name__ == "__main__":
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
 
-     char_to_shape = pipe(CharShapeTable.select(),
+    char_to_shape = pipe(CharShapeTable.select(),
         map(lambda e: (e.char, e.shapes)),
         reduceby(lambda e: e[0], lambda e1, e2: e1),
         valmap(lambda e: e[1]),
