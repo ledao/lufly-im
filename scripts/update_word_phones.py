@@ -1,6 +1,6 @@
 import os, sys
 from pypinyin import lazy_pinyin
-from lufly.models.tables import db, FullToTwoTable, WordPhoneTable
+from tables import db, FullToTwoTable, WordPhoneTable
 
 def split_sy(pinyin: str):
     if pinyin == "sh":
