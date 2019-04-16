@@ -1,7 +1,7 @@
 import sys, os
 from collections import defaultdict
 from datetime import datetime
-from lufly.models.tables import db, CharFreqTable
+from tables import db, CharFreqTable
 
 #这里还要一些中文文本，里面有很多中国的东西
 

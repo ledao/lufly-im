@@ -1,6 +1,6 @@
 import sys, os
 from datetime import datetime
-from lufly.models.tables import db, CharPhoneTable
+from tables import db, CharPhoneTable
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:

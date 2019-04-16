@@ -1,7 +1,7 @@
 import sys, os
 from datetime import datetime
 from typing import Dict
-from lufly.models.tables import db, WordPhoneShapeTable
+from tables import db, WordPhoneShapeTable
 
 def read_shapes(shape_path: str) -> Dict[str, str]:
     char_shapes = {}
