@@ -1,7 +1,7 @@
 import sys, os
 from collections import defaultdict
 from datetime import datetime
-from lufly.models.tables import db, WordPhoneTable, CharPhoneTable
+from tables import db, WordPhoneTable, CharPhoneTable
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
