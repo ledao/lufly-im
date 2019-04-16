@@ -45,6 +45,12 @@ class FullToTwoTable(BaseModel):
     two = CharField()
 
 
+class ZrmToTwoTable(BaseModel):
+    id = IntegerField(primary_key=True)
+    full = CharField();
+    two = CharField(); 
+
+
 class CharFreqTable(BaseModel):
     id = IntegerField(primary_key=True)
     char = CharField()
@@ -80,6 +86,9 @@ def create_tables():
         DelWordTable.create_table()
     if not EngWordTable.table_exists():
         EngWordTable.create_table()
+    if not ZrmToTwoTable.table_exists():
+        ZrmToTwoTable.create_table()
+
 
 
 
