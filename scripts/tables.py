@@ -14,16 +14,21 @@ class BaseModel(Model):
 
 class CharPhoneTable(BaseModel):
     id = IntegerField(primary_key=True)
-    char = CharField(2)
-    phones = CharField(2)
+    char = CharField()
+    phones = CharField()
+    full = CharField()
+    zrm = CharField()
     priority = IntegerField()
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
+
+    def __str__(self):
+        return f"<{self.id},{self.char},{self.phones},{self.full},{self.zrm},{self.priority},{self.updatedt}>"
 
 
 class CharShapeTable(BaseModel):
     id = IntegerField(primary_key=True)
-    char = CharField(2)
-    shapes = CharField(2)
+    char = CharField()
+    shapes = CharField()
     priority = IntegerField()
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
@@ -45,7 +50,7 @@ class FullToTwoTable(BaseModel):
     two = CharField()
 
 
-class ZrmToTwoTable(BaseModel):
+class FullToZrmTable(BaseModel):
     id = IntegerField(primary_key=True)
     full = CharField();
     two = CharField(); 
@@ -86,8 +91,8 @@ def create_tables():
         DelWordTable.create_table()
     if not EngWordTable.table_exists():
         EngWordTable.create_table()
-    if not ZrmToTwoTable.table_exists():
-        ZrmToTwoTable.create_table()
+    if not FullToZrmTable.table_exists():
+        FullToZrmTable.create_table()
 
 
 

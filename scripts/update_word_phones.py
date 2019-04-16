@@ -1,42 +1,7 @@
 import os, sys
 from pypinyin import lazy_pinyin
 from tables import db, FullToTwoTable, WordPhoneTable
-
-def split_sy(pinyin: str):
-    if pinyin == "sh":
-        s = "sh"
-        y = "i"
-    elif pinyin.startswith("zh"):
-        s = "zh"
-        y = pinyin[2:]
-    elif pinyin.startswith("ch"):
-        s = "ch"
-        y = pinyin[2:]
-    elif pinyin.startswith("sh"):
-        s = "sh"
-        y = pinyin[2:]
-    elif pinyin.startswith("er"):
-        s = "e"
-        y = "r"
-    elif pinyin == "e":
-        s = "e"
-        y = "e"
-    elif pinyin == "a":
-        s = "a"
-        y = "a"
-    elif pinyin == "n":
-        s = "e"
-        y = "n"
-    elif pinyin == "o":
-        s = "o"
-        y = "o"
-    elif pinyin == "ang":
-        s = "a"
-        y = "ang"
-    else:
-        s = pinyin[0]
-        y = pinyin[1:]
-    return (s, y)
+from common import split_sy
 
 
 def full_to_double(pinyin, full_to_two):
