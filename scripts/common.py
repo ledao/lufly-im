@@ -1,11 +1,11 @@
 import sys
 from typing import Tuple, List, Dict
-from toolz.curried import curry
+from toolz.curried import curry, pipe, map, filter, groupby
+from toolz.curried import itemmap, valfilter
 from pypinyin import lazy_pinyin
-from tables import FullToTwoTable, FullToZrmTable
+from tables import FullToTwoTable, FullToZrmTable, FullToZrmTable
 
 
-@curry
 def for_each(proc, eles):
     if type(eles) is dict:
         for (k, v) in eles.items():
@@ -13,6 +13,9 @@ def for_each(proc, eles):
     else:
         for e in eles:
             proc(e)
+
+
+for_each = curry(for_each)
 
 
 def split_sy(pinyin: str) -> Tuple[str, str]:
@@ -58,7 +61,7 @@ def get_full(word: str) -> List[str]:
         for e in full:
             if e not in "abcdefghijklmnopqrstuvwxyz":
                 raise RuntimeError(f"{e} not alphe, word is: {word}")
-        fulls.append(full) 
+        fulls.append(full)
     return fulls
 
 
@@ -73,11 +76,33 @@ def get_full_to_xhe_transformer() -> Dict[str, str]:
     return full_to_two
 
 
+def get_full_to_zrm_transformmer() -> Dict[str, str]:
+    return pipe(FullToZrmTable().select(),
+                map(lambda e: (e.full, e.two)),
+                groupby(lambda e: e[0]),
+                itemmap(lambda kv: (kv[0], list(
+                    map(lambda e: e[1], kv[1]))[0])),
+                dict
+                )
+
+
+def get_xhe_to_full_transformer() -> Dict[str, List[str]]:
+    return pipe(FullToTwoTable.select(),
+                map(lambda e: (e.full, e.two)),
+                groupby(lambda e: e[1]),
+                itemmap(lambda kv: (kv[0], list(
+                    filter(lambda e: e != kv[0], map(lambda e: e[0], kv[1]))))),
+                itemmap(lambda kv: (kv[0], kv[1]
+                                    if len(kv[1]) > 0 else [kv[0]])),
+                valfilter(lambda e: len(e) == 1),
+                dict
+                )
+
+
 def full_to_two(pinyin: str, transformer: Dict[str, str]) -> str:
     sy = split_sy(pinyin)
     if len(sy) != 2:
         raise RuntimeError(f"{sy} length != 2")
     if sy[0] not in transformer or sy[1] not in transformer:
         raise RuntimeError(f"{sy} not in transformer")
-    return f"{transformer[sy[0]]}{transformer[sy[1]]}" 
-
+    return f"{transformer[sy[0]]}{transformer[sy[1]]}"
