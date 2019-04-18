@@ -5,7 +5,8 @@ from peewee import SqliteDatabase, Model, CharField, IntegerField, DateTimeField
 
 pwd = Path(__file__).parent
 
-db = SqliteDatabase(str(Path(pwd) /  "../lufly/sys_data/sys_table.sqlitedb"))
+db = SqliteDatabase(str(Path(pwd) / "../lufly/sys_data/sys_table.sqlitedb"))
+
 
 class BaseModel(Model):
     class Meta:
@@ -40,24 +41,23 @@ class CharShapeTable(BaseModel):
 class WordPhoneTable(BaseModel):
     id = IntegerField(primary_key=True)
     word = CharField()
-    phones = CharField()
+    full = CharField()
+    xhe = CharField()
+    zrm = CharField()
+    lu = CharField()
     priority = IntegerField()
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
     def __str__(self):
-        return f"<{self.id},{self.word},{self.phones},{self.priority},{self.updatedt}>"
+        return f"<{self.id},{self.word},{self.full},{self.xhe},{self.zrm},{self.lu},{self.priority},{self.updatedt}>"
 
 
 class FullToTwoTable(BaseModel):
     id = IntegerField(primary_key=True)
     full = CharField()
-    two = CharField()
-
-
-class FullToZrmTable(BaseModel):
-    id = IntegerField(primary_key=True)
-    full = CharField();
-    two = CharField()
+    xhe = CharField()
+    zrm = CharField()
+    lu = CharField()
 
 
 class CharFreqTable(BaseModel):
@@ -95,7 +95,6 @@ def create_tables():
         DelWordTable.create_table()
     if not EngWordTable.table_exists():
         EngWordTable.create_table()
-    if not FullToZrmTable.table_exists():
-        FullToZrmTable.create_table()
+
 
 create_tables()

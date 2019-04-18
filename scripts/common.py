@@ -3,7 +3,7 @@ from typing import Tuple, List, Dict
 from toolz.curried import curry, pipe, map, filter, groupby
 from toolz.curried import itemmap, valfilter
 from pypinyin import lazy_pinyin
-from tables import FullToTwoTable, FullToZrmTable, FullToZrmTable
+from tables import FullToTwoTable
 
 
 def for_each(proc, eles):
@@ -31,7 +31,7 @@ def split_sy(pinyin: str) -> Tuple[str, str]:
     elif pinyin.startswith("sh"):
         s = "sh"
         y = pinyin[2:]
-    elif pinyin.startswith("er"):
+    elif pinyin == "er":
         s = "e"
         y = "r"
     elif pinyin == "e":
@@ -72,13 +72,13 @@ def get_full_to_xhe_transformer() -> Dict[str, str]:
             print(f"ERROR in {item.full}")
             sys.exit(1)
         else:
-            full_to_two[item.full] = item.two
+            full_to_two[item.full] = item.xhe
     return full_to_two
 
 
 def get_full_to_zrm_transformmer() -> Dict[str, str]:
-    return pipe(FullToZrmTable().select(),
-                map(lambda e: (e.full, e.two)),
+    return pipe(FullToTwoTable().select(),
+                map(lambda e: (e.full, e.zrm)),
                 groupby(lambda e: e[0]),
                 itemmap(lambda kv: (kv[0], list(
                     map(lambda e: e[1], kv[1]))[0])),
@@ -106,3 +106,6 @@ def full_to_two(pinyin: str, transformer: Dict[str, str]) -> str:
     if sy[0] not in transformer or sy[1] not in transformer:
         raise RuntimeError(f"{sy} not in transformer")
     return f"{transformer[sy[0]]}{transformer[sy[1]]}"
+
+def word_to_two(word: str, transformer: Dict[str, str]) -> str:
+    return ''.join([full_to_two(e, transformer) for e in get_full(word)])
