@@ -1,7 +1,7 @@
 
 import os
 from pathlib import Path
-from peewee import *
+from peewee import SqliteDatabase, Model, CharField, IntegerField, DateTimeField
 
 pwd = Path(__file__).parent
 
@@ -29,8 +29,12 @@ class CharShapeTable(BaseModel):
     id = IntegerField(primary_key=True)
     char = CharField()
     shapes = CharField()
+    lu_shapes = CharField()
     priority = IntegerField()
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
+
+    def __str__(self):
+        return f"<{self.id},{self.char},{self.shapes},{self.lu_shapes},{self.priority},{self.updatedt}>"
 
 
 class WordPhoneTable(BaseModel):
@@ -53,7 +57,7 @@ class FullToTwoTable(BaseModel):
 class FullToZrmTable(BaseModel):
     id = IntegerField(primary_key=True)
     full = CharField();
-    two = CharField(); 
+    two = CharField()
 
 
 class CharFreqTable(BaseModel):
@@ -93,9 +97,5 @@ def create_tables():
         EngWordTable.create_table()
     if not FullToZrmTable.table_exists():
         FullToZrmTable.create_table()
-
-
-
-
 
 create_tables()
