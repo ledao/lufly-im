@@ -83,11 +83,13 @@ if __name__ == "__main__":
                            )
     if len(null_full_items) != 0:
         print(f"null full items is {len(null_full_items)}")
-        pipe(null_full_items,
+        to_update_full_items = pipe(null_full_items,
              map(lambda e: (e, ''.join(get_full(e.char)))),
              map(lambda e: update_full(e[0], e[1])),
-             for_each(lambda e: e.save()),
              )
+        with db.atomic():
+            CharPhoneTable.bulk_update(to_update_full_items, fields=['full'], batch_size=100)
+        del to_update_full_items
     del null_full_items
 
     full_to_xhe_transformer = get_full_to_xhe_transformer()
@@ -99,21 +101,25 @@ if __name__ == "__main__":
     if len(xhe_full_neq_items) != 0:
         print(f"xhe full not equal len is {len(xhe_full_neq_items)}")
 
-        pipe(xhe_full_neq_items,
+        to_update_xhe_full_neq_items = pipe(xhe_full_neq_items,
              filter(lambda e: is_diff_s_same_y_full(
                  e, full_to_xhe_transformer)),
              map(fix_diff_s_same_y_full),
-             for_each(lambda e: e.save()),
              )
+        with db.atomic():
+            CharPhoneTable.bulk_update(to_update_xhe_full_neq_items, fields=['full'], batch_size=100)
+        del to_update_xhe_full_neq_items
 
         xhe_to_full_transformer = get_xhe_to_full_transformer()
-        pipe(xhe_full_neq_items,
+        to_update_fix_full_from_xhe_items = pipe(xhe_full_neq_items,
              filter(lambda e: not is_diff_s_same_y_full(
                  e, full_to_xhe_transformer)),
              map(lambda e: fix_full_from_xhe(e, xhe_to_full_transformer)),
              filter(lambda e: e[1]),
-             for_each(lambda e: e[0].save()),
              )
+        with db.atomic():
+            CharPhoneTable.bulk_update(to_update_fix_full_from_xhe_items, fields=['full'], batch_size=100)
+        del to_update_fix_full_from_xhe_items 
 
         pipe(xhe_full_neq_items,
              filter(lambda e: not is_diff_s_same_y_full(
@@ -125,6 +131,7 @@ if __name__ == "__main__":
              )
 
     del xhe_full_neq_items
+    del full_to_xhe_transformer
 
     null_zrm_items = pipe(CharPhoneTable.select().where(CharPhoneTable.zrm == ''),
                           list,
@@ -133,11 +140,13 @@ if __name__ == "__main__":
         print(f"null zrm items is {len(null_zrm_items)}")
         full_to_zrm_transformaer = get_full_to_zrm_transformmer()
 
-        pipe(null_zrm_items,
+        to_update_zrm_items = pipe(null_zrm_items,
              map(lambda e: fill_zrm(e, full_to_zrm_transformaer)),
              filter(lambda e: e[1]),
-             for_each(lambda e: e[0].save()),
              )
+        with db.atomic():
+            CharPhoneTable.bulk_update(to_update_zrm_items, fields=['zrm'], batch_size=100)
+        del to_update_zrm_items
 
         not_auto_fill_zrm_items = pipe(null_zrm_items,
                                        filter(lambda e: not fill_zrm(
