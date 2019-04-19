@@ -16,9 +16,10 @@ class BaseModel(Model):
 class CharPhoneTable(BaseModel):
     id = IntegerField(primary_key=True)
     char = CharField()
-    phones = CharField()
+    xhe = CharField()
     full = CharField()
     zrm = CharField()
+    lu = CharField()
     priority = IntegerField()
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
