@@ -66,19 +66,28 @@ def get_full(word: str) -> List[str]:
 
 
 def get_full_to_xhe_transformer() -> Dict[str, str]:
-    full_to_two = {}
-    for item in FullToTwoTable.select():
-        if item.full in full_to_two:
-            print(f"ERROR in {item.full}")
-            sys.exit(1)
-        else:
-            full_to_two[item.full] = item.xhe
-    return full_to_two
+    return pipe(FullToTwoTable().select(),
+            map(lambda e: (e.full, e.xhe)),
+            groupby(lambda e: e[0]),
+            itemmap(lambda kv: (kv[0], list(
+                map(lambda e: e[1], kv[1]))[0])),
+            dict
+            )
 
 
 def get_full_to_zrm_transformmer() -> Dict[str, str]:
     return pipe(FullToTwoTable().select(),
                 map(lambda e: (e.full, e.zrm)),
+                groupby(lambda e: e[0]),
+                itemmap(lambda kv: (kv[0], list(
+                    map(lambda e: e[1], kv[1]))[0])),
+                dict
+                )
+
+
+def get_full_to_lu_transformmer() -> Dict[str, str]:
+    return pipe(FullToTwoTable().select(),
+                map(lambda e: (e.full, e.lu)),
                 groupby(lambda e: e[0]),
                 itemmap(lambda kv: (kv[0], list(
                     map(lambda e: e[1], kv[1]))[0])),
