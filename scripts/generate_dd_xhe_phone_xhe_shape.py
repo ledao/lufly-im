@@ -53,11 +53,11 @@ def for_each(proc, eles):
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 2:
-        print("USAGE: python3 generate_dd_txt.py output_dir")
+    if len(sys.argv) != 1:
+        print("USAGE: python3 generate_dd_txt.py ")
         sys.exit(1)
 
-    fname, output_dir = sys.argv
+    fname, output_dir = sys.argv[0], "xhe_phone_xhe_shape"
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
@@ -71,7 +71,7 @@ if __name__ == "__main__":
     print(f"total {len(char_to_shape)} char shapes")
 
     char_to_phones = pipe(CharPhoneTable.select(),
-                          map(lambda e: (e.char, e.phones)),
+                          map(lambda e: (e.char, e.xhe)),
                           groupby(lambda e: e[0]),
                           valmap(lambda phones: [e[1] for e in phones]),
                           dict
@@ -99,7 +99,7 @@ if __name__ == "__main__":
             CharPhoneTable.select().order_by(CharPhoneTable.priority.desc()),
             filter(lambda e: e.char in char_to_shape),
             map(
-                lambda e: f"{e.char}\t{e.phones+char_to_shape[e.char]}#序40000"),
+                lambda e: f"{e.char}\t{e.xhe+char_to_shape[e.char]}#序40000"),
             for_each(lambda e: fout.write(e+'\n')),
         )
 
@@ -117,7 +117,7 @@ if __name__ == "__main__":
             WordPhoneTable.select().order_by(fn.LENGTH(WordPhoneTable.word),
                                              WordPhoneTable.priority.desc()),
             filter(lambda e: e.word not in del_words),
-            map(lambda e: (f'{e.word}\t{e.phones}', e.word[0], e.word[-1])),
+            map(lambda e: (f'{e.word}\t{e.xhe}', e.word[0], e.word[-1])),
             filter(lambda e: e[1] in char_to_shape and e[2] in char_to_shape),
             map(lambda e: f'{e[0]}{char_to_shape[e[1]][0]}{char_to_shape[e[2]][-1]}#序20000'),
             for_each(lambda e: fout.write(e+'\n'))
