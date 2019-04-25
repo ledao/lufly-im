@@ -1,0 +1,1 @@
+lufly/sys_data/sys_table.sqlitedb filter=lfs diff=lfs merge=lfs -text
