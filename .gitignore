@@ -110,6 +110,5 @@ lufly/win-dd/生成结果/setup.exe
 sys_data.txt
 words.txt
 tmp/*
-lu_phone_xhe_shape/*
-xhe_phone_xhe_shape/*
 lufly/sys_data/sys_table.sqlitedb
+lufly/win-dd/生成结果/*.exe
