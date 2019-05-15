@@ -10,7 +10,7 @@ from tables import db, CharPhoneTable, CharShapeTable, WordPhoneTable
 from tables import DelWordTable
 from peewee import fn
 from toolz.curried import pipe, map, groupby, filter, keymap, curry, take
-from update_word_phones import split_sy, get_double_dict, full_to_double
+from common import split_sy, get_double_dict, full_to_double
 from pypinyin import lazy_pinyin
 import attr
 
@@ -76,6 +76,8 @@ if __name__ == "__main__":
                                      )
 
     with open(words_path, "r", encoding='utf8') as fin:
+
+        #FIXME: bug to fix, we have more phone type now.
         ft_dict = get_double_dict()
 
         to_add_words = pipe(fin,
