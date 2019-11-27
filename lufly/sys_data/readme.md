@@ -1,4 +1,12 @@
-### sqlite db文件下载地址
-http://note.youdao.com/noteshare?id=d886e22ff42855f5fb93b0eda014c32b
+# 文件合并
 
-下载完成后将sys_table.sqlitedb文件放到当前文件夹。
+由于github 100M单文件限制，所以上传的数据库文件进行了切分，请使用
+
+```
+sh cat_sqlitedb.sh 
+```
+
+组合切分的文件为正确的数据库文件。
+
+
+
