@@ -5,7 +5,7 @@ from peewee import SqliteDatabase, Model, CharField, IntegerField, DateTimeField
 
 pwd = Path(__file__).parent
 
-db = SqliteDatabase(str(Path(pwd) / "../lufly/sys_data/sys_table.sqlitedb"))
+db = SqliteDatabase(str(Path(pwd) / "../lufly/sys_data/sys_table.sqlite"))
 
 
 class BaseModel(Model):
