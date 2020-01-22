@@ -54,10 +54,14 @@ def for_each(proc, eles):
 if __name__ == "__main__":
 
     if len(sys.argv) != 1:
-        print("USAGE: python3 generate_dd_txt.py ")
+        print("USAGE: python3 generate_dd_txt.py \n" + '''
+百度手机输入法：  
+可进入“高级设置→管理双拼方案→常用双拼方案”选择“小鹤双拼”，完成双拼方案设置；
+再进入“高级设置→管理个性短语→导入个性短语”导入“xiaolu_word_for_baidu.ini”文件即可。
+        ''')
         sys.exit(1)
 
-    fname, output_dir = sys.argv[0], "xhe_phone_xhe_shape"
+    fname, output_dir = sys.argv[0], "baidu_mobile_ini"
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
@@ -87,9 +91,9 @@ if __name__ == "__main__":
     all_items.extend(pipe(
         CharPhoneTable.select(),
         filter(lambda e: e.char in char_to_shape),
-        map(lambda e: (e.char, f"{e.xhe+char_to_shape[e.char]}"),
+        map(lambda e: (e.char, f"{e.xhe+char_to_shape[e.char]}")),
         list
-    )))
+    ))
 
     del_words = pipe(
         DelWordTable.select(),
@@ -105,5 +109,12 @@ if __name__ == "__main__":
         list
     ))
 
-    print(all_items[:100])
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    with open(output_dir+"/xiaolu_word_for_baidu.ini", 'w', encoding='utf8') as fout:
+        
+        for key, value in groupby(lambda e: e[1], sorted(all_items, key=lambda e: (e[1]))).items():
+            for i in range(len(value)):
+                fout.write(f"{value[i][1]}={i+1},{value[i][0]}\n")
+
     print('done')
