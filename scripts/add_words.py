@@ -59,7 +59,7 @@ def cols_to_word_phone_table(cols: List[str], xhe_transformer, zrm_transformer) 
         priority = cols[1]
         full = list(filter(lambda e: len(e) > 0, [e.strip() for e in cols[2:]]))
     else:
-        raise RuntimeError("cols length not in [1,2]")
+        raise RuntimeError("word item should be: 你好 [priority n i h ao]")
 
     return WordPhoneTable(
         word=word, 
@@ -114,12 +114,12 @@ if __name__ == "__main__":
     with open(words_path, "r", encoding='utf8') as fin:
         to_add_words = pipe(fin,
                             map(lambda e: e.strip().split(' ')),
-                            filter(lambda e: len(e) in (1, 2)),
+                            # filter(lambda e: len(e) in (1, 2)),
                             filter(lambda e: len(e[0]) <= 5),
                             filter(lambda e: not contain_alpha(
                                 e[0]) and not contain_symbols(e[0])),
                             filter(lambda e: e[0] not in exist_words),
-                            map(cols_to_word_phone_table)
+                            map(lambda e: cols_to_word_phone_table(e, xhe_transformer, zrm_transformer))
                             )
 
         with db.atomic():

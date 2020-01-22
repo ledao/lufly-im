@@ -2,3 +2,9 @@ kaldi
 wechat
 vscode
 intellij
+nba
+microsoft
+apple
+iphone
+webank
+webo
