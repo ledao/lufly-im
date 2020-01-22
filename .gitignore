@@ -112,3 +112,4 @@ words.txt
 tmp/*
 lufly/sys_data/sys_table.sqlitedb
 lufly/win-dd/生成结果/*.exe
+lufly/sys_data/sys_table.sqlite
