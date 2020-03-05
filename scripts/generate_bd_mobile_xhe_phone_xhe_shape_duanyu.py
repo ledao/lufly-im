@@ -105,7 +105,7 @@ if __name__ == "__main__":
         filter(lambda e: e.word not in del_words),
         map(lambda e: (e.word, e.xhe, e.word[0], e.word[-1])),
         filter(lambda e: e[2] in char_to_shape and e[3] in char_to_shape),
-        map(lambda e: (e[0], e[1] + char_to_shape[e[2]][0]+char_to_shape[e[3]][-1])),
+        map(lambda e: (e[0], e[1] + char_to_shape[e[2]][0]+char_to_shape[e[3]][0])),
         list
     ))
 
