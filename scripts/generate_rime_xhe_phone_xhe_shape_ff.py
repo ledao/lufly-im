@@ -89,7 +89,7 @@ if __name__ == "__main__":
         fout.write("    reset: 1\n")
         fout.write("    states: [ 繁, 简 ]\n")
         fout.write("  - name: ascii_punct\n")
-        fout.write("    #states: [ 。，, ．， ]\n")
+        # fout.write("    states: [ 。，, ．， ]\n")
         fout.write("    reset: 0\n")
  
         fout.write("\nengine:\n")
@@ -123,10 +123,10 @@ if __name__ == "__main__":
         fout.write("  alphabet: '/;zyxwvutsrqponmlkjihgfedcba'\n")
         fout.write("  initials: 'abcdefghijklmnopqrstuvwxyz;'\n")
         fout.write("  finals: '/'\n")
-        fout.write("  max_code_length: 4\n")
+        # fout.write("  max_code_length: 4\n")
         fout.write("  auto_select: true\n")
         fout.write("  auto_select_pattern: ^;.$|^\w{4}$\n")
-        fout.write("  auto_clear: max_length\n")
+        # fout.write("  auto_clear: max_length\n")
 
         fout.write("\n")
         
@@ -134,8 +134,8 @@ if __name__ == "__main__":
         fout.write("  dictionary: luyinxing\n")
         fout.write("  enable_charset_filter: false\n")
         fout.write("  enable_sentence: false\n")
-        fout.write("  enable_completion: true\n")
-        fout.write("  enable_user_dict: true\n")
+        fout.write("  enable_completion: false\n")
+        fout.write("  enable_user_dict: false\n")
 
         fout.write("\n")
  
@@ -194,9 +194,22 @@ if __name__ == "__main__":
         fout.write("\n---\n")
         fout.write("name: luyinxing\n")
         fout.write(f'version: "{now.hour}"\n')
-        #fout.write(f'sort: original\n')
-        fout.write(f'sort: by_weight\n')
+        fout.write(f'sort: original\n')
+        # fout.write(f'sort: by_weight\n')
         fout.write(f'use_preset_vocabulary: false\n')
+        fout.write('columns:\n')
+        fout.write('  - text\n')
+        fout.write('  - code\n')
+        # fout.write('  - stem\n')
+
+        # fout.write('encoder:\n')
+        # fout.write('  exclude_patterns:\n')
+        # fout.write("    - '^z.*$'\n")
+        # fout.write('  rules:\n')
+        # fout.write('    - length_equal: 2\n')
+        # fout.write('      formula: "AaAzBaBbBz"\n')
+
+
         fout.write("...\n")
         
         fout.write("\n# 单字\n")
@@ -204,16 +217,28 @@ if __name__ == "__main__":
         one_hit_char_items = generate_one_hit_char(10000000)
         top_single_chars_items = generate_topest_char(char_to_phones, 9000000)
         for item in one_hit_char_items.items():
-            fout.write(f"{item[0]}\t{item[1]}\n")
+            #fout.write(f"{item[0]}\t{item[1]}\n")
+            fout.write(f"{item[0]}\n")
         for item in top_single_chars_items.items():
-            fout.write(f"{item[0]}\t{item[1]}\n")
+            #fout.write(f"{item[0]}\t{item[1]}\n")
+            fout.write(f"{item[0]}\n")
 
         pipe(
             CharPhoneTable.select().order_by(CharPhoneTable.priority.desc()),
             filter(lambda e: e.char in char_to_shape),
-            map(lambda e: f"{e.char}\t{e.xhe+char_to_shape[e.char]}\t{e.priority}"),
+            #map(lambda e: f"{e.char}\t{e.xhe+char_to_shape[e.char]}\t{e.priority}"),
+            map(lambda e: f"{e.char}\t{e.xhe}"),
             for_each(lambda e: fout.write(e+'\n')),
         )
+        
+        pipe(
+            CharPhoneTable.select().order_by(CharPhoneTable.priority.desc()),
+            filter(lambda e: e.char in char_to_shape),
+            #map(lambda e: f"{e.char}\t{e.xhe+char_to_shape[e.char]}\t{e.priority}"),
+            map(lambda e: f"{e.char}\t{e.xhe}{char_to_shape[e.char]}"),
+            for_each(lambda e: fout.write(e+'\n')),
+        )
+
 
         fout.write("\n# 词语\n")
 
@@ -228,9 +253,21 @@ if __name__ == "__main__":
             filter(lambda e: e.word not in del_words),
             map(lambda e: (f'{e.word}\t{e.xhe}', e.word[0], e.word[-1], e.priority)),
             filter(lambda e: e[1] in char_to_shape and e[2] in char_to_shape),
-            map(lambda e: f'{e[0]}{char_to_shape[e[1]][0]}{char_to_shape[e[2]][0]}\t{e[3]}'),
+            #map(lambda e: f'{e[0]}{char_to_shape[e[1]][0]}{char_to_shape[e[2]][0]}\t{e[3]}'),
+            map(lambda e: f'{e[0]}'),
             for_each(lambda e: fout.write(e+'\n'))
         )
+        pipe(
+            WordPhoneTable.select().order_by(fn.LENGTH(WordPhoneTable.word),
+                                             WordPhoneTable.priority.desc()).limit(50000),
+            filter(lambda e: e.word not in del_words),
+            map(lambda e: (f'{e.word}\t{e.xhe}', e.word[0], e.word[-1], e.priority)),
+            filter(lambda e: e[1] in char_to_shape and e[2] in char_to_shape),
+            #map(lambda e: f'{e[0]}{char_to_shape[e[1]][0]}{char_to_shape[e[2]][0]}\t{e[3]}'),
+            map(lambda e: f'{e[0]}{char_to_shape[e[1]][0]}{char_to_shape[e[2]][0]}'),
+            for_each(lambda e: fout.write(e+'\n'))
+        )
+
 
 
         pass    
