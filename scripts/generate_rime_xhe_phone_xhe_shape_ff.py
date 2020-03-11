@@ -271,7 +271,7 @@ if __name__ == "__main__":
         )
         
         pipe(
-            WordPhoneTable.select().order_by(fn.LENGTH(WordPhoneTable.word),
+            WordPhoneTable.select().where(WordPhoneTable.priority >= 1).order_by(fn.LENGTH(WordPhoneTable.word),
                                              WordPhoneTable.priority.desc()),
             filter(lambda e: e.word not in del_words),
             map(lambda e: (f'{e.word}\t{e.xhe}', e.word[0], e.word[-1], e.priority)),
