@@ -27,16 +27,26 @@ class CharPhoneTable(BaseModel):
         return f"<{self.id},{self.char},{self.phones},{self.full},{self.zrm},{self.priority},{self.updatedt}>"
 
 
-class CharShapeTable(BaseModel):
+class CharHeShapeTable(BaseModel):
     id = IntegerField(primary_key=True)
     char = CharField()
     shapes = CharField()
-    lu_shapes = CharField()
     priority = IntegerField()
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
     def __str__(self):
-        return f"<{self.id},{self.char},{self.shapes},{self.lu_shapes},{self.priority},{self.updatedt}>"
+        return f"<{self.id},{self.char},{self.shapes},{self.priority},{self.updatedt}>"
+
+
+class CharLuShapeTable(BaseModel):
+    id = IntegerField(primary_key=True)
+    char = CharField()
+    shapes = CharField()
+    priority = IntegerField()
+    updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
+
+    def __str__(self):
+        return f"<{self.id},{self.char},{self.shapes},{self.priority},{self.updatedt}>"
 
 
 class WordPhoneTable(BaseModel):
@@ -84,8 +94,10 @@ class EngWordTable(BaseModel):
 def create_tables():
     if not CharPhoneTable.table_exists():
         CharPhoneTable.create_table()
-    if not CharShapeTable.table_exists():
-        CharShapeTable.create_table()
+    if not CharHeShapeTable.table_exists():
+        CharHeShapeTable.create_table()
+    if not CharLuShapeTable.table_exists():
+        CharLuShapeTable.create_table()
     if not WordPhoneTable.table_exists():
         WordPhoneTable.create_table()
     if not FullToTwoTable.table_exists():
