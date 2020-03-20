@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 from collections import defaultdict
-from common import get_char_to_shapes, get_char_to_phones, get_del_words
+from common import get_char_to_lu_shapes, get_char_to_phones, get_del_words
 from peewee import fn
 from toolz.curried import pipe, map, filter, curry, reduceby, valmap, groupby
 from tables import CharPhoneTable, CharHeShapeTable, WordPhoneTable, EngWordTable
@@ -57,12 +57,12 @@ if __name__ == "__main__":
         print(f"USAGE: python3 {sys.argv[0]} ")
         sys.exit(1)
 
-    fname, output_dir = sys.argv[0], "xhe_phone_xhe_shape_ff"
+    fname, output_dir = sys.argv[0], "xhe_phone_lu_shape_ff"
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
 
-    char_to_shape = get_char_to_shapes()
+    char_to_shape = get_char_to_lu_shapes()
     print(f"total {len(char_to_shape)} char shapes")
 
     char_to_phones = get_char_to_phones()
