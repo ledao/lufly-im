@@ -14,11 +14,12 @@ from tables import CharPhoneTable, CharHeShapeTable, WordPhoneTable, EngWordTabl
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 1:
-        print(f"USAGE: python3 {sys.argv[0]} ")
+    if len(sys.argv) != 2 or sys.argv[1] not in ['ff', 'fb']:
+        print(f"USAGE: python3 {sys.argv[0]} mode[ff|fb] ")
         sys.exit(1)
 
     fname, output_dir = sys.argv[0], "xhe_phone_lu_shape_ff"
+    mode = sys.argv[1]
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
@@ -66,7 +67,10 @@ if __name__ == "__main__":
             if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
                 for shape_first in char_to_shape[item.word[0]]:
                     for shape_last in char_to_shape[item.word[-1]]:
-                        fout.write(f'{item.word}\t{item.xhe+shape_first[0]+shape_last[0]}#序20000\n')
+                        if mode == 'ff':
+                            fout.write(f'{item.word}\t{item.xhe+shape_first[0]+shape_last[0]}#序20000\n')
+                        else:
+                            fout.write(f'{item.word}\t{item.xhe+shape_first[0]+shape_last[-1]}#序20000\n')
             else:
                 #fout.write(f'{item.word}\t{item.xhe}#序20000\n')
                 pass
