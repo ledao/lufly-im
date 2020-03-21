@@ -15,8 +15,8 @@ if __name__ == "__main__":
         print(f"USAGE: python3 {sys.argv[0]}  mode[ff, fb]")
         sys.exit(1)
 
-    fname, output_dir = sys.argv[0], "xhe_phone_xhe_shape_ff"
     mode = sys.argv[1]
+    fname, output_dir = sys.argv[0], "xhe_phone_xhe_shape_" + mode
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)

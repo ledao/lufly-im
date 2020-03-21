@@ -11,15 +11,12 @@ from common import *
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 2:
+    if len(sys.argv) != 2 or sys.argv[1] not in ['ff', 'fb']:
         print("USAGE: python3 generate_dd_txt.py mode[ff, fb]]")
         sys.exit(1)
 
-    fname, output_dir = sys.argv[0], "zrm_phone_xhe_shape"
     mode = sys.argv[1]
-    if mode not in ['ff', 'fb']:
-        print("USAGE: python3 generate_dd_txt.py mode[ff, fb]]")
-        sys.exit(1)
+    fname, output_dir = sys.argv[0], "zrm_phone_xhe_shape_" + mode
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
