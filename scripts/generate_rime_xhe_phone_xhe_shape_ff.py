@@ -3,20 +3,21 @@ import os
 import sys
 from pathlib import Path
 from collections import defaultdict
-from tables import CharPhoneTable, CharShapeTable, WordPhoneTable, EngWordTable
-from tables import DelWordTable
+from tables import *
 from peewee import fn
-from toolz.curried import pipe, map, filter, curry, reduceby, valmap, groupby
+from toolz.curried import *
 from datetime import datetime
+from common import *
 
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 1:
-        print(f"USAGE: python3 {sys.argv[0]} ")
+    if len(sys.argv) != 2 or sys.argv[1] not in ['ff', 'fb']:
+        print(f"USAGE: python3 {sys.argv[0]} mode[ff|fb] ")
         sys.exit(1)
 
     fname, output_dir = sys.argv[0], "rime_xhe_ff"
+    mode = sys.argv[1]
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
@@ -97,11 +98,6 @@ if __name__ == "__main__":
 
         fout.write("\n")
  
-        # fout.write("history:\n")
-        # fout.write("  input: ;f\n")
-        # fout.write("  size: 1\n")
-        # fout.write("  initial_quality: 1\n")
-        
         fout.write("\n")
         
         fout.write("punctuator:\n")
@@ -140,20 +136,10 @@ if __name__ == "__main__":
         fout.write("  horizontal: true\n")
 
 
-    char_to_phones = pipe(CharPhoneTable.select(),
-                          map(lambda e: (e.char, e.xhe)),
-                          groupby(lambda e: e[0]),
-                          valmap(lambda phones: [e[1] for e in phones]),
-                          dict
-                          )
+    char_to_phones = get_char_to_xhe_phones()
     print(f"total {len(char_to_phones)} char phones")
 
-    char_to_shape = pipe(CharShapeTable.select(),
-                         map(lambda e: (e.char, e.shapes)),
-                         reduceby(lambda e: e[0], lambda e1, e2: e1),
-                         valmap(lambda e: e[1]),
-                         dict
-                         )
+    char_to_shape = get_char_to_xhe_shapes()
     print(f"total {len(char_to_shape)} char shapes")
 
     with open(output_dir + "/luyinxing.dict.yaml", 'w', encoding='utf8') as fout:
@@ -203,8 +189,8 @@ if __name__ == "__main__":
         
         fout.write("\n# 单字\n")
 
-        one_hit_char_items = generate_one_hit_char(10000000)
-        top_single_chars_items = generate_topest_char(char_to_phones, 9000000)
+        one_hit_char_items = generate_one_hit_char(0)
+        top_single_chars_items = generate_topest_char(char_to_phones, 0)
         for item in one_hit_char_items.items():
             #fout.write(f"{item[0]}\t{item[1]}\n")
             fout.write(f"{item[0]}\n")
@@ -212,44 +198,29 @@ if __name__ == "__main__":
             #fout.write(f"{item[0]}\t{item[1]}\n")
             fout.write(f"{item[0]}\n")
 
-        pipe(
-            CharPhoneTable.select().order_by(CharPhoneTable.priority.desc()),
-            filter(lambda e: e.char in char_to_shape),
-            #map(lambda e: f"{e.char}\t{e.xhe+char_to_shape[e.char]}\t{e.priority}"),
-            map(lambda e: (f"{e.char}\t{e.xhe}", f"{e.char}\t{e.xhe}{char_to_shape[e.char]}")),
-            for_each(lambda e: fout.write(e[0]+'\n' + e[1] + '\n')),
-        )
+        for item in CharPhoneTable.select().order_by(CharPhoneTable.priority.desc()):
+            if item.char in char_to_shape:
+                fout.write("f{item.char}\t{item.xhe}\n")
+                for shape in char_to_shape[item.char]:
+                    fout.write("f{item.char}\t{item.xhe}{shape}\n")
+            else:
+                fout.write("f{item.char}\t{item.xhe}\n")
 
         fout.write("\n# 词语\n")
 
-        del_words = pipe(
-            DelWordTable.select(),
-            map(lambda e: e.word),
-            set
-        )
-        
-        pipe(
-            WordPhoneTable.select().where(WordPhoneTable.priority >= 1).order_by(fn.LENGTH(WordPhoneTable.word),
-                                             WordPhoneTable.priority.desc()),
-            filter(lambda e: e.word not in del_words),
-            map(lambda e: (f'{e.word}\t{e.xhe}', e.word[0], e.word[-1], e.priority)),
-            filter(lambda e: e[1] in char_to_shape and e[2] in char_to_shape),
-            #map(lambda e: f'{e[0]}{char_to_shape[e[1]][0]}{char_to_shape[e[2]][0]}\t{e[3]}'),
-            map(lambda e: (f'{e[0]}', f'{e[0]}{char_to_shape[e[1]][0]}{char_to_shape[e[2]][0]}')),
-            for_each(lambda e: fout.write(e[0]+'\n' + e[1] + '\n'))
-        )
+        del_words = get_del_words()
 
-
-
-        pass    
-    # with open(f'{output_dir}/sys_eng_data.txt', 'w', encoding='utf8') as fout:
-    #     fout.write("---config@码表分类=主码-3\n")
-    #     fout.write("---config@允许编辑=否\n")
-    #     fout.write(f"---config@码表别名=系统英文\n")
-    #     pipe(EngWordTable.select().where(EngWordTable.priority > 0).order_by(fn.LENGTH(EngWordTable.word), EngWordTable.priority),
-    #          filter(lambda e: is_all_alpha(e.word)),
-    #          map(lambda e: e.word+'\t'+e.word+"#序10000"),
-    #          for_each(lambda e: fout.write(e+'\n')),
-    #          )
-
-    # print('done')
+        for item in  WordPhoneTable.select().where(WordPhoneTable.priority >= 1).order_by(fn.LENGTH(WordPhoneTable.word),
+                                             WordPhoneTable.priority.desc()):
+            if item.word in del_words:
+                continue
+            if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
+                fout.write(f"{item.word}\t{item.xhe}\n")
+                for shape_first in char_to_shape[item.word[0]]:
+                    for shape_last in char_to_shape[item.word[-1]]:
+                        if mode == 'ff':
+                            fout.write(f"{item.word}\t{item.xhe}{shape_first[0]}{shape_last[0]}\n") 
+                        else:
+                            fout.write(f"{item.word}\t{item.xhe}{shape_first[0]}{shape_last[-1]}\n") 
+            else:
+                pass

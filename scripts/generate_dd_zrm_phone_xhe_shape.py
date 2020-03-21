@@ -3,37 +3,31 @@ import os
 import sys
 from pathlib import Path
 from collections import defaultdict
-from tables import CharPhoneTable, CharShapeTable, WordPhoneTable, EngWordTable
-from tables import DelWordTable
+from tables import *
 from peewee import fn
-from toolz.curried import pipe, map, filter, curry, reduceby, valmap, groupby
+from toolz.curried import *
+from common import *
 
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 1:
-        print("USAGE: python3 generate_dd_txt.py ")
+    if len(sys.argv) != 2:
+        print("USAGE: python3 generate_dd_txt.py mode[ff, fb]]")
         sys.exit(1)
 
     fname, output_dir = sys.argv[0], "zrm_phone_xhe_shape"
+    mode = sys.argv[1]
+    if mode not in ['ff', 'fb']:
+        print("USAGE: python3 generate_dd_txt.py mode[ff, fb]]")
+        sys.exit(1)
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
 
-    char_to_shape = pipe(CharShapeTable.select(),
-                         map(lambda e: (e.char, e.shapes)),
-                         reduceby(lambda e: e[0], lambda e1, e2: e1),
-                         valmap(lambda e: e[1]),
-                         dict
-                         )
+    char_to_shape = get_char_to_xhe_shapes()
     print(f"total {len(char_to_shape)} char shapes")
 
-    char_to_phones = pipe(CharPhoneTable.select(),
-                          map(lambda e: (e.char, e.zrm)),
-                          groupby(lambda e: e[0]),
-                          valmap(lambda phones: [e[1] for e in phones]),
-                          dict
-                          )
+    char_to_phones = get_char_to_zrm_phones()
     print(f"total {len(char_to_phones)} char phones")
 
     one_hit_char_items = generate_one_hit_char(60000)
@@ -48,47 +42,57 @@ if __name__ == "__main__":
         for item in top_single_chars_items.items():
             fout.write(f"{item[0]}#序{item[1]}\n")
 
+
     sys_single_char_data = f"{output_dir}/sys_single_char_data.txt"
     with open(sys_single_char_data, 'w', encoding='utf8') as fout:
         fout.write("---config@码表分类=主码-系统码表\n")
         fout.write("---config@允许编辑=否\n")
         fout.write(f"---config@码表别名=系统单字\n")
-        pipe(
-            CharPhoneTable.select().order_by(CharPhoneTable.priority.desc()),
-            filter(lambda e: e.char in char_to_shape),
-            map(
-                lambda e: f"{e.char}\t{e.zrm+char_to_shape[e.char]}#序40000"),
-            for_each(lambda e: fout.write(e+'\n')),
-        )
+        for item in CharPhoneTable.select().order_by(CharPhoneTable.priority.desc()):
+            if item.char in char_to_shape:
+                for shape in char_to_shape[item.char]:
+                    fout.write(f"{item.char}\t{item.zrm+shape}#序40000\n")
+            else:
+                fout.write(f"{item.char}\t{item.zrm}#序40000\n")
 
-    del_words = pipe(
-        DelWordTable.select(),
-        map(lambda e: e.word),
-        set
-    )
+    del_words = get_del_words()
+
     sys_word_data = f"{output_dir}/sys_word_data.txt"
     with open(sys_word_data, 'w', encoding='utf8') as fout:
         fout.write("---config@码表分类=主码-2\n")
         fout.write("---config@允许编辑=否\n")
         fout.write(f"---config@码表别名=系统词组\n")
-        pipe(
-            WordPhoneTable.select().order_by(fn.LENGTH(WordPhoneTable.word),
-                                             WordPhoneTable.priority.desc()),
-            filter(lambda e: e.word not in del_words),
-            map(lambda e: (f'{e.word}\t{e.zrm}', e.word[0], e.word[-1])),
-            filter(lambda e: e[1] in char_to_shape and e[2] in char_to_shape),
-            map(lambda e: f'{e[0]}{char_to_shape[e[1]][0]}{char_to_shape[e[2]][-1]}#序20000'),
-            for_each(lambda e: fout.write(e+'\n'))
-        )
+        for item in WordPhoneTable.select().order_by(fn.LENGTH(WordPhoneTable.word), WordPhoneTable.priority.desc()):
+            if item.word in del_words:
+                continue
+            if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
+                for shape_first in char_to_shape[item.word[0]]:
+                    for shape_last in char_to_shape[item.word[-1]]:
+                        if mode == 'ff':
+                            fout.write(f'{item.word}\t{item.zrm+shape_first[0]+shape_last[0]}#序20000\n')
+                        else:
+                            fout.write(f'{item.word}\t{item.zrm+shape_first[0]+shape_last[-1]}#序20000\n')
+            else:
+                #fout.write(f'{item.word}\t{item.zrm}#序20000\n')
+                pass
+
 
     with open(f'{output_dir}/sys_eng_data.txt', 'w', encoding='utf8') as fout:
         fout.write("---config@码表分类=主码-3\n")
         fout.write("---config@允许编辑=否\n")
         fout.write(f"---config@码表别名=系统英文\n")
-        pipe(EngWordTable.select().where(EngWordTable.priority > 100).order_by(fn.LENGTH(EngWordTable.word), EngWordTable.priority),
+        pipe(EngWordTable.select().where(EngWordTable.priority > 0).order_by(fn.LENGTH(EngWordTable.word), EngWordTable.priority),
              filter(lambda e: is_all_alpha(e.word)),
              map(lambda e: e.word+'\t'+e.word+"#序10000"),
              for_each(lambda e: fout.write(e+'\n')),
              )
 
+    with open(f'{output_dir}/sys_cmd_data.txt', 'w', encoding='utf8') as fout:
+        fout.write("---config@码表分类=主码-4\n")
+        fout.write("---config@允许编辑=否\n")
+        fout.write(f"---config@码表别名=直通车\n")
+        cmds = get_dd_cmds()
+        for cmd in cmds:
+            fout.write(f"{cmd}\n")
+    
     print('done')
