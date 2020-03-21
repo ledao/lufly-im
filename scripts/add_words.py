@@ -13,36 +13,7 @@ from toolz.curried import pipe, map, groupby, filter, keymap, curry, take
 from common import get_full_to_xhe_transformer, get_full_to_zrm_transformmer, get_full_to_lu_transformmer, get_full, word_to_two
 from common import full_to_two
 from pypinyin import lazy_pinyin
-# import attr
 
-
-# @attr.s(frozen=True)
-# class Item(object):
-#     word = attr.ib(type=str,)
-#     priority = attr.ib(type=int, default=1)
-#     phones = attr.ib(type=list, default=list())
-
-
-@curry
-def for_each(proc, eles):
-    if type(eles) is dict:
-        for (k, v) in eles.items():
-            proc(k, v)
-    else:
-        for e in eles:
-            proc(e)
-
-
-# @curry
-# def cols_to_item(cols: List[str])->Item:
-#     if len(cols) == 1:
-#         return Item(word=cols[0])
-#     elif len(cols) == 2:
-#         return Item(word=cols[0], priority=int(cols[1]))
-#     elif len(cols) == 2 + len(cols[0]):
-#         return Item(word=cols[0], priority=cols[1], phones=list(filter(lambda e: len(e) != 0, [e.srtip() for e in cols[2:]])))
-#     else:
-#         raise RuntimeError("cols length not in [1,2]")
 
 @curry
 def cols_to_word_phone_table(cols: List[str], xhe_transformer, zrm_transformer) -> WordPhoneTable:
