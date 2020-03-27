@@ -7,6 +7,9 @@ q群：958293407
 
 from typing import *
 from dataclasses import dataclass
+import json
+import os, sys
+
 
 
 @dataclass 
@@ -17,18 +20,13 @@ class KeyDetail(object):
     location: Tuple[float, float]
 
 
-@dataclass 
-class ShengNum(object):
-    name: str
-    index: int
-    num: int
+@dataclass
+class Draft(object):
+    key_name: str
+    yuns: List[str]
 
 
-@dataclass    
-class YunDetail(object):
-    name: str
-    index: int
-    shengs: List[ShengNum] # 按SHengNum.index由小到大排序
+
 
 
 def load_keys() -> Dict[str, KeyDetail]:
@@ -63,7 +61,83 @@ def load_keys() -> Dict[str, KeyDetail]:
         'M': KeyDetail(name="M", hand="R", from_key="J", location=(7.0, 2.0)),
     }
 
+def load_yun_infos(yun_info_file: str) -> List[Dict]:
+    with open(yun_info_file, 'r', encoding='utf8') as fin:
+        return json.loads(fin.read())
+
+def load_pre_locked_yuns() -> Dict[str, str]:
+    return {
+        "i": "I",
+    }
+    return [
+        Draft(key_name="Q", sheng="q", yuns=[]),
+    ]
+
+def load_pre_locked_neighbors()-> Dict[str, List[str]]:
+    neighbors = [
+        ("uai", "king"), 
+        ("iang", "uang"), 
+        ("ue", "ve"), 
+        ("v", "ui"), 
+        ("ia", "ua"), 
+        ("iong", "uong")
+    ]
+    neighbor_relations = {}
+    for neighbor in neighbors:
+        for index, host in enumerate(neighbor):
+            for i in range(len(neighbor)):
+                if index == i:
+                    continue
+                else:
+                    if host in neighbor_relations:
+                        neighbor_relations[host].append(neighbor[i])
+                    else:
+                        neighbor_relations[host] = [neighbor[i]]
+    return neighbor_relations 
+
+def get_yun_info(yun_name: str, yun_details: List[Dict]) -> Dict:
+    for detail in yun_details:
+        if detail['name'] == yun_name:
+            return detail
+    
+    return None
+
+def get_yun_shengs_info(yun_name: str, neighbors: List[str], yun_details: List[Dict]):
+    yun_info = get_yun_info(yun_name, yun_details)
+    if yun_info is None:
+        print(f'{yun_name} do not have sheng infos. It is a series error, exiting...')
+        sys.exit(1)
+    print(yun_info)
+    neighbors_info = [get_yun_info(e, yun_details) for e in neighbors]
+    if None in neighbors_info:
+        print(f"{neighbors[neighbors_info.find(None)]} do not have shengs. It is a series error, exiting...")
+        sys.exit(1)
+    print(neighbors)
+    #TODO:
+
+
+def generate_drafts(yun_details: List[Dict], manual_yuns: Dict[str, str], neighbors: Dict[str, List[str]]):
+    drafts = []
+    for yun in yun_details:
+        yun_name = yun['name']
+        if yun_name in manual_yuns:
+            print(f"yun: {yun_name} manually selected.")
+            drafts.append(Draft(key_name=manual_yuns[yun_name], yuns=[yun_name]))
+        else:
+            print(f"process yun: {yun_name}")
+            if yun_name in neighbors:
+                print(f"{yun_name} has neighbor: {neighbors[yun_name]}, merge shengs info.")
+                #TODO:
+            print(f'get {yun_name} shengs info') 
+            shengs = get_yun_shengs_info(yun_name, [], yun_details)
+            #TODO:
+            sys.exit(1)
+
+
 
 if __name__ == "__main__":
     keys = load_keys()
-    print(keys)
+    yun_details = load_yun_infos("yun_details.json")
+    manual_yuns = load_pre_locked_yuns()
+    neighbors = load_pre_locked_neighbors()
+    generate_drafts(yun_details, manual_yuns, neighbors)
