@@ -16,11 +16,51 @@ if __name__ == "__main__":
                 char, 
                 full, 
                 priority, 
-                case substr(full, 1, 2) when 'sh' then 'sh' else case substr(full, 1, 2) when "ch" then "ch" else case substr(full, 1, 2) when 'zh' then 'zh' else substr(full, 1, 1) end end end as sheng,
-                case substr(full, 1, 2) when 'sh' then substr(full, 3, 5) else case substr(full, 1, 2) when 'ch' then substr(full, 3, 5) else case substr(full, 1, 2) when 'zh' then substr(full, 3, 5) else substr(full, 2, 5) end end end as yun
+                
+                case substr(full, 1, 2) 
+                when 'sh' then 'sh' 
+                else 
+                    case substr(full, 1, 2) 
+                    when "ch" then "ch" 
+                    else 
+                        case substr(full, 1, 2) 
+                        when 'zh' then 'zh' 
+                        else 
+                            case full
+                            when 'ang' then 'a'
+                            else 
+                                case length(full)
+                                when 1 then full
+                                else substr(full, 1, 1)
+                                end
+                            end 
+                        end 
+                    end 
+                end as sheng,
+                
+                case substr(full, 1, 2) 
+                when 'sh' then substr(full, 3, 5) 
+                else 
+                    case substr(full, 1, 2) 
+                    when 'ch' then substr(full, 3, 5) 
+                    else 
+                        case substr(full, 1, 2) 
+                        when 'zh' then substr(full, 3, 5) 
+                        else 
+                            case full
+                            when 'ang' then 'ang'
+                            else 
+                                case length(full) 
+                                when 1 then full
+                                else substr(full, 2, 5)
+                                end
+                            end 
+                        end 
+                    end
+                end as yun
             from charphonetable)a
         group by a.yun
-        order by yun_priority desc
+        order by yun_priority desc;
     ''')
     ordered_yuns = []
     for e in q_result:
@@ -35,20 +75,59 @@ if __name__ == "__main__":
     for yun in ordered_yuns:
         yun_info = {}
         q_result = cursor.execute(f'''
-            select 
-                a.sheng,
-                sum(a.priority) as sheng_priority
-            from
-                (select 
-                    char, 
-                    full, 
-                    priority, 
-                    case substr(full, 1, 2) when 'sh' then 'sh' else case substr(full, 1, 2) when "ch" then "ch" else case substr(full, 1, 2) when 'zh' then 'zh' else substr(full, 1, 1) end end end as sheng,
-                    case substr(full, 1, 2) when 'sh' then substr(full, 3, 5) else case substr(full, 1, 2) when 'ch' then substr(full, 3, 5) else case substr(full, 1, 2) when 'zh' then substr(full, 3, 5) else substr(full, 2, 5) end end end as yun
+        select 
+            a.sheng,
+            sum(a.priority) as sheng_priority
+        from
+            (select 
+                char, 
+                full, 
+                priority, 
+                case substr(full, 1, 2) 
+                when 'sh' then 'sh' 
+                else 
+                    case substr(full, 1, 2) 
+                    when "ch" then "ch" 
+                    else 
+                        case substr(full, 1, 2) 
+                        when 'zh' then 'zh' 
+                        else 
+                            case full
+                            when 'ang' then 'a'
+                            else 
+                                case length(full)
+                                when 1 then full
+                                else substr(full, 1, 1)
+                                end
+                            end 
+                        end 
+                    end 
+                end as sheng,
+                
+                case substr(full, 1, 2) 
+                when 'sh' then substr(full, 3, 5) 
+                else 
+                    case substr(full, 1, 2) 
+                    when 'ch' then substr(full, 3, 5) 
+                    else 
+                        case substr(full, 1, 2) 
+                        when 'zh' then substr(full, 3, 5) 
+                        else 
+                            case full
+                            when 'ang' then 'ang'
+                            else 
+                                case length(full) 
+                                when 1 then full
+                                else substr(full, 2, 5)
+                                end
+                            end 
+                        end 
+                    end
+                end as yun                   
                 from charphonetable)a
-            where a.yun = '{yun}'
-            group by a.sheng
-            order by sheng_priority desc
+        where a.yun = '{yun}'
+        group by a.sheng
+        order by sheng_priority desc
         ''')
         sheng_infos = []
         for sheng_index, sheng in enumerate(q_result):
