@@ -126,3 +126,6 @@ lufly/sys_data/xiaohe_shapes.txt
 lufly/win-dd/$码表文件/*
 lufly/win-dd/$码表文件/sys_top_chars_data.txt
 zrm_phone_xhe_shape_ff/*
+*.zip
+
+.idea
