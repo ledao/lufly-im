@@ -1,3 +1,4 @@
+from collections import defaultdict
 import sys
 from typing import Tuple, List, Dict, Set
 from toolz.curried import curry, pipe, map, filter, groupby, valmap
@@ -69,46 +70,35 @@ def get_full(word: str) -> List[str]:
 
 
 def get_full_to_xhe_transformer() -> Dict[str, str]:
-    return pipe(FullToTwoTable().select(),
-            map(lambda e: (e.full, e.xhe)),
-            groupby(lambda e: e[0]),
-            itemmap(lambda kv: (kv[0], list(
-                map(lambda e: e[1], kv[1]))[0])),
-            dict
-            )
+    return pipe(
+        FullToTwoTable().select(), map(lambda e: (e.full, e.xhe)),
+        groupby(lambda e: e[0]),
+        itemmap(lambda kv: (kv[0], list(map(lambda e: e[1], kv[1]))[0])), dict)
 
 
 def get_full_to_zrm_transformmer() -> Dict[str, str]:
-    return pipe(FullToTwoTable().select(),
-                map(lambda e: (e.full, e.zrm)),
-                groupby(lambda e: e[0]),
-                itemmap(lambda kv: (kv[0], list(
-                    map(lambda e: e[1], kv[1]))[0])),
-                dict
-                )
+    return pipe(
+        FullToTwoTable().select(), map(lambda e: (e.full, e.zrm)),
+        groupby(lambda e: e[0]),
+        itemmap(lambda kv: (kv[0], list(map(lambda e: e[1], kv[1]))[0])), dict)
 
 
 def get_full_to_lu_transformmer() -> Dict[str, str]:
-    return pipe(FullToTwoTable().select(),
-                map(lambda e: (e.full, e.lu)),
-                groupby(lambda e: e[0]),
-                itemmap(lambda kv: (kv[0], list(
-                    map(lambda e: e[1], kv[1]))[0])),
-                dict
-                )
+    return pipe(
+        FullToTwoTable().select(), map(lambda e: (e.full, e.lu)),
+        groupby(lambda e: e[0]),
+        itemmap(lambda kv: (kv[0], list(map(lambda e: e[1], kv[1]))[0])), dict)
 
 
 def get_xhe_to_full_transformer() -> Dict[str, List[str]]:
-    return pipe(FullToTwoTable.select(),
-                map(lambda e: (e.full, e.two)),
-                groupby(lambda e: e[1]),
-                itemmap(lambda kv: (kv[0], list(
-                    filter(lambda e: e != kv[0], map(lambda e: e[0], kv[1]))))),
-                itemmap(lambda kv: (kv[0], kv[1]
-                                    if len(kv[1]) > 0 else [kv[0]])),
-                valfilter(lambda e: len(e) == 1),
-                dict
-                )
+    return pipe(
+        FullToTwoTable.select(), map(lambda e: (e.full, e.two)),
+        groupby(lambda e: e[1]),
+        itemmap(lambda kv: (
+            kv[0],
+            list(filter(lambda e: e != kv[0], map(lambda e: e[0], kv[1]))))),
+        itemmap(lambda kv: (kv[0], kv[1] if len(kv[1]) > 0 else [kv[0]])),
+        valfilter(lambda e: len(e) == 1), dict)
 
 
 def full_to_two(pinyin: str, transformer: Dict[str, str]) -> str:
@@ -126,24 +116,24 @@ def word_to_two(word: str, transformer: Dict[str, str]) -> str:
 
 def get_char_to_xhe_shapes() -> Dict[str, List[str]]:
     char_to_shape = pipe(CharHeShapeTable.select(),
-                     map(lambda e: (e.char, e.shapes)),
-                     filter(lambda e: e[0] != '' and e[1] != ''),
-                     groupby(lambda e: e[0]),
-                     valmap(lambda e: [s[1] for s in e]),
-                     dict
-                     )
+                         map(lambda e: (e.char, e.shapes)),
+                         filter(lambda e: e[0] != '' and e[1] != ''),
+                         groupby(lambda e: e[0]),
+                         valmap(lambda e: [s[1] for s in e]), dict)
     return char_to_shape
 
 
 def get_char_to_lu_shapes() -> Dict[str, List[str]]:
-    char_to_shape = pipe(CharLuShapeTable.select(),
-                     map(lambda e: (e.char, e.shapes)),
-                     filter(lambda e: e[0] != '' and e[1] != ''),
-                     groupby(lambda e: e[0]),
-                     valmap(lambda e: [s[1] for s in e]),
-                     dict
-                     )
-    return char_to_shape
+    char_to_shapes = defaultdict(list)
+    for item in CharLuShapeTable.select().where(CharLuShapeTable.shapes != "-",
+                                                CharLuShapeTable.shapes != ''):
+        char = item.char
+        shapes = item.shapes
+        if char == '' or shapes == '':
+            continue
+        char_to_shapes[char].append(shapes)
+
+    return char_to_shapes
 
 
 def get_char_to_xhe_phones() -> Dict[str, List[str]]:
@@ -151,9 +141,7 @@ def get_char_to_xhe_phones() -> Dict[str, List[str]]:
                           map(lambda e: (e.char, e.xhe)),
                           filter(lambda e: e[0] != '' and e[1] != ''),
                           groupby(lambda e: e[0]),
-                          valmap(lambda phones: [e[1] for e in phones]),
-                          dict
-                          )
+                          valmap(lambda phones: [e[1] for e in phones]), dict)
     return char_to_phones
 
 
@@ -162,27 +150,44 @@ def get_char_to_zrm_phones() -> Dict[str, List[str]]:
                           map(lambda e: (e.char, e.zrm)),
                           filter(lambda e: e[0] != '' and e[1] != ''),
                           groupby(lambda e: e[0]),
-                          valmap(lambda phones: [e[1] for e in phones]),
-                          dict
-                          )
+                          valmap(lambda phones: [e[1] for e in phones]), dict)
     return char_to_phones
 
 
 def get_del_words() -> Set[str]:
-    del_words = pipe(
-        DelWordTable.select(),
-        map(lambda e: e.word),
-        filter(lambda e: e != ''),
-        set
-    )
+    del_words = pipe(DelWordTable.select(), map(lambda e: e.word),
+                     filter(lambda e: e != ''), set)
     return del_words
 
 
 def generate_one_hit_char(priority):
     items = {
-        "去\tq": priority, "我\tw": priority, "二\te": priority, "人\tr": priority, "他\tt": priority, "一\ty": priority, "是\tu": priority, "出\ti": priority, "哦\to": priority, "平\tp": priority,
-        "啊\ta": priority, "三\ts": priority, "的\td": priority, "非\tf": priority, "个\tg": priority, "和\th": priority, "就\tj": priority, "可\tk": priority, "了\tl": priority,
-        "在\tz": priority, "小\tx": priority, "才\tc": priority, "这\tv": priority, "不\tb": priority, "你\tn": priority, "没\tm": priority,
+        "去\tq": priority,
+        "我\tw": priority,
+        "二\te": priority,
+        "人\tr": priority,
+        "他\tt": priority,
+        "一\ty": priority,
+        "是\tu": priority,
+        "出\ti": priority,
+        "哦\to": priority,
+        "平\tp": priority,
+        "啊\ta": priority,
+        "三\ts": priority,
+        "的\td": priority,
+        "非\tf": priority,
+        "个\tg": priority,
+        "和\th": priority,
+        "就\tj": priority,
+        "可\tk": priority,
+        "了\tl": priority,
+        "在\tz": priority,
+        "小\tx": priority,
+        "才\tc": priority,
+        "这\tv": priority,
+        "不\tb": priority,
+        "你\tn": priority,
+        "没\tm": priority,
     }
     return items
 
@@ -205,7 +210,7 @@ def generate_topest_char(char_to_phones, prioroty):
     return items
 
 
-def is_all_alpha(s: str)->bool:
+def is_all_alpha(s: str) -> bool:
     for e in s:
         if e.lower() in "abcdefghijklmnopqrstuvwxyz":
             continue
@@ -216,66 +221,63 @@ def is_all_alpha(s: str)->bool:
 
 def get_dd_cmds():
     cmds = [
-            '$ddcmd(<date.yyyy>年<date.m>月<date.d>日,[2011年1月1日])\torq',
-            '$ddcmd(<date.z> <time.hh>时<time.mm>分,[星期五 08时05分])\touj',
-            '$ddcmd(run(calc.exe),[计算器])\tojsq',
-            '$ddcmd(<last.1>,★)\tz',
-            '$ddcmd(run(%apppath%\\),[安装目录])\toav',
-            '$ddcmd(<date.yyyy>年<date.m>月<date.d>日,<date.yyyy>年<date.m>月<date.d>日)\torq',
-            '$ddcmd(<date.YYYY>年<date.M>月<date.D>日,<date.YYYY>年<date.M>月<date.D>日)\torq',
-            '$ddcmd(<date.yyyy>-<date.mm>-<date.dd>,<date.yyyy>-<date.mm>-<date.dd>)\torq',
-            '$ddcmd(<date.z> <time.h>:<time.mm>,<date.z> <time.h>:<time.mm>)\touj',
-            '$ddcmd(run(https://www.baidu.com/s?wd=<last.0>),[百度]：<last.0>)\toss',
-            '$ddcmd(run(https://www.zdic.net/hans/?q=<last.1>),[汉典]：<last.1>)\tohd',
-            '$ddcmd(run(http://www.xhup.club/?search_word=<last.1>),[小鹤查形]：<last.1>)\tohd',
-            '$ddcmd(run(cmd.exe),[命令提示行])\tocm',
-            '$ddcmd(run(::{20D04FE0-3AEA-1069-A2D8-08002B30309D}),[我的电脑])\todn',
-            '$ddcmd(run(control.exe),[控制面板])\tokv',
-            '$ddcmd(run(::{450D8FBA-AD25-11D0-98A8-0800361B1103}),[我的文档])\towd',
-            '$ddcmd(run(winword.exe),[word])\towd',
-            '$ddcmd(run(excel.exe),[excel])\toec',
-            '$ddcmd(run(mspaint.exe),[画图])\toht',
-            '$ddcmd(run(notepad.exe),[记事本])\toju',
-            '$ddcmd(keyboard(<32+Alt><78>),[最小化])\tozx',
-            '$ddcmd(keyboard(<83+Shift+Win>),[截屏])\tojp',
-            '$ddcmd(keyboard(<68+Win>),[桌面])\tovm',
-            '$ddcmd(help(keyboardmap.html,600,500),[键盘图])\tojp',
-            '$ddcmd(config(/do anjianshezhi),[按键定义])\toaj',
-            '$ddcmd(config(/do 常用),[常用项])\toiy',
-            '$ddcmd(config(/do 界面),[界面项])\tojm',
-            '$ddcmd(config(/do 码表),[码表项])\tomb',
-            '$ddcmd(config(/do 高级),[高级项])\togj',
-            '$ddcmd(config(/do gaojishezhi),[高级设置])\togj',
-            '$ddcmd(config(/do about),[关于项])\togy',
-            '$ddcmd(set([-IME设置-],嵌入文本内容=嵌入编码),[嵌入编码])\toiq',
-            '$ddcmd(set([-IME设置-],嵌入文本内容=嵌入首选),[嵌入首选])\toiq',
-            '$ddcmd(set([-IME设置-],嵌入文本内容=传统样式),[传统样式])\toiq',
-            '$ddcmd(set([-IME设置-],隐藏候选窗口=切换),[显隐候选窗])\toic',
-            '$ddcmd(set([-SKIN设置-],候选列表排列样式=横排),[横排窗口])\toih',
-            '$ddcmd(set([-SKIN设置-],候选列表排列样式=竖排),[竖排窗口])\toih',
-            '$ddcmd(set([-DME设置-],查询输入只查单字=切换),[万能键查字词切换])\toiz',
-            '$ddcmd(config(/do 输出反查),[反查]：<last.1>)\tofi',
-            '$ddcmd(config(/do 剪贴板反查),[剪贴板反查])\tofi',
-            '$ddcmd(config(/do 在线加词),[在线加词])\tojc',
-            '$ddcmd(convert(中英文标点,切换),[中英文标点切换])\tovy',
-            '$ddcmd(convert(全半角,切换),[全半角切换])\toqb',
-            '$ddcmd(convert(繁体输出,切换),[简繁切换])\tojf',
-            '$ddcmd(keyboard(<35><36+Shift><46>),[删当前行])\toui',
-            '$ddcmd(keyboard(<35><36+Shift><46>),[删当前行])\toiu',
-            '$ddcmd(config(/dict <last.1>),[字典]：<last.1>)\tozd',
-            '$ddcmd(set([-IME设置-],禁用鼠标悬停词典=切换),[候选窗字典开关])\tozd',
-            '$ddcmd(set([-IME设置-],检索次显码表=是),[启用单字全码])\toqm',
-            '$ddcmd(set([-IME设置-],检索次显码表=否),[关闭])\toqm',
-            '$ddcmd(set([-IME设置-],输入方案=主+辅),[启用词语辅助])\tocf',
-            '$ddcmd(set([-IME设置-],输入方案=主),[关闭])\tocf',
-            '$ddcmd(set([-SKIN设置-],使用皮肤名称=切换),[换肤])\tohf',
-            '$ddcmd(set([-SKIN设置-],使用皮肤名称=fw.col),[默认])\tohf',
-            '$ddcmd(keyboard(<173>),[静音开关])\tojy',
-            '$ddcmd(run(https://flypy.com),[小鹤官网])\txhgw',
-            '$ddcmd(run(https://bbs.flypy.com),[小鹤论坛])\txhlt',
-            '$ddcmd(run(http://flypy.ys168.com),[小鹤网盘])\txhwp',
-
-        ]
+        '$ddcmd(<date.yyyy>年<date.m>月<date.d>日,[2011年1月1日])\torq',
+        '$ddcmd(<date.z> <time.hh>时<time.mm>分,[星期五 08时05分])\touj',
+        '$ddcmd(run(calc.exe),[计算器])\tojsq',
+        '$ddcmd(<last.1>,★)\tz',
+        '$ddcmd(run(%apppath%\\),[安装目录])\toav',
+        '$ddcmd(<date.yyyy>年<date.m>月<date.d>日,<date.yyyy>年<date.m>月<date.d>日)\torq',
+        '$ddcmd(<date.YYYY>年<date.M>月<date.D>日,<date.YYYY>年<date.M>月<date.D>日)\torq',
+        '$ddcmd(<date.yyyy>-<date.mm>-<date.dd>,<date.yyyy>-<date.mm>-<date.dd>)\torq',
+        '$ddcmd(<date.z> <time.h>:<time.mm>,<date.z> <time.h>:<time.mm>)\touj',
+        '$ddcmd(run(https://www.baidu.com/s?wd=<last.0>),[百度]：<last.0>)\toss',
+        '$ddcmd(run(https://www.zdic.net/hans/?q=<last.1>),[汉典]：<last.1>)\tohd',
+        '$ddcmd(run(http://www.xhup.club/?search_word=<last.1>),[小鹤查形]：<last.1>)\tohd',
+        '$ddcmd(run(cmd.exe),[命令提示行])\tocm',
+        '$ddcmd(run(::{20D04FE0-3AEA-1069-A2D8-08002B30309D}),[我的电脑])\todn',
+        '$ddcmd(run(control.exe),[控制面板])\tokv',
+        '$ddcmd(run(::{450D8FBA-AD25-11D0-98A8-0800361B1103}),[我的文档])\towd',
+        '$ddcmd(run(winword.exe),[word])\towd',
+        '$ddcmd(run(excel.exe),[excel])\toec',
+        '$ddcmd(run(mspaint.exe),[画图])\toht',
+        '$ddcmd(run(notepad.exe),[记事本])\toju',
+        '$ddcmd(keyboard(<32+Alt><78>),[最小化])\tozx',
+        '$ddcmd(keyboard(<83+Shift+Win>),[截屏])\tojp',
+        '$ddcmd(keyboard(<68+Win>),[桌面])\tovm',
+        '$ddcmd(help(keyboardmap.html,600,500),[键盘图])\tojp',
+        '$ddcmd(config(/do anjianshezhi),[按键定义])\toaj',
+        '$ddcmd(config(/do 常用),[常用项])\toiy',
+        '$ddcmd(config(/do 界面),[界面项])\tojm',
+        '$ddcmd(config(/do 码表),[码表项])\tomb',
+        '$ddcmd(config(/do 高级),[高级项])\togj',
+        '$ddcmd(config(/do gaojishezhi),[高级设置])\togj',
+        '$ddcmd(config(/do about),[关于项])\togy',
+        '$ddcmd(set([-IME设置-],嵌入文本内容=嵌入编码),[嵌入编码])\toiq',
+        '$ddcmd(set([-IME设置-],嵌入文本内容=嵌入首选),[嵌入首选])\toiq',
+        '$ddcmd(set([-IME设置-],嵌入文本内容=传统样式),[传统样式])\toiq',
+        '$ddcmd(set([-IME设置-],隐藏候选窗口=切换),[显隐候选窗])\toic',
+        '$ddcmd(set([-SKIN设置-],候选列表排列样式=横排),[横排窗口])\toih',
+        '$ddcmd(set([-SKIN设置-],候选列表排列样式=竖排),[竖排窗口])\toih',
+        '$ddcmd(set([-DME设置-],查询输入只查单字=切换),[万能键查字词切换])\toiz',
+        '$ddcmd(config(/do 输出反查),[反查]：<last.1>)\tofi',
+        '$ddcmd(config(/do 剪贴板反查),[剪贴板反查])\tofi',
+        '$ddcmd(config(/do 在线加词),[在线加词])\tojc',
+        '$ddcmd(convert(中英文标点,切换),[中英文标点切换])\tovy',
+        '$ddcmd(convert(全半角,切换),[全半角切换])\toqb',
+        '$ddcmd(convert(繁体输出,切换),[简繁切换])\tojf',
+        '$ddcmd(keyboard(<35><36+Shift><46>),[删当前行])\toui',
+        '$ddcmd(keyboard(<35><36+Shift><46>),[删当前行])\toiu',
+        '$ddcmd(config(/dict <last.1>),[字典]：<last.1>)\tozd',
+        '$ddcmd(set([-IME设置-],禁用鼠标悬停词典=切换),[候选窗字典开关])\tozd',
+        '$ddcmd(set([-IME设置-],检索次显码表=是),[启用单字全码])\toqm',
+        '$ddcmd(set([-IME设置-],检索次显码表=否),[关闭])\toqm',
+        '$ddcmd(set([-IME设置-],输入方案=主+辅),[启用词语辅助])\tocf',
+        '$ddcmd(set([-IME设置-],输入方案=主),[关闭])\tocf',
+        '$ddcmd(set([-SKIN设置-],使用皮肤名称=切换),[换肤])\tohf',
+        '$ddcmd(set([-SKIN设置-],使用皮肤名称=fw.col),[默认])\tohf',
+        '$ddcmd(keyboard(<173>),[静音开关])\tojy',
+        '$ddcmd(run(https://flypy.com),[小鹤官网])\txhgw',
+        '$ddcmd(run(https://bbs.flypy.com),[小鹤论坛])\txhlt',
+        '$ddcmd(run(http://flypy.ys168.com),[小鹤网盘])\txhwp',
+    ]
     return cmds
-
-

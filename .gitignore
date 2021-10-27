@@ -118,15 +118,11 @@ lufly/win-dd/*生成结果*/*.exe
 baidu_mobile_ini/
 "lufly/sys_data/*.sqlite
 rime_xhe_ff/
-xhe_phone_lu_shape_ff/
-xhe_phone_xhe_shape_ff/
-zrm_phone_xhe_shape/
 lufly/sys_data/sys_table - 副本.sqlite
-lufly/sys_data/xiaohe_shapes.txt
 lufly/win-dd/$码表文件/*
 lufly/win-dd/$码表文件/sys_top_chars_data.txt
-zrm_phone_xhe_shape_ff/*
 *.zip
 
 .idea
 lufly/win-dd/*/*/*.exe
+lufly/sys_data/sys_table.sqlite-journal
