@@ -113,7 +113,7 @@ WHERE
                 if len(py) == 0:
                     continue
                 if len(py) == 1:
-                    phones.append("o" + py)
+                    phones.append(py + py)
                 else:
                     phones.append(py)
 
