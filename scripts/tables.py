@@ -19,11 +19,12 @@ class CharPhoneTable(BaseModel):
     full = CharField()
     zrm = CharField()
     lu = CharField()
+    bingji = CharField()
     priority = IntegerField()
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
     def __str__(self):
-        return f"<{self.id},{self.char},{self.phones},{self.full},{self.zrm},{self.priority},{self.updatedt}>"
+        return f"<{self.id},{self.char},{self.xhe},{self.full},{self.zrm},{self.lu},{self.bingji},{self.priority},{self.updatedt}>"
 
 
 class CharHeShapeTable(BaseModel):
@@ -68,6 +69,7 @@ class FullToTwoTable(BaseModel):
     xhe = CharField()
     zrm = CharField()
     lu = CharField()
+    bingji = CharField()
 
 
 class CharFreqTable(BaseModel):
