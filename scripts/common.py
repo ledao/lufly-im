@@ -90,6 +90,13 @@ def get_full_to_lu_transformmer() -> Dict[str, str]:
         itemmap(lambda kv: (kv[0], list(map(lambda e: e[1], kv[1]))[0])), dict)
 
 
+def get_full_to_bingji_transformer() -> Dict[str, str]:
+    return pipe(
+        FullToTwoTable().select(), map(lambda e: (e.full, e.bingji)),
+        groupby(lambda e: e[0]),
+        itemmap(lambda kv: (kv[0], list(map(lambda e: e[1], kv[1]))[0])), dict)
+
+
 def get_xhe_to_full_transformer() -> Dict[str, List[str]]:
     return pipe(
         FullToTwoTable.select(), map(lambda e: (e.full, e.two)),
@@ -148,6 +155,15 @@ def get_char_to_xhe_phones() -> Dict[str, List[str]]:
 def get_char_to_zrm_phones() -> Dict[str, List[str]]:
     char_to_phones = pipe(CharPhoneTable.select(),
                           map(lambda e: (e.char, e.zrm)),
+                          filter(lambda e: e[0] != '' and e[1] != ''),
+                          groupby(lambda e: e[0]),
+                          valmap(lambda phones: [e[1] for e in phones]), dict)
+    return char_to_phones
+
+
+def get_char_to_bingji_phones() -> Dict[str, List[str]]:
+    char_to_phones = pipe(CharPhoneTable.select(),
+                          map(lambda e: (e.char, e.bingji)),
                           filter(lambda e: e[0] != '' and e[1] != ''),
                           groupby(lambda e: e[0]),
                           valmap(lambda phones: [e[1] for e in phones]), dict)

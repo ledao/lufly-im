@@ -27,6 +27,7 @@ if __name__ == "__main__":
     print(f"total {len(char_to_phones)} char phones")
 
     global_priority = 999999
+    exist_rules = defaultdict(list)
 
     one_hit_char_items = generate_one_hit_char(60000)
     top_single_chars_items = generate_topest_char(char_to_phones, 60000)
@@ -53,13 +54,22 @@ if __name__ == "__main__":
                 CharPhoneTable.priority.desc()):
             if item.char in char_to_shape:
                 for shape in char_to_shape[item.char]:
-                    #fout.write(f"{item.char}\t{item.xhe+shape}#序40000\n")
-                    fout.write(
-                        f"{item.char}\t{item.xhe+shape}#序{global_priority}\n")
+                    encode = item.xhe + shape
+                    decode = item.char
+                    rule = f"{decode}\t{encode}"
+                    exist_rules[encode].append(rule)
+                    if len(exist_rules[encode]) > 1:
+                        print(exist_rules[encode])
+                    fout.write(f"{rule}#序{global_priority}\n")
                     global_priority -= 1
             else:
-                #fout.write(f"{item.char}\t{item.xhe}#序40000\n")
-                fout.write(f"{item.char}\t{item.xhe}#序{global_priority}\n")
+                encode = item.xhe
+                decode = item.char
+                rule = f"{decode}\t{encode}"
+                exist_rules[encode].append(rule)
+                if len(exist_rules[encode]) > 1:
+                    print(exist_rules[encode])
+                fout.write(f"{rule}#序{global_priority}\n")
                 global_priority -= 1
 
     del_words = get_del_words()
@@ -78,17 +88,26 @@ if __name__ == "__main__":
                 for shape_first in char_to_shape[item.word[0]]:
                     for shape_last in char_to_shape[item.word[-1]]:
                         if mode == 'ff':
-                            fout.write(
-                                #f'{item.word}\t{item.xhe+shape_first[0]+shape_last[0]}#序20000\n'
-                                f'{item.word}\t{item.xhe+shape_first[0]+shape_last[0]}#序{global_priority}\n'
-                            )
-                            global_priority -= 1
+                            encode = item.xhe + shape_first[0] + shape_last[0]
                         else:
-                            fout.write(
-                                #f'{item.word}\t{item.xhe+shape_first[0]+shape_last[-1]}#序20000\n'
-                                f'{item.word}\t{item.xhe+shape_first[0]+shape_last[-1]}#序{global_priority}\n'
-                            )
-                            global_priority -= 1
+                            encode = item.xhe + shape_first[0] + shape_last[-1]
+
+                        decode = item.word
+                        rule = f'{decode}\t{encode}'
+                        exist_rules[encode].append(rule)
+                        if len(exist_rules[encode]) > 1:
+                            print(exist_rules[encode])
+                        fout.write(f'{rule}#序{global_priority}\n')
+
+                        if len(decode) == 4:
+                            encode = ''.join([
+                                e for e in item.xhe
+                            ][::2]) + shape_first[0] + shape_last[0]
+                        rule = f"{decode}\t{encode}"
+                        fout.write(f'{rule}#序{global_priority}\n')
+
+                        global_priority -= 1
+
             else:
                 pass
 
@@ -101,10 +120,15 @@ if __name__ == "__main__":
                     fn.LENGTH(EngWordTable.word), EngWordTable.priority):
             if not is_all_alpha(e.word):
                 continue
-            #item = e.word + '\t' + e.word + f"#序{10000}"
-            item = e.word + '\t' + e.word + f"#序{global_priority}"
-            global_priority -= 1
+            encode = e.word
+            decode = e.word
+            rule = f"{decode}\t{encode}"
+            exist_rules[encode].append(rule)
+            if len(exist_rules[encode]) > 1:
+                print(exist_rules[encode])
+            item = rule + f"#序{global_priority}"
             fout.write(item + "\n")
+            global_priority -= 1
 
     with open(f'{output_dir}/sys_cmd_data.txt', 'w', encoding='utf8') as fout:
         fout.write("---config@码表分类=主码-4\n")
