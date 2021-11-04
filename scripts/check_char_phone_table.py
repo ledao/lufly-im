@@ -36,7 +36,8 @@ def fill_bingji(item: CharPhoneTable,
     if sy[0] not in transformer or sy[1] not in transformer:
         raise RuntimeError(f"{sy} not in transformer")
     s = transformer[sy[0]] if sy[0] != "a" else "a"
-    item.bingji = s + transformer[sy[1]]
+    y = transformer[sy[1]] if sy[0] != "a" else sy[1]
+    item.bingji = s + y
     return item
 
 
