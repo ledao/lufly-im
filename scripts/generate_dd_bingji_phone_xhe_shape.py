@@ -55,11 +55,12 @@ if __name__ == "__main__":
                 for shape in char_to_shape[item.char]:
                     #fout.write(f"{item.char}\t{item.xhe+shape}#序40000\n")
                     fout.write(
-                        f"{item.char}\t{item.xhe+shape}#序{global_priority}\n")
+                        f"{item.char}\t{item.bingji+shape}#序{global_priority}\n"
+                    )
                     global_priority -= 1
             else:
                 #fout.write(f"{item.char}\t{item.xhe}#序40000\n")
-                fout.write(f"{item.char}\t{item.xhe}#序{global_priority}\n")
+                fout.write(f"{item.char}\t{item.bingji}#序{global_priority}\n")
                 global_priority -= 1
 
     #del_words = get_del_words()
