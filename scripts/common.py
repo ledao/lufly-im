@@ -98,7 +98,7 @@ def split_sy_bingji(pinyin: str) -> Tuple[str, str]:
         y = "r"
     elif pinyin == "a":
         s = "a"
-        y = "a"
+        y = "u"
     elif pinyin == "n":
         s = "a"
         y = "e"
