@@ -100,8 +100,8 @@ def split_sy_bingji(pinyin: str) -> Tuple[str, str]:
         s = "a"
         y = "a"
     elif pinyin == "n":
-        s = "e"
-        y = "n"
+        s = "a"
+        y = "e"
     elif pinyin == "o":
         s = "a"
         y = "f"
@@ -177,9 +177,11 @@ def full_to_two(pinyin: str, transformer: Dict[str, str], bingji=False) -> str:
         raise RuntimeError(f"{sy} not in transformer")
     if not bingji:
         s = transformer[sy[0]]
+        y = transformer[sy[1]]
     else:
         s = transformer[sy[0]] if sy[0] != "a" else "a"
-    return f"{s}{transformer[sy[1]]}"
+        y = transformer[sy[1]] if sy[0] != "a" else sy[1]
+    return f"{s}{y}"
 
 
 def word_to_two(word: str, transformer: Dict[str, str], bingji=False) -> str:
