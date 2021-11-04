@@ -86,18 +86,19 @@ if __name__ == "__main__":
     #del to_update_lu_items
     #del full_to_lu_transformer
 
-    #print("check bingji")
-    #full_to_bingji_transformer = get_full_to_bingji_transformer()
-    #to_update_bingji_items = pipe(
-    #    WordPhoneTable.select().where(WordPhoneTable.bingji == ""),
-    #    map(lambda e: (e, word_to_two(e.word, full_to_bingji_transformer))),
-    #    map(lambda e: fill_bingji(e[0], e[1])),
-    #)
-    #with db.atomic():
-    #    WordPhoneTable.bulk_update(to_update_bingji_items,
-    #                               fields=['bingji'],
-    #                               batch_size=100)
-    #del to_update_bingji_items
-    #del full_to_bingji_transformer
+    print("check bingji")
+    full_to_bingji_transformer = get_full_to_bingji_transformer()
+    to_update_bingji_items = pipe(
+        WordPhoneTable.select().where(WordPhoneTable.bingji == ""),
+        map(lambda e:
+            (e, word_to_two(e.word, full_to_bingji_transformer, bingji=True))),
+        map(lambda e: fill_bingji(e[0], e[1])),
+    )
+    with db.atomic():
+        WordPhoneTable.bulk_update(to_update_bingji_items,
+                                   fields=['bingji'],
+                                   batch_size=100)
+    del to_update_bingji_items
+    del full_to_bingji_transformer
 
     print("done")

@@ -59,6 +59,64 @@ def split_sy(pinyin: str) -> Tuple[str, str]:
     return (s, y)
 
 
+def split_sy_bingji(pinyin: str) -> Tuple[str, str]:
+    if pinyin == "sh":
+        s = "sh"
+        y = "i"
+    elif pinyin.startswith("zh"):
+        s = "zh"
+        y = pinyin[2:]
+    elif pinyin.startswith("ch"):
+        s = "ch"
+        y = pinyin[2:]
+    elif pinyin.startswith("sh"):
+        s = "sh"
+        y = pinyin[2:]
+    elif pinyin == "ai":
+        s = "a"
+        y = "x"
+    elif pinyin == "an":
+        s = "a"
+        y = "g"
+    elif pinyin == "ao":
+        s = "a"
+        y = "h"
+    elif pinyin == "e":
+        s = "a"
+        y = "d"
+    elif pinyin == "ei":
+        s = "a"
+        y = "m"
+    elif pinyin == "en":
+        s = "a"
+        y = "e"
+    elif pinyin == "eng":
+        s = "a"
+        y = "i"
+    elif pinyin == "er":
+        s = "a"
+        y = "r"
+    elif pinyin == "a":
+        s = "a"
+        y = "a"
+    elif pinyin == "n":
+        s = "e"
+        y = "n"
+    elif pinyin == "o":
+        s = "a"
+        y = "f"
+    elif pinyin == "ou":
+        s = "a"
+        y = "w"
+    elif pinyin == "ang":
+        s = "a"
+        y = "b"
+    else:
+        s = pinyin[0]
+        y = pinyin[1:]
+    return (s, y)
+
+
 def get_full(word: str) -> List[str]:
     fulls = []
     for full in lazy_pinyin(word):
@@ -108,17 +166,25 @@ def get_xhe_to_full_transformer() -> Dict[str, List[str]]:
         valfilter(lambda e: len(e) == 1), dict)
 
 
-def full_to_two(pinyin: str, transformer: Dict[str, str]) -> str:
-    sy = split_sy(pinyin)
+def full_to_two(pinyin: str, transformer: Dict[str, str], bingji=False) -> str:
+    if not bingji:
+        sy = split_sy(pinyin)
+    else:
+        sy = split_sy_bingji(pinyin)
     if len(sy) != 2:
         raise RuntimeError(f"{sy} length != 2")
     if sy[0] not in transformer or sy[1] not in transformer:
         raise RuntimeError(f"{sy} not in transformer")
-    return f"{transformer[sy[0]]}{transformer[sy[1]]}"
+    if not bingji:
+        s = transformer[sy[0]]
+    else:
+        s = transformer[sy[0]] if sy[0] != "a" else "a"
+    return f"{s}{transformer[sy[1]]}"
 
 
-def word_to_two(word: str, transformer: Dict[str, str]) -> str:
-    return ''.join([full_to_two(e, transformer) for e in get_full(word)])
+def word_to_two(word: str, transformer: Dict[str, str], bingji=False) -> str:
+    return ''.join(
+        [full_to_two(e, transformer, bingji) for e in get_full(word)])
 
 
 def get_char_to_xhe_shapes() -> Dict[str, List[str]]:
