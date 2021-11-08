@@ -53,59 +53,55 @@ if __name__ == "__main__":
                 CharPhoneTable.priority.desc()):
             if item.char in char_to_shape:
                 for shape in char_to_shape[item.char]:
-                    #fout.write(f"{item.char}\t{item.xhe+shape}#序40000\n")
                     fout.write(
                         f"{item.char}\t{item.bingji+shape}#序{global_priority}\n"
                     )
                     global_priority -= 1
             else:
-                #fout.write(f"{item.char}\t{item.xhe}#序40000\n")
                 fout.write(f"{item.char}\t{item.bingji}#序{global_priority}\n")
                 global_priority -= 1
 
-    #del_words = get_del_words()
+    del_words = get_del_words()
 
-    #sys_word_data = f"{output_dir}/sys_word_data.txt"
-    #with open(sys_word_data, 'w', encoding='utf8') as fout:
-    #    fout.write("---config@码表分类=主码-2\n")
-    #    fout.write("---config@允许编辑=否\n")
-    #    fout.write(f"---config@码表别名=系统词组\n")
-    #    for item in WordPhoneTable.select().order_by(
-    #            fn.LENGTH(WordPhoneTable.word),
-    #            WordPhoneTable.priority.desc()):
-    #        if item.word in del_words:
-    #            continue
-    #        if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
-    #            for shape_first in char_to_shape[item.word[0]]:
-    #                for shape_last in char_to_shape[item.word[-1]]:
-    #                    if mode == 'ff':
-    #                        fout.write(
-    #                            #f'{item.word}\t{item.xhe+shape_first[0]+shape_last[0]}#序20000\n'
-    #                            f'{item.word}\t{item.xhe+shape_first[0]+shape_last[0]}#序{global_priority}\n'
-    #                        )
-    #                        global_priority -= 1
-    #                    else:
-    #                        fout.write(
-    #                            #f'{item.word}\t{item.xhe+shape_first[0]+shape_last[-1]}#序20000\n'
-    #                            f'{item.word}\t{item.xhe+shape_first[0]+shape_last[-1]}#序{global_priority}\n'
-    #                        )
-    #                        global_priority -= 1
-    #        else:
-    #            pass
+    sys_word_data = f"{output_dir}/sys_word_data.txt"
+    with open(sys_word_data, 'w', encoding='utf8') as fout:
+        fout.write("---config@码表分类=主码-2\n")
+        fout.write("---config@允许编辑=否\n")
+        fout.write(f"---config@码表别名=系统词组\n")
+        for item in WordPhoneTable.select().order_by(
+                fn.LENGTH(WordPhoneTable.word),
+                WordPhoneTable.priority.desc()):
+            if item.word in del_words:
+                continue
+            if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
+                for shape_first in char_to_shape[item.word[0]]:
+                    for shape_last in char_to_shape[item.word[-1]]:
+                        if mode == 'ff':
+                            fout.write(
+                                f'{item.word}\t{item.bingji+shape_first[0]+shape_last[0]}#序{global_priority}\n'
+                            )
+                            global_priority -= 1
+                        else:
+                            fout.write(
+                                f'{item.word}\t{item.bingji+shape_first[0]+shape_last[-1]}#序{global_priority}\n'
+                            )
+                            global_priority -= 1
+            else:
+                pass
 
-    #with open(f'{output_dir}/sys_eng_data.txt', 'w', encoding='utf8') as fout:
-    #    fout.write("---config@码表分类=主码-3\n")
-    #    fout.write("---config@允许编辑=否\n")
-    #    fout.write(f"---config@码表别名=系统英文\n")
-    #    for e in EngWordTable.select().where(
-    #            EngWordTable.priority > 0).order_by(
-    #                fn.LENGTH(EngWordTable.word), EngWordTable.priority):
-    #        if not is_all_alpha(e.word):
-    #            continue
-    #        #item = e.word + '\t' + e.word + f"#序{10000}"
-    #        item = e.word + '\t' + e.word + f"#序{global_priority}"
-    #        global_priority -= 1
-    #        fout.write(item + "\n")
+    with open(f'{output_dir}/sys_eng_data.txt', 'w', encoding='utf8') as fout:
+        fout.write("---config@码表分类=主码-3\n")
+        fout.write("---config@允许编辑=否\n")
+        fout.write(f"---config@码表别名=系统英文\n")
+        for e in EngWordTable.select().where(
+                EngWordTable.priority > 0).order_by(
+                    fn.LENGTH(EngWordTable.word), EngWordTable.priority):
+            if not is_all_alpha(e.word):
+                continue
+            #item = e.word + '\t' + e.word + f"#序{10000}"
+            item = e.word + '\t' + e.word + f"#序{global_priority}"
+            global_priority -= 1
+            fout.write(item + "\n")
 
     with open(f'{output_dir}/sys_cmd_data.txt', 'w', encoding='utf8') as fout:
         fout.write("---config@码表分类=主码-4\n")
