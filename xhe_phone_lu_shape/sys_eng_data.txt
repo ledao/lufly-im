@@ -1,0 +1,13 @@
+---config@码表分类=主码-3
+---config@允许编辑=否
+---config@码表别名=系统英文
+nba	nba#序506521
+webo	webo#序506520
+kaldi	kaldi#序506519
+apple	apple#序506518
+wechat	wechat#序506517
+vscode	vscode#序506516
+iphone	iphone#序506515
+webank	webank#序506514
+intellij	intellij#序506513
+microsoft	microsoft#序506512
