@@ -55,6 +55,8 @@ if __name__ == "__main__":
                 for shape in char_to_shape[item.char]:
                     if shape in exist_shapes:
                         continue
+                    exist_shapes.add(shape)
+
                     encode = item.xhe + shape
                     decode = item.char
                     rule = f"{decode}\t{encode}"
@@ -86,18 +88,23 @@ if __name__ == "__main__":
         fout.write("---config@码表分类=主码-2\n")
         fout.write("---config@允许编辑=否\n")
         fout.write(f"---config@码表别名=系统词组\n")
+        exist_word_phones = set()
         for item in WordPhoneTable.select().order_by(
                 fn.LENGTH(WordPhoneTable.word),
                 WordPhoneTable.priority.desc()):
             if item.word in del_words:
                 continue
+            if item.word + ":" + item.xhe in exist_word_phones:
+                continue
+            exist_word_phones.add(item.word + ":" + item.xhe)
             if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
                 exist_shapes = set()
                 for shape_first in char_to_shape[item.word[0]]:
                     for shape_last in char_to_shape[item.word[-1]]:
-                        shapes = shape_first + ':' + shape_last
-                        if shapes in exist_shapes:
+                        shape = shape_first[0] + ':' + shape_last[0]
+                        if shape in exist_shapes:
                             continue
+                        exist_shapes.add(shape)
                         encode = item.xhe + shape_first[0] + shape_last[0]
 
                         decode = item.word
@@ -106,6 +113,7 @@ if __name__ == "__main__":
                         position_symbol = ''
                         if len(exist_rules[encode]) > 1:
                             print(exist_rules[encode])
+                            continue
                             if len(exist_rules[encode]) < 7:
                                 position_symbol = position_symbols[len(
                                     exist_rules[encode])]
