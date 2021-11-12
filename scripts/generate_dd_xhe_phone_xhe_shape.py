@@ -10,12 +10,11 @@ from tables import *
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 2 or sys.argv[1] not in ['ff', 'fb']:
-        print(f"USAGE: python3 {sys.argv[0]}  mode[ff, fb]")
+    if len(sys.argv) != 1:
+        print(f"USAGE: python3 {sys.argv[0]}")
         sys.exit(1)
 
-    mode = sys.argv[1]
-    fname, output_dir = sys.argv[0], "xhe_phone_xhe_shape_" + mode
+    fname, output_dir = sys.argv[0], "xhe_phone_xhe_shape"
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
@@ -36,11 +35,9 @@ if __name__ == "__main__":
         fout.write("---config@允许编辑=否\n")
         fout.write(f"---config@码表别名=简码单字\n")
         for item in one_hit_char_items.items():
-            #fout.write(f"{item[0]}#序{item[1]}\n")
             fout.write(f"{item[0]}#序{global_priority}\n")
             global_priority -= 1
         for item in top_single_chars_items.items():
-            #fout.write(f"{item[0]}#序{item[1]}\n")
             fout.write(f"{item[0]}#序{global_priority}\n")
             global_priority -= 1
 
@@ -52,13 +49,15 @@ if __name__ == "__main__":
         for item in CharPhoneTable.select().order_by(
                 CharPhoneTable.priority.desc()):
             if item.char in char_to_shape:
+                exist_shapes = set()
                 for shape in char_to_shape[item.char]:
-                    #fout.write(f"{item.char}\t{item.xhe+shape}#序40000\n")
+                    if shape in exist_shapes:
+                        continue
+                    exist_shapes.add(shape)
                     fout.write(
                         f"{item.char}\t{item.xhe+shape}#序{global_priority}\n")
                     global_priority -= 1
             else:
-                #fout.write(f"{item.char}\t{item.xhe}#序40000\n")
                 fout.write(f"{item.char}\t{item.xhe}#序{global_priority}\n")
                 global_priority -= 1
 
@@ -69,26 +68,27 @@ if __name__ == "__main__":
         fout.write("---config@码表分类=主码-2\n")
         fout.write("---config@允许编辑=否\n")
         fout.write(f"---config@码表别名=系统词组\n")
+        exist_encodes = set()
         for item in WordPhoneTable.select().order_by(
                 fn.LENGTH(WordPhoneTable.word),
                 WordPhoneTable.priority.desc()):
             if item.word in del_words:
                 continue
             if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
+                exist_shapes = set()
                 for shape_first in char_to_shape[item.word[0]]:
                     for shape_last in char_to_shape[item.word[-1]]:
-                        if mode == 'ff':
-                            fout.write(
-                                #f'{item.word}\t{item.xhe+shape_first[0]+shape_last[0]}#序20000\n'
-                                f'{item.word}\t{item.xhe+shape_first[0]+shape_last[0]}#序{global_priority}\n'
-                            )
-                            global_priority -= 1
-                        else:
-                            fout.write(
-                                #f'{item.word}\t{item.xhe+shape_first[0]+shape_last[-1]}#序20000\n'
-                                f'{item.word}\t{item.xhe+shape_first[0]+shape_last[-1]}#序{global_priority}\n'
-                            )
-                            global_priority -= 1
+                        shape = shape_first[0] + ":" + shape_last[0]
+                        if shape in exist_shapes:
+                            continue
+                        exist_shapes.add(shape)
+                        encode = item.xhe + shape_first[0] + shape_last[0]
+                        decode = item.word
+                        if encode in exist_encodes:
+                            continue
+                        exist_encodes.add(encode)
+                        fout.write(f'{decode}\t{encode}#序{global_priority}\n')
+                        global_priority -= 1
             else:
                 pass
 
