@@ -76,7 +76,7 @@ class FullToTwoTable(BaseModel):
 class CharFreqTable(BaseModel):
     id = IntegerField(primary_key=True)
     char = CharField()
-    freq = CharField()
+    freq = IntegerField()
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
 
