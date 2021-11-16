@@ -51,34 +51,36 @@ if __name__ == "__main__":
         for item in CharPhoneTable.select().order_by(
                 CharPhoneTable.priority.desc()):
             if item.char in char_to_shape:
-                exist_shapes = set()
+                used_shapes = set()
                 for shape in char_to_shape[item.char]:
-                    if shape in exist_shapes:
+                    if shape in used_shapes:
                         continue
-                    exist_shapes.add(shape)
+                    used_shapes.add(shape)
 
                     encode = item.xhe + shape
                     decode = item.char
-                    rule = f"{decode}\t{encode}"
-                    exist_rules[encode].append(rule)
                     position_symbol = ''
-                    if len(exist_rules[encode]) > 1:
-                        print(exist_rules[encode])
+                    if encode in exist_rules:
                         position_symbol = position_symbols[len(
                             exist_rules[encode])]
-                    fout.write(f"{rule}{position_symbol}#序{global_priority}\n")
+                    rule = f"{decode}\t{encode}{position_symbol}"
+                    exist_rules[encode].append(rule)
+                    if len(exist_rules[encode]) > 1:
+                        print(exist_rules[encode])
+                    fout.write(f"{rule}#序{global_priority}\n")
                     global_priority -= 1
             else:
                 encode = item.xhe
                 decode = item.char
-                rule = f"{decode}\t{encode}"
-                exist_rules[encode].append(rule)
                 position_symbol = ''
-                if len(exist_rules[encode]) > 1:
-                    print(exist_rules[encode])
+                if encode in exist_rules:
                     position_symbol = position_symbols[len(
                         exist_rules[encode])]
-                fout.write(f"{rule}{position_symbol}#序{global_priority}\n")
+                rule = f"{decode}\t{encode}{position_symbol}"
+                exist_rules[encode].append(rule)
+                if len(exist_rules[encode]) > 1:
+                    print(exist_rules[encode])
+                fout.write(f"{rule}#序{global_priority}\n")
                 global_priority -= 1
 
     del_words = get_del_words()
@@ -98,39 +100,25 @@ if __name__ == "__main__":
                 continue
             exist_word_phones.add(item.word + ":" + item.xhe)
             if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
-                exist_shapes = set()
+                used_shapes = set()
                 for shape_first in char_to_shape[item.word[0]]:
                     for shape_last in char_to_shape[item.word[-1]]:
                         shape = shape_first[0] + ':' + shape_last[0]
-                        if shape in exist_shapes:
+                        if shape in used_shapes:
                             continue
-                        exist_shapes.add(shape)
-                        encode = item.xhe + shape_first[0] + shape_last[0]
+                        used_shapes.add(shape)
 
+                        encode = item.xhe + shape_first[0] + shape_last[0]
                         decode = item.word
-                        rule = f'{decode}\t{encode}'
-                        exist_rules[encode].append(rule)
                         position_symbol = ''
                         if len(exist_rules[encode]) > 1:
-                            print(exist_rules[encode])
+                            position_symbol = position_symbols[len(
+                                exist_rules[encode])]
                             continue
-                            if len(exist_rules[encode]) < 7:
-                                position_symbol = position_symbols[len(
-                                    exist_rules[encode])]
-                        fout.write(
-                            f'{rule}{position_symbol}#序{global_priority}\n')
+                        rule = f'{decode}\t{encode}{position_symbol}'
+                        exist_rules[encode].append(rule)
+                        fout.write(f'{rule}#序{global_priority}\n')
                         global_priority -= 1
-
-                        # if len(decode) == 4:
-                        #     encode = ''.join([
-                        #         e for e in item.xhe
-                        #     ][::2]) + shape_first[0] + shape_last[0]
-                        #     rule = f"{decode}\t{encode}"
-                        #     fout.write(f'{rule}#序{global_priority}\n')
-                        #     global_priority -= 1
-
-            else:
-                pass
 
     with open(f'{output_dir}/sys_eng_data.txt', 'w', encoding='utf8') as fout:
         fout.write("---config@码表分类=主码-3\n")
