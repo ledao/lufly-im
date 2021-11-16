@@ -61,7 +61,7 @@ class WordPhoneTable(BaseModel):
     bingji = CharField()
 
     def __str__(self):
-        return f"<{self.id},{self.word},{self.full},{self.xhe},{self.zrm},{self.lu},{self.priority},{self.updatedt}>"
+        return f"<{self.id},{self.word},{self.full},{self.xhe},{self.zrm},{self.lu},{self.priority},{self.updatedt},{self.bingji}>"
 
 
 class FullToTwoTable(BaseModel):
