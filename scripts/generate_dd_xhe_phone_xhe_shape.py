@@ -49,11 +49,11 @@ if __name__ == "__main__":
         for item in CharPhoneTable.select().order_by(
                 CharPhoneTable.priority.desc()):
             if item.char in char_to_shape:
-                exist_shapes = set()
+                used_shapes = set()
                 for shape in char_to_shape[item.char]:
-                    if shape in exist_shapes:
+                    if shape in used_shapes:
                         continue
-                    exist_shapes.add(shape)
+                    used_shapes.add(shape)
                     fout.write(
                         f"{item.char}\t{item.xhe+shape}#序{global_priority}\n")
                     global_priority -= 1
@@ -75,13 +75,13 @@ if __name__ == "__main__":
             if item.word in del_words:
                 continue
             if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
-                exist_shapes = set()
+                used_shapes = set()
                 for shape_first in char_to_shape[item.word[0]]:
                     for shape_last in char_to_shape[item.word[-1]]:
                         shape = shape_first[0] + ":" + shape_last[0]
-                        if shape in exist_shapes:
+                        if shape in used_shapes:
                             continue
-                        exist_shapes.add(shape)
+                        used_shapes.add(shape)
                         encode = item.xhe + shape_first[0] + shape_last[0]
                         decode = item.word
                         if encode in exist_encodes:

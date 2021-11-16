@@ -13,20 +13,21 @@ def mean(lst: List[int]) -> int:
 
 
 def get_priority(lst: List[int]) -> int:
-    weights = {
-        2: (0.8, 0.2),
-        3: (0.7, 0.2, 0.1),
-        4: (0.7, 0.1, 0.1, 0.1),
-        5: (0.6, 0.1, 0.1, 0.1, 0.1),
-    }
-    size = len(lst)
-    if size not in (2, 3, 4, 5):
-        raise (f"only 2, 3, 4, 5 length words supported")
-    priority = 0
-    for i in range(size):
-        priority += int(weights[size][i] * lst[i])
+    #weights = {
+    #    2: (0.8, 0.2),
+    #    3: (0.7, 0.2, 0.1),
+    #    4: (0.7, 0.1, 0.1, 0.1),
+    #    5: (0.6, 0.1, 0.1, 0.1, 0.1),
+    #}
+    #size = len(lst)
+    #if size not in (2, 3, 4, 5):
+    #    raise (f"only 2, 3, 4, 5 length words supported")
+    #priority = 0
+    #for i in range(size):
+    #    priority += int(weights[size][i] * lst[i])
+    #return priority
 
-    return priority
+    return min(lst)
 
 
 if __name__ == "__main__":
