@@ -10,17 +10,17 @@ from tables import db, CharPhoneTable, CharHeShapeTable, WordPhoneTable
 from tables import DelWordTable
 from peewee import fn
 from toolz.curried import pipe, map, groupby, filter, keymap, curry, take
-from common import get_full_to_xhe_transformer, get_full_to_zrm_transformmer, get_full_to_lu_transformmer, get_full, word_to_two
+from common import get_full_to_bingji_transformer, get_full_to_xhe_transformer, get_full_to_zrm_transformmer, get_full_to_lu_transformmer, get_full, word_to_two
 from common import full_to_two
 from pypinyin import lazy_pinyin
 
 
 @curry
-def cols_to_word_phone_table(cols: List[str], xhe_transformer,
-                             zrm_transformer) -> WordPhoneTable:
+def cols_to_word_phone_table(cols: List[str], xhe_transformer, zrm_transformer,
+                             bingji_transformer) -> WordPhoneTable:
     if len(cols) == 1:
         word = cols[0]
-        priority = 1
+        priority = 10
         full = get_full(word)
     elif len(cols) == 2:
         word = cols[0]
@@ -34,14 +34,18 @@ def cols_to_word_phone_table(cols: List[str], xhe_transformer,
     else:
         raise RuntimeError("word item should be: 你好 [priority ni hao]")
 
-    return WordPhoneTable(
+    item = WordPhoneTable(
         word=word,
         full=''.join(full),
         xhe=''.join([full_to_two(e, xhe_transformer) for e in full]),
         zrm=''.join([full_to_two(e, zrm_transformer) for e in full]),
         lu="",
         priority=priority,
-        updatedt=datetime.now())
+        updatedt=datetime.now(),
+        bingji=''.join(
+            full_to_two(e, bingji_transformer, bingji=True) for e in full))
+    print("add ", item)
+    return item
 
 
 def contain_alpha(word: str) -> bool:
@@ -78,6 +82,7 @@ if __name__ == "__main__":
     xhe_transformer = get_full_to_xhe_transformer()
     zrm_transformer = get_full_to_zrm_transformmer()
     lu_transformer = get_full_to_lu_transformmer()
+    bingji_transformer = get_full_to_bingji_transformer()
 
     with open(words_path, "r", encoding='utf8') as fin:
         to_add_words = pipe(
@@ -88,8 +93,8 @@ if __name__ == "__main__":
             filter(lambda e: not contain_alpha(e[0]) and not contain_symbols(e[
                 0])),
             filter(lambda e: e[0] not in exist_words),
-            map(lambda e: cols_to_word_phone_table(e, xhe_transformer,
-                                                   zrm_transformer)))
+            map(lambda e: cols_to_word_phone_table(
+                e, xhe_transformer, zrm_transformer, bingji_transformer)))
 
         # print(to_add_words[:100])
         with db.atomic():
