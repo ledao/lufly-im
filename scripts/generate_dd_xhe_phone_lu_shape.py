@@ -65,7 +65,7 @@ if __name__ == "__main__":
                         position_symbol = position_symbols[len(
                             exist_rules[encode])]
                     rule = f"{decode}\t{encode}{position_symbol}"
-                    exist_rules[encode].append(rule)
+                    exist_rules[encode].append(rule.replace("\t", ":"))
                     if len(exist_rules[encode]) > 1:
                         print(exist_rules[encode])
                     fout.write(f"{rule}#序{global_priority}\n")
@@ -78,7 +78,7 @@ if __name__ == "__main__":
                     position_symbol = position_symbols[len(
                         exist_rules[encode])]
                 rule = f"{decode}\t{encode}{position_symbol}"
-                exist_rules[encode].append(rule)
+                exist_rules[encode].append(rule.replace("\t", ":"))
                 if len(exist_rules[encode]) > 1:
                     print(exist_rules[encode])
                 fout.write(f"{rule}#序{global_priority}\n")
@@ -115,9 +115,10 @@ if __name__ == "__main__":
                         if len(exist_rules[encode]) > 1:
                             position_symbol = position_symbols[len(
                                 exist_rules[encode])]
-                            continue
                         rule = f'{decode}\t{encode}{position_symbol}'
-                        exist_rules[encode].append(rule)
+                        exist_rules[encode].append(rule.replace("\t", ":"))
+                        if len(exist_rules[encode]) > 1:
+                            print(exist_rules[encode])
                         fout.write(f'{rule}#序{global_priority}\n')
                         global_priority -= 1
 
