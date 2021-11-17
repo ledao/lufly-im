@@ -7,6 +7,7 @@ from common import *
 from peewee import fn
 from toolz.curried import *
 from tables import *
+import shutil
 
 if __name__ == "__main__":
 
@@ -147,4 +148,8 @@ if __name__ == "__main__":
         for cmd in cmds:
             fout.write(f"{cmd}\n")
 
+    dd_dir = 'lufly/win-dd/lufly-im-v4/$码表文件/'
+    if os.path.exists(dd_dir):
+        shutil.rmtree(dd_dir)
+    shutil.copytree(output_dir, dd_dir)
     print('done')

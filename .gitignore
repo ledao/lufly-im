@@ -127,3 +127,4 @@ lufly/win-dd/$码表文件/sys_top_chars_data.txt
 lufly/win-dd/*/*/*.exe
 lufly/sys_data/sys_table.sqlite-journal
 duplicated.txt
+to_add_words.txt
