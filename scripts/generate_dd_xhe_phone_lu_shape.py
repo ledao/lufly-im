@@ -112,10 +112,11 @@ if __name__ == "__main__":
                         encode = item.xhe + shape_first[0] + shape_last[0]
                         decode = item.word
                         position_symbol = ''
-                        if len(exist_rules[encode]) > 1:
+                        if encode in exist_rules:
                             position_symbol = position_symbols[len(
                                 exist_rules[encode])]
-                        rule = f'{decode}\t{encode}{position_symbol}'
+                        ##rule = f'{decode}\t{encode}{position_symbol}'
+                        rule = f'{decode}\t{encode}'
                         exist_rules[encode].append(rule.replace("\t", ":"))
                         if len(exist_rules[encode]) > 1:
                             print(exist_rules[encode])
