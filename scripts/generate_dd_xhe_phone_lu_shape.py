@@ -38,10 +38,12 @@ if __name__ == "__main__":
         fout.write("---config@允许编辑=否\n")
         fout.write(f"---config@码表别名=简码单字\n")
         for item in one_hit_char_items.items():
-            fout.write(f"{item[0]}#序{global_priority}\n")
+            #fout.write(f"{item[0]}#序{global_priority}\n")
+            fout.write(f"{item[0]}#序{9000}\n")
             global_priority -= 1
         for item in top_single_chars_items.items():
-            fout.write(f"{item[0]}#序{global_priority}\n")
+            #fout.write(f"{item[0]}#序{global_priority}\n")
+            fout.write(f"{item[0]}#序{8000}\n")
             global_priority -= 1
 
     sys_single_char_data = f"{output_dir}/sys_single_char_data.txt"
@@ -68,7 +70,8 @@ if __name__ == "__main__":
                     exist_rules[encode].append(rule.replace("\t", ":"))
                     if len(exist_rules[encode]) > 1:
                         print(exist_rules[encode])
-                    fout.write(f"{rule}#序{global_priority}\n")
+                    #fout.write(f"{rule}#序{global_priority}\n")
+                    fout.write(f"{rule}#序{7000}\n")
                     global_priority -= 1
             else:
                 encode = item.xhe
@@ -81,7 +84,8 @@ if __name__ == "__main__":
                 exist_rules[encode].append(rule.replace("\t", ":"))
                 if len(exist_rules[encode]) > 1:
                     print(exist_rules[encode])
-                fout.write(f"{rule}#序{global_priority}\n")
+                #fout.write(f"{rule}#序{global_priority}\n")
+                fout.write(f"{rule}#序{7000}\n")
                 global_priority -= 1
 
     del_words = get_del_words()
@@ -120,7 +124,8 @@ if __name__ == "__main__":
                         exist_rules[encode].append(rule.replace("\t", ":"))
                         if len(exist_rules[encode]) > 1:
                             print(exist_rules[encode])
-                        fout.write(f'{rule}#序{global_priority}\n')
+                        #fout.write(f'{rule}#序{global_priority}\n')
+                        fout.write(f'{rule}#序{6000}\n')
                         global_priority -= 1
 
     with open(f'{output_dir}/sys_eng_data.txt', 'w', encoding='utf8') as fout:
@@ -138,7 +143,8 @@ if __name__ == "__main__":
             exist_rules[encode].append(rule)
             if len(exist_rules[encode]) > 1:
                 print(exist_rules[encode])
-            item = rule + f"#序{global_priority}"
+            #item = rule + f"#序{global_priority}"
+            item = rule + f"#序{5000}"
             fout.write(item + "\n")
             global_priority -= 1
 
