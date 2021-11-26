@@ -1,4 +1,5 @@
 import os
+import datetime
 from pathlib import Path
 from peewee import SqliteDatabase, Model, CharField, IntegerField, DateTimeField
 
@@ -101,6 +102,18 @@ class YeFengWordTable(BaseModel):
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
 
+class SimplerTable(BaseModel):
+    id = IntegerField(primary_key=True)
+    keys = CharField()
+    words = CharField()
+    priority = IntegerField()
+    create_date = DateTimeField("%Y-%m-%d %H:%M:%S",
+                                default=datetime.datetime.now())
+
+    def __str__(self):
+        return f"<{self.id},{self.keys},{self.words},{self.priority},{self.create_date}>"
+
+
 def create_tables():
     if not CharPhoneTable.table_exists():
         CharPhoneTable.create_table()
@@ -120,6 +133,8 @@ def create_tables():
         EngWordTable.create_table()
     if not YeFengWordTable.table_exists():
         YeFengWordTable.create_table()
+    if not SimplerTable.table_exists():
+        SimplerTable.create_table()
 
 
 create_tables()
