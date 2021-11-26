@@ -128,3 +128,4 @@ lufly/win-dd/*/*/*.exe
 lufly/sys_data/sys_table.sqlite-journal
 duplicated.txt
 to_add_words.txt
+simpler_words.txt

@@ -74,10 +74,10 @@ if __name__ == "__main__":
     _, words_path = sys.argv
 
     exist_words = set()
-    exist_words = pipe(WordPhoneTable.select(), map(lambda e: e.word), set)
+    # exist_words = pipe(WordPhoneTable.select(), map(lambda e: e.word), set)
 
-    exist_words = exist_words | pipe(DelWordTable.select(),
-                                     map(lambda e: e.word), set)
+    # exist_words = exist_words | pipe(DelWordTable.select(),
+    #                                  map(lambda e: e.word), set)
 
     xhe_transformer = get_full_to_xhe_transformer()
     zrm_transformer = get_full_to_zrm_transformmer()
@@ -86,13 +86,11 @@ if __name__ == "__main__":
 
     with open(words_path, "r", encoding='utf8') as fin:
         to_add_words = pipe(
-            fin,
+            fin, map(lambda e: e.strip()), filter(lambda e: len(e) > 0),
             map(lambda e: e.strip().split(' ')),
-            # filter(lambda e: len(e) in (1, 2)),
             filter(lambda e: len(e[0]) <= 5),
             filter(lambda e: not contain_alpha(e[0]) and not contain_symbols(e[
-                0])),
-            filter(lambda e: e[0] not in exist_words),
+                0])), filter(lambda e: e[0] not in exist_words),
             map(lambda e: cols_to_word_phone_table(
                 e, xhe_transformer, zrm_transformer, bingji_transformer)))
 
