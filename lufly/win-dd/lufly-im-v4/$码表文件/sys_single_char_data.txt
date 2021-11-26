@@ -185,6 +185,11 @@
 定	dkbz#序7000
 定	dkbxr#序7000
 方	fhdw#序7000
+方	fhdac#序7000
+方	fhdap#序7000
+方	fhww#序7000
+方	fhwc#序7000
+方	fhwp#序7000
 气	qipef#序7000
 做	zorg#序7000
 车	iealu#序7000
@@ -339,7 +344,7 @@
 应	ykgx#序7000
 从	csrr#序7000
 同	tscak#序7000
-常	ihxbd#序7000
+常	ihdj#序7000
 走	zztz#序7000
 法	fadq#序7000
 需	xuye#序7000
@@ -480,7 +485,7 @@
 换	hrfh#序7000
 店	dmgv#序7000
 风	fgjx#序7000
-件	jmjn#序7000
+件	jmrn#序7000
 片	pmput#序7000
 房	fhhf#序7000
 师	uipaj#序7000
@@ -982,6 +987,7 @@
 命	mkrak#序7000
 讯	xyyfu#序7000
 树	uumdj#序7000
+树	uumyc#序7000
 馆	grug#序7000
 武	wuhyv#序7000
 突	tuxq#序7000
@@ -1287,7 +1293,7 @@
 央	yhiar#序7000
 藏	chcz#序7000
 藏	zhcz#序7000
-堂	thxbkt#序7000
+堂	thdkt#序7000
 典	dmialb#序7000
 谱	puyp#序7000
 疑	nibusz#序7000
@@ -1449,7 +1455,7 @@
 抽	izfy#序7000
 努	nunl#序7000
 凤	fgcy#序7000
-掌	vhxbku#序7000
+掌	vhdku#序7000
 册	ceppa#序7000
 菲	fwcf#序7000
 勇	yssyl#序7000
@@ -1762,7 +1768,7 @@
 植	vimv#序7000
 宅	vdbp#序7000
 废	fwgf#序7000
-尝	ihxby#序7000
+尝	ihdy#序7000
 烈	lplh#序7000
 弱	rogdgd#序7000
 媳	xinx#序7000
@@ -1793,7 +1799,7 @@
 卓	voiaz#序7000
 嫁	jxnj#序7000
 粒	liml#序7000
-党	dhxbx#序7000
+党	dhdx#序7000
 胸	xsox#序7000
 渐	jmdv#序7000
 厕	ceiz#序7000
@@ -2089,6 +2095,7 @@
 尬	gajj#序7000
 纠	jqsy#序7000
 撑	igfv#序7000
+撑	igfdku#序7000
 琳	lbwl#序7000
 潜	qmdt#序7000
 壮	vlku#序7000
@@ -2128,7 +2135,7 @@
 萧	xncs#序7000
 缩	soss#序7000
 墨	moht#序7000
-赏	uhiy#序7000
+赏	uhdy#序7000
 毫	hcwkbm#序7000
 怖	buxb#序7000
 玫	mwww#序7000
@@ -3388,8 +3395,8 @@
 斋	vdwe#序7000
 涕	tidd#序7000
 皂	zcbq#序7000
-裳	ihiky#序7000
-裳	uhiky#序7000
+裳	ihdky#序7000
+裳	uhdky#序7000
 疙	gebq#序7000
 仨	sars#序7000
 硫	lquyi#序7000
@@ -7539,7 +7546,7 @@
 牁	kelk#序7000
 牂	zhly#序7000
 牖	yzphf#序7000
-牚	igiky#序7000
+牚	igdky#序7000
 牝	pbnbs#序7000
 牥	fhnfj#序7000
 牮	jmdn#序7000
@@ -8499,7 +8506,7 @@
 鹛	mwmn#序7000
 鹟	wgwn#序7000
 鹠	lqln#序7000
-鹣	jmjnj#序7000
+鹣	jmjn#序7000
 鹨	lqypn#序7000
 鹪	jnjnj#序7000
 鹮	hrin#序7000
