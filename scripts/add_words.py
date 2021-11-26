@@ -74,10 +74,10 @@ if __name__ == "__main__":
     _, words_path = sys.argv
 
     exist_words = set()
-    # exist_words = pipe(WordPhoneTable.select(), map(lambda e: e.word), set)
+    exist_words = pipe(WordPhoneTable.select(), map(lambda e: e.word), set)
 
-    # exist_words = exist_words | pipe(DelWordTable.select(),
-    #                                  map(lambda e: e.word), set)
+    exist_words = exist_words | pipe(DelWordTable.select(),
+                                     map(lambda e: e.word), set)
 
     xhe_transformer = get_full_to_xhe_transformer()
     zrm_transformer = get_full_to_zrm_transformmer()
