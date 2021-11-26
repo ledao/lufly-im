@@ -8,7 +8,7 @@ from pathlib import Path
 from collections import defaultdict
 from tables import SimplerTable, db, CharPhoneTable, CharHeShapeTable, WordPhoneTable
 from tables import DelWordTable
-from peewee import fn
+from peewee import fn, reraise
 from toolz.curried import pipe, map, groupby, filter, keymap, curry, take
 from common import get_full_to_bingji_transformer, get_full_to_xhe_transformer, get_full_to_zrm_transformmer, get_full_to_lu_transformmer, get_full, word_to_two
 from common import full_to_two
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     new_items = []
     with open(words_path, "r", encoding='utf8') as fin:
         for line in fin:
-            line = fin.readline().strip()
+            line = line.strip()
             if line == '': continue
             cols = line.split(' ')
             if len(cols) == 2:
@@ -91,6 +91,9 @@ if __name__ == "__main__":
                 words = cols[0]
                 keys = cols[1]
                 priority = int(cols[2])
+            else:
+                raise ("format error")
+            if words in exist_words: continue
             new_items.append(
                 SimplerTable(words=words, keys=keys, priority=priority))
     print(new_items)

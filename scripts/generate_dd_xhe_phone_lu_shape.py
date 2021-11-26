@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
     sys_single_char_data = f"{output_dir}/sys_single_char_data.txt"
     with open(sys_single_char_data, 'w', encoding='utf8') as fout:
-        fout.write("---config@码表分类=主码-系统码表\n")
+        fout.write("---config@码表分类=主码-2\n")
         fout.write("---config@允许编辑=否\n")
         fout.write(f"---config@码表别名=系统单字\n")
         for item in CharPhoneTable.select().order_by(
@@ -92,7 +92,7 @@ if __name__ == "__main__":
 
     sys_word_data = f"{output_dir}/sys_word_data.txt"
     with open(sys_word_data, 'w', encoding='utf8') as fout:
-        fout.write("---config@码表分类=主码-2\n")
+        fout.write("---config@码表分类=主码-3\n")
         fout.write("---config@允许编辑=否\n")
         fout.write(f"---config@码表别名=系统词组\n")
         exist_word_phones = set()
@@ -129,12 +129,12 @@ if __name__ == "__main__":
                         global_priority -= 1
 
     with open(f'{output_dir}/sys_eng_data.txt', 'w', encoding='utf8') as fout:
-        fout.write("---config@码表分类=主码-3\n")
+        fout.write("---config@码表分类=主码-4\n")
         fout.write("---config@允许编辑=否\n")
         fout.write(f"---config@码表别名=系统英文\n")
         for e in EngWordTable.select().where(
                 EngWordTable.priority > 0).order_by(
-                    fn.LENGTH(EngWordTable.word), EngWordTable.priority):
+                    EngWordTable.priority.desc()):
             if not is_all_alpha(e.word):
                 continue
             encode = e.word
@@ -148,8 +148,26 @@ if __name__ == "__main__":
             fout.write(item + "\n")
             global_priority -= 1
 
+    with open(f'{output_dir}/sys_simpler_data.txt', 'w',
+              encoding='utf8') as fout:
+        fout.write("---config@码表分类=主码-5\n")
+        fout.write("---config@允许编辑=否\n")
+        fout.write(f"---config@码表别名=系统简码\n")
+        for e in SimplerTable.select().where(
+                SimplerTable.priority > 0).order_by(
+                    SimplerTable.priority.desc()):
+            encode = e.keys
+            decode = e.words
+            rule = f"{decode}\t{encode}"
+            exist_rules[encode].append(rule)
+            if len(exist_rules[encode]) > 1:
+                print(exist_rules[encode])
+            item = rule + f"#序{4000}"
+            fout.write(item + "\n")
+            global_priority -= 1
+
     with open(f'{output_dir}/sys_cmd_data.txt', 'w', encoding='utf8') as fout:
-        fout.write("---config@码表分类=主码-4\n")
+        fout.write("---config@码表分类=主码-6\n")
         fout.write("---config@允许编辑=否\n")
         fout.write(f"---config@码表别名=直通车\n")
         cmds = get_dd_cmds()
