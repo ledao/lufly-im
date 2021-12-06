@@ -109,6 +109,7 @@
 得	deidc#序7000
 得	dwidc#序7000
 子	zitla#序7000
+子	zila#序7000
 歌	gegq#序7000
 过	gozc#序7000
 里	lije#序7000
@@ -1062,7 +1063,8 @@
 艺	yicy#序7000
 护	hufh#序7000
 谈	tjyy#序7000
-济	jiuq#序7000
+济	jidq#序7000
+济	jidwp#序7000
 落	lacl#序7000
 落	lccl#序7000
 落	locl#序7000
@@ -2231,7 +2233,8 @@
 叠	dpybq#序7000
 恰	qxxh#序7000
 晋	jbyo#序7000
-湘	xlux#序7000
+湘	xldx#序7000
+湘	xldmm#序7000
 拐	gkfl#序7000
 帐	vhji#序7000
 丫	yabi#序7000
@@ -2485,7 +2488,8 @@
 兹	zibas#序7000
 缝	fgsf#序7000
 犹	yzqy#序7000
-凑	czuz#序7000
+凑	czdz#序7000
+凑	czdit#序7000
 绒	rssr#序7000
 贡	gsgb#序7000
 薪	xbcx#序7000
@@ -2586,7 +2590,8 @@
 侵	qbqeby#序7000
 鹤	hein#序7000
 逸	yizt#序7000
-泛	fjufj#序7000
+泛	fjdf#序7000
+泛	fjdpv#序7000
 笼	lsvl#序7000
 蝴	huih#序7000
 巢	icsg#序7000
@@ -2795,7 +2800,7 @@
 拘	jufjs#序7000
 嘟	dukd#序7000
 弗	fugpi#序7000
-泼	pouf#序7000
+泼	podf#序7000
 枚	mwmw#序7000
 盯	dkmd#序7000
 愧	kvxg#序7000
@@ -2892,8 +2897,8 @@
 枯	kumg#序7000
 钉	dkjd#序7000
 巍	wwuw#序7000
-泊	boub#序7000
-泊	poub#序7000
+泊	bodbj#序7000
+泊	podb#序7000
 坝	batb#序7000
 拽	vkfv#序7000
 鞍	anga#序7000
@@ -3326,7 +3331,7 @@
 犀	xikpun#序7000
 疚	jqbj#序7000
 橡	xlmx#序7000
-渤	bodbj#序7000
+渤	bodbs#序7000
 剖	pzlkd#序7000
 蟋	xiix#序7000
 婶	ufnu#序7000
@@ -3525,7 +3530,8 @@
 渗	ufdc#序7000
 韭	jqfa#序7000
 锄	iujv#序7000
-棠	thid#序7000
+棠	thdj#序7000
+棠	thdkm#序7000
 凹	aokk#序7000
 凹	wakk#序7000
 咐	fukf#序7000
@@ -4380,7 +4386,7 @@
 囱	cspkw#序7000
 捍	hjfh#序7000
 赂	lubg#序7000
-涓	jruy#序7000
+涓	jrdy#序7000
 涓	jrdko#序7000
 诧	iayv#序7000
 鼹	yjuy#序7000
@@ -4610,7 +4616,7 @@
 氟	fuqf#序7000
 汞	gsgu#序7000
 眩	xrox#序7000
-礴	boubj#序7000
+礴	boub#序7000
 窕	tnxv#序7000
 蚩	iiuai#序7000
 衙	yaiwi#序7000
@@ -5237,7 +5243,7 @@
 柘	vemu#序7000
 璟	jkwj#序7000
 瘁	cvbz#序7000
-矾	fjufs#序7000
+矾	fjufj#序7000
 臼	jqpca#序7000
 苒	rjcr#序7000
 诿	wwyhn#序7000
@@ -5415,7 +5421,7 @@
 茼	tsct#序7000
 蝼	lzil#序7000
 衮	gywgy#序7000
-饷	xluxj#序7000
+饷	xlux#序7000
 俅	qqrq#序7000
 倏	uuriwq#序7000
 傩	norn#序7000
@@ -5941,7 +5947,7 @@
 鹁	boan#序7000
 麂	jilj#序7000
 伉	khrk#序7000
-劏	thidj#序7000
+劏	thid#序7000
 厩	jqij#序7000
 呓	yikyk#序7000
 哚	dokdj#序7000
@@ -7720,7 +7726,7 @@
 砬	lauw#序7000
 砬	liuw#序7000
 砮	nunu#序7000
-砵	boubs#序7000
+砵	boubj#序7000
 砹	aiua#序7000
 砻	lsls#序7000
 硁	kgut#序7000
