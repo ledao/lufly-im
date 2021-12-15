@@ -68,7 +68,7 @@ def contain_symbols(word: str) -> bool:
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print(f"USAGE: python3 {sys.argv[0]} words.txt", file=sys.stderr)
-        print("words format:words hits priority")
+        print("words format:word keys priority")
         sys.exit(1)
 
     _, words_path = sys.argv
