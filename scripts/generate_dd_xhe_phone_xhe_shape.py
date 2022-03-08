@@ -110,6 +110,7 @@ if __name__ == "__main__":
             decode = e.words
             rule = f"{decode}\t{encode}"
             item = rule + f"#序{40000}"
+            fout.write(item + "\n")
 
     with open(f'{output_dir}/sys_cmd_data.txt', 'w', encoding='utf8') as fout:
         fout.write("---config@码表分类=主码-6\n")

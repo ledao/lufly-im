@@ -1,4 +1,4 @@
----config@码表分类=主码-4
+---config@码表分类=主码-6
 ---config@允许编辑=否
 ---config@码表别名=直通车
 $ddcmd(<date.yyyy>年<date.m>月<date.d>日,[2011年1月1日])	orq

@@ -1,4 +1,5 @@
 # encoding=utf8
+from genericpath import exists
 import os
 import sys
 import re
@@ -64,38 +65,45 @@ def contain_symbols(word: str) -> bool:
     else:
         return True
 
-
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print(f"USAGE: python3 {sys.argv[0]} words.txt", file=sys.stderr)
-        print("words format:word prioroty w1_yin w2_yin ...")
-        sys.exit(1)
-
-    _, words_path = sys.argv
-
+def load_words(filepath: str):
     exist_words = set()
-    exist_words = pipe(WordPhoneTable.select(), map(lambda e: e.word), set)
-
-    exist_words = exist_words | pipe(DelWordTable.select(),
-                                     map(lambda e: e.word), set)
+    for e in WordPhoneTable.select():
+        exist_words.add(e.word)
+    # for e in DelWordTable.select():
+    #     exist_words.add(e.word)
 
     xhe_transformer = get_full_to_xhe_transformer()
     zrm_transformer = get_full_to_zrm_transformmer()
     lu_transformer = get_full_to_lu_transformmer()
     bingji_transformer = get_full_to_bingji_transformer()
 
-    with open(words_path, "r", encoding='utf8') as fin:
-        to_add_words = pipe(
-            fin, map(lambda e: e.strip()), filter(lambda e: len(e) > 0),
-            map(lambda e: e.strip().split(' ')),
-            filter(lambda e: len(e[0]) <= 5),
-            filter(lambda e: not contain_alpha(e[0]) and not contain_symbols(e[
-                0])), filter(lambda e: e[0] not in exist_words),
-            map(lambda e: cols_to_word_phone_table(
-                e, xhe_transformer, zrm_transformer, bingji_transformer)))
+    words = []
+    with open(filepath, 'r', encoding='utf8') as fin:
+        for line in fin:
+            line = line.strip()
+            if len(line)==0:continue
+            cols = line.split(" ")
+            if len(cols) > 5: continue
+            if contain_alpha(cols[0]) or contain_symbols(cols[0]): continue
+            if cols[0] in exist_words: continue
+            words.append(cols_to_word_phone_table(cols, xhe_transformer, zrm_transformer, bingji_transformer))
 
-        # print(to_add_words[:100])
-        with db.atomic():
-            WordPhoneTable.bulk_create(to_add_words, batch_size=100)
+    return words
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print(f"使用方法: python3 {sys.argv[0]} words.txt", file=sys.stderr)
+        print("文件行格式:word [prioroty w1_yin w2_yin ...]")
+        print("举例:你好 [10 ni hao]")
+        print("中括号内为可选内容")
+        sys.exit(1)
+
+    _, words_path = sys.argv
+
+    add_words = load_words(words_path)
+    print(add_words)
+    with db.atomic():
+        WordPhoneTable.bulk_create(add_words, batch_size=100)
 
     print('done')
