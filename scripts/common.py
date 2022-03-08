@@ -239,9 +239,10 @@ def get_char_to_bingji_phones() -> Dict[str, List[str]]:
 
 
 def get_del_words() -> Set[str]:
-    del_words = pipe(DelWordTable.select(), map(lambda e: e.word),
-                     filter(lambda e: e != ''), set)
-    return del_words
+    # del_words = pipe(DelWordTable.select(), map(lambda e: e.word),
+    #                  filter(lambda e: e != ''), set)
+    # return del_words
+    return set()
 
 
 def generate_one_hit_char(priority):
