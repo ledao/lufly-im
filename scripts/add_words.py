@@ -11,7 +11,8 @@ from tables import db, CharPhoneTable, CharHeShapeTable, WordPhoneTable
 from tables import DelWordTable
 from peewee import fn
 from toolz.curried import pipe, map, groupby, filter, keymap, curry, take
-from common import get_full_to_bingji_transformer, get_full_to_xhe_transformer, get_full_to_zrm_transformmer, get_full_to_lu_transformmer, get_full, word_to_two
+from common import get_full_to_bingji_transformer, get_full_to_xhe_transformer, get_full_to_zrm_transformmer, \
+    get_full_to_lu_transformmer, get_full, word_to_two
 from common import full_to_two
 from pypinyin import lazy_pinyin
 
@@ -21,7 +22,7 @@ def cols_to_word_phone_table(cols: List[str], xhe_transformer, zrm_transformer,
                              bingji_transformer) -> WordPhoneTable:
     if len(cols) == 1:
         word = cols[0]
-        priority = 10
+        priority = 100
         full = get_full(word)
     elif len(cols) == 2:
         word = cols[0]
@@ -65,6 +66,7 @@ def contain_symbols(word: str) -> bool:
     else:
         return True
 
+
 def load_words(filepath: str):
     exist_words = set()
     for e in WordPhoneTable.select():
@@ -81,7 +83,7 @@ def load_words(filepath: str):
     with open(filepath, 'r', encoding='utf8') as fin:
         for line in fin:
             line = line.strip()
-            if len(line)==0:continue
+            if len(line) == 0: continue
             cols = line.split(" ")
             if len(cols) > 5: continue
             if contain_alpha(cols[0]) or contain_symbols(cols[0]): continue

@@ -1,18 +1,14 @@
 # encoding=utf8
-import os
-import sys
 import re
-from typing import List
+import sys
 from datetime import datetime
-from pathlib import Path
-from collections import defaultdict
-from tables import SimplerTable, db, CharPhoneTable, CharHeShapeTable, WordPhoneTable
-from tables import DelWordTable
-from peewee import fn, reraise
-from toolz.curried import pipe, map, groupby, filter, keymap, curry, take
-from common import get_full_to_bingji_transformer, get_full_to_xhe_transformer, get_full_to_zrm_transformmer, get_full_to_lu_transformmer, get_full, word_to_two
+from typing import List
+
+from toolz.curried import filter, curry
+
 from common import full_to_two
-from pypinyin import lazy_pinyin
+from common import get_full
+from tables import SimplerTable, db, WordPhoneTable
 
 
 @curry
@@ -82,7 +78,7 @@ if __name__ == "__main__":
         for line in fin:
             line = line.strip()
             if line == '': continue
-            cols = line.split(' ')
+            cols = line.split()
             if len(cols) == 2:
                 words = cols[0]
                 keys = cols[1]
