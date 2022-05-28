@@ -62,12 +62,15 @@ if __name__ == "__main__":
         fout.write("---config@码表分类=主码-3\n")
         fout.write("---config@允许编辑=否\n")
         fout.write(f"---config@码表别名=系统词组\n")
-        exist_encodes = set()
+        exit_word_phones = set()
         for item in WordPhoneTable.select().order_by(
                 fn.LENGTH(WordPhoneTable.word),
                 WordPhoneTable.priority.desc()):
             if item.word in del_words:
                 continue
+            if item.word + ":" + item.xhe in exit_word_phones:
+                continue
+            exit_word_phones.add(item.word + ":" + item.xhe)
             if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
                 used_shapes = set()
                 for shape_first in char_to_shape[item.word[0]]:
@@ -78,9 +81,6 @@ if __name__ == "__main__":
                         used_shapes.add(shape)
                         encode = item.xhe + shape_first[0] + shape_last[0]
                         decode = item.word
-                        if encode in exist_encodes:
-                            continue
-                        exist_encodes.add(encode)
                         fout.write(f'{decode}\t{encode}#序{60000}\n')
             else:
                 pass

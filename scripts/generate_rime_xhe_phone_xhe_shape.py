@@ -210,10 +210,14 @@ if __name__ == "__main__":
 
         del_words = get_del_words()
 
+        exit_word_phones = set()
         for item in  WordPhoneTable.select().where(WordPhoneTable.priority >= 1).order_by(fn.LENGTH(WordPhoneTable.word),
                                              WordPhoneTable.priority.desc()):
             if item.word in del_words:
                 continue
+            if item.word + ":" + item.xhe in exit_word_phones:
+                continue
+            exit_word_phones.add(item.word + ":" + item.xhe)
             if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
                 fout.write(f"{item.word}\t{item.xhe}\n")
                 for shape_first in char_to_shape[item.word[0]]:
