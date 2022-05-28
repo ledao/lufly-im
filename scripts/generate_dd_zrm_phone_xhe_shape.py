@@ -53,9 +53,13 @@ if __name__ == "__main__":
         fout.write("---config@码表分类=主码-2\n")
         fout.write("---config@允许编辑=否\n")
         fout.write(f"---config@码表别名=系统词组\n")
+        exit_word_phones = set()
         for item in WordPhoneTable.select().order_by(fn.LENGTH(WordPhoneTable.word), WordPhoneTable.priority.desc()):
             if item.word in del_words:
                 continue
+            if item.word + ":" + item.zrm in exit_word_phones:
+                continue
+            exit_word_phones.add(item.word + ":" + item.zrm)
             if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
                 for shape_first in char_to_shape[item.word[0]]:
                     for shape_last in char_to_shape[item.word[-1]]:
