@@ -1,8 +1,7 @@
----config@码表分类=主码-6
----config@允许编辑=否
+---config@码表分类=主码-8
+---config@允许编辑=是
 ---config@码表别名=直通车
-$ddcmd(<date.yyyy>年<date.m>月<date.d>日,[2011年1月1日])	orq
-$ddcmd(<date.z> <time.hh>时<time.mm>分,[星期五 08时05分])	ouj
+$ddcmd(<date.z> <time.hh>时<time.mm>分)	ouj
 $ddcmd(run(calc.exe),[计算器])	ojsq
 $ddcmd(<last.1>,★)	z
 $ddcmd(run(%apppath%\),[安装目录])	oav

@@ -1,5 +1,5 @@
----config@码表分类=主码-4
----config@允许编辑=否
+---config@码表分类=主码-6
+---config@允许编辑=是
 ---config@码表别名=系统英文
 nba	nba#序50000
 webo	webo#序50000
