@@ -9,7 +9,6 @@ from toolz.curried import *
 from datetime import datetime
 from common import *
 
-
 if __name__ == "__main__":
 
     if len(sys.argv) != 2 or sys.argv[1] not in ['ff', 'fb']:
@@ -22,7 +21,7 @@ if __name__ == "__main__":
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
     now = datetime.now()
-    
+
     with open(output_dir + "/luyinxing.schema.yaml", 'w', encoding='utf8') as fout:
         fout.write(f"# luyinxing 输入法\n")
         fout.write("# encoding: utf-8\n")
@@ -37,7 +36,7 @@ if __name__ == "__main__":
         fout.write(f'    - ledao/xiuyingbala <790717479@qq.com> \n')
         fout.write(f'  description: |\n')
         fout.write(f'     一款简单、舒服的音形输入方案\n')
-        
+
         fout.write("\nswitches:\n")
         fout.write("  - name: ascii_mode \n")
         fout.write("    reset: 0\n")
@@ -50,7 +49,7 @@ if __name__ == "__main__":
         fout.write("  - name: ascii_punct\n")
         # fout.write("    states: [ 。，, ．， ]\n")
         fout.write("    reset: 0\n")
- 
+
         fout.write("\nengine:\n")
         fout.write("  processors:\n")
         fout.write("    - ascii_composer\n")
@@ -84,11 +83,12 @@ if __name__ == "__main__":
         fout.write("  finals: '/'\n")
         # fout.write("  max_code_length: 4\n")
         fout.write("  auto_select: true\n")
-        fout.write("  auto_select_pattern: ^\w{4}$|^\w{5}$|^\w{6}$|^\w{7}$|^\w{8}$|^\w{9}$|^\w{10}$|^\w{11}$|^\w{12}$|^\w{13}$|^\w{14}$|^\w{15}$|^\w{16}$|^\w{17}$|^\w{18}$\n")
+        fout.write(
+            "  auto_select_pattern: ^\w{4}$|^\w{5}$|^\w{6}$|^\w{7}$|^\w{8}$|^\w{9}$|^\w{10}$|^\w{11}$|^\w{12}$|^\w{13}$|^\w{14}$|^\w{15}$|^\w{16}$|^\w{17}$|^\w{18}$\n")
         # fout.write("  auto_clear: max_length\n")
 
         fout.write("\n")
-        
+
         fout.write("translator:\n")
         fout.write("  dictionary: luyinxing\n")
         fout.write("  enable_charset_filter: false\n")
@@ -97,14 +97,14 @@ if __name__ == "__main__":
         fout.write("  enable_user_dict: true\n")
 
         fout.write("\n")
- 
+
         fout.write("\n")
-        
+
         fout.write("punctuator:\n")
         fout.write("  import_preset: default\n")
 
         fout.write("\n")
-        
+
         fout.write("key_binder:\n")
         fout.write("  import_preset: default\n")
         fout.write("  bindings:\n")
@@ -128,13 +128,12 @@ if __name__ == "__main__":
         fout.write('    - {accept: "Control+period", toggle: ascii_punct, when: always}\n')
 
         fout.write("\n")
-        
+
         fout.write("menu:\n")
         fout.write("  page_size: 6\n")
 
         fout.write("style:\n")
         fout.write("  horizontal: true\n")
-
 
     char_to_phones = get_char_to_xhe_phones()
     print(f"total {len(char_to_phones)} char phones")
@@ -186,17 +185,15 @@ if __name__ == "__main__":
         fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbFaFbGaGbHaHbAcHc"\n')
 
         fout.write("...\n")
-        
+
         fout.write("\n# 单字\n")
 
-        one_hit_char_items = generate_one_hit_char(0)
-        top_single_chars_items = generate_topest_char(char_to_phones, 0)
-        for item in one_hit_char_items.items():
-            #fout.write(f"{item[0]}\t{item[1]}\n")
-            fout.write(f"{item[0]}\n")
-        for item in top_single_chars_items.items():
-            #fout.write(f"{item[0]}\t{item[1]}\n")
-            fout.write(f"{item[0]}\n")
+        one_hit_char_items = generate_one_hit_char()
+        top_single_chars_items = generate_topest_char(char_to_phones)
+        for item in one_hit_char_items:
+            fout.write(f"{item}\n")
+        for item in top_single_chars_items:
+            fout.write(f"{item}\n")
 
         for item in CharPhoneTable.select().order_by(CharPhoneTable.priority.desc()):
             if item.char in char_to_shape:
@@ -211,8 +208,8 @@ if __name__ == "__main__":
         del_words = get_del_words()
 
         exit_word_phones = set()
-        for item in  WordPhoneTable.select().where(WordPhoneTable.priority >= 1).order_by(fn.LENGTH(WordPhoneTable.word),
-                                             WordPhoneTable.priority.desc()):
+        for item in WordPhoneTable.select().where(WordPhoneTable.priority >= 1).order_by(fn.LENGTH(WordPhoneTable.word),
+                                                                                         WordPhoneTable.priority.desc()):
             if item.word in del_words:
                 continue
             if item.word + ":" + item.xhe in exit_word_phones:
@@ -223,8 +220,8 @@ if __name__ == "__main__":
                 for shape_first in char_to_shape[item.word[0]]:
                     for shape_last in char_to_shape[item.word[-1]]:
                         if mode == 'ff':
-                            fout.write(f"{item.word}\t{item.xhe}{shape_first[0]}{shape_last[0]}\n") 
+                            fout.write(f"{item.word}\t{item.xhe}{shape_first[0]}{shape_last[0]}\n")
                         else:
-                            fout.write(f"{item.word}\t{item.xhe}{shape_first[0]}{shape_last[-1]}\n") 
+                            fout.write(f"{item.word}\t{item.xhe}{shape_first[0]}{shape_last[-1]}\n")
             else:
                 pass
