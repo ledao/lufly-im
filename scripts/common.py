@@ -249,7 +249,7 @@ def get_del_words() -> Set[str]:
 def generate_one_hit_char() -> List[str]:
     items = [
         "去\tq",
-        "我\tw"
+        "我\tw",
         "二\te",
         "人\tr",
         "他\tt",
