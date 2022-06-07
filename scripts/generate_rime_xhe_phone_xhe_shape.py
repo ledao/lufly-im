@@ -1,6 +1,7 @@
 # encoding=utf8
 import os
 import sys
+import time
 from pathlib import Path
 from collections import defaultdict
 from tables import *
@@ -20,34 +21,31 @@ if __name__ == "__main__":
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
-    now = datetime.now()
+    version = int(time.time())
 
     with open(output_dir + "/luyinxing.schema.yaml", 'w', encoding='utf8') as fout:
-        fout.write(f"# luyinxing 输入法\n")
+        fout.write(f"# 鹭音形输入方案\n")
         fout.write("# encoding: utf-8\n")
         fout.write("# 机器生成，请勿修改\n")
         fout.write("\n")
 
         fout.write("\nschema:\n")
         fout.write("  schema_id: luyinxing\n")
-        fout.write("  name: Lu音形输入方案\n")
-        fout.write(f'  version: "{now.year}.{now.month}.{now.day}"\n')
+        fout.write("  name: 鹭音形输入方案\n")
+        fout.write(f'  version: "{version}"\n')
         fout.write(f'  author: \n')
-        fout.write(f'    - ledao/xiuyingbala <790717479@qq.com> \n')
+        fout.write(f'    - ledao <790717479@qq.com> \n')
         fout.write(f'  description: |\n')
         fout.write(f'     一款简单、舒服的音形输入方案\n')
 
         fout.write("\nswitches:\n")
         fout.write("  - name: ascii_mode \n")
         fout.write("    reset: 0\n")
-        # fout.write("    states: [ 中文, 英文 ]\n")
         fout.write("  - name: full_shape\n")
-        # fout.write("    states: [ 半角, 全角 ]\n")
         fout.write("  - name: zh_simp\n")
         fout.write("    reset: 1\n")
         fout.write("    states: [ 繁, 简 ]\n")
         fout.write("  - name: ascii_punct\n")
-        # fout.write("    states: [ 。，, ．， ]\n")
         fout.write("    reset: 0\n")
 
         fout.write("\nengine:\n")
@@ -81,11 +79,9 @@ if __name__ == "__main__":
         fout.write("  alphabet: '/;zyxwvutsrqponmlkjihgfedcba'\n")
         fout.write("  initials: 'abcdefghijklmnopqrstuvwxyz;'\n")
         fout.write("  finals: '/'\n")
-        # fout.write("  max_code_length: 4\n")
         fout.write("  auto_select: true\n")
         fout.write(
             "  auto_select_pattern: ^\w{4}$|^\w{5}$|^\w{6}$|^\w{7}$|^\w{8}$|^\w{9}$|^\w{10}$|^\w{11}$|^\w{12}$|^\w{13}$|^\w{14}$|^\w{15}$|^\w{16}$|^\w{17}$|^\w{18}$\n")
-        # fout.write("  auto_clear: max_length\n")
 
         fout.write("\n")
 
@@ -113,7 +109,7 @@ if __name__ == "__main__":
         fout.write("    - {accept: comma, send: comma, when: paging} #注销逗号翻页\n")
         fout.write("    - {accept: period, send: period, when: has_menu} #注销句号翻页\n")
         fout.write("    - {accept: semicolon, send: 2, when: has_menu} #分号次选\n")
-        fout.write("    - {accept:  dollar, send: 2, when: composing}\n")
+        fout.write("    - {accept: dollar, send: 2, when: composing}\n")
         fout.write("    - {accept: Release+dollar, send: period, when: composing}\n")
         fout.write("    - {accept: Release+period, send: period, when: composing}\n")
         fout.write("    - {accept: bar, send: 2, when: composing}\n")
@@ -130,7 +126,7 @@ if __name__ == "__main__":
         fout.write("\n")
 
         fout.write("menu:\n")
-        fout.write("  page_size: 6\n")
+        fout.write("  page_size: 5\n")
 
         fout.write("style:\n")
         fout.write("  horizontal: true\n")
@@ -145,44 +141,43 @@ if __name__ == "__main__":
         fout.write("# luyinxing dictionary\n")
         fout.write("# encoding: utf-8\n")
         fout.write("# \n")
-        fout.write("# lu音形输入法码表\n")
+        fout.write("# 鹭音形输入法码表\n")
         fout.write("# 机器生成，请勿修改\n")
 
         fout.write("\n---\n")
         fout.write("name: luyinxing\n")
-        fout.write(f'version: "{now.hour}"\n')
-        fout.write(f'sort: original\n')
-        # fout.write(f'sort: by_weight\n')
-        fout.write(f'use_preset_vocabulary: true\n')
+        fout.write(f'version: "{version}"\n')
+        # fout.write(f'sort: original\n')
+        fout.write(f'sort: by_weight\n')
+        fout.write(f'use_preset_vocabulary: false\n')
         fout.write('columns:\n')
         fout.write('  - text\n')
         fout.write('  - code\n')
-        # fout.write('  - stem\n')
 
-        fout.write('encoder:\n')
-        fout.write('  exclude_patterns:\n')
-        fout.write("    - '^z.*$'\n")
-        fout.write('  rules:\n')
-        fout.write('    - length_equal: 2\n')
-        fout.write('      formula: "AaAbBaBbAcBc"\n')
-        fout.write('  rules:\n')
-        fout.write('    - length_equal: 3\n')
-        fout.write('      formula: "AaAbBaBbCaCbAcCc"\n')
-        fout.write('  rules:\n')
-        fout.write('    - length_equal: 4\n')
-        fout.write('      formula: "AaAbBaBbCaCbDaDbAcDc"\n')
-        fout.write('  rules:\n')
-        fout.write('    - length_equal: 5\n')
-        fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbAcEc"\n')
-        fout.write('  rules:\n')
-        fout.write('    - length_equal: 6\n')
-        fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbFaFbAcFc"\n')
-        fout.write('  rules:\n')
-        fout.write('    - length_equal: 7\n')
-        fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbFaFbGaGbAcGc"\n')
-        fout.write('  rules:\n')
-        fout.write('    - length_equal: 8\n')
-        fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbFaFbGaGbHaHbAcHc"\n')
+        # fout.write('encoder:\n')
+        # fout.write('  exclude_patterns:\n')
+        # fout.write("    - '^z.*$'\n")
+        # fout.write('  rules:\n')
+        # fout.write('    - length_equal: 2\n')
+        # fout.write('      formula: "AaAbBaBbAcBc"\n')
+        # fout.write('  rules:\n')
+        # fout.write('    - length_equal: 3\n')
+        # fout.write('      formula: "AaAbBaBbCaCbAcCc"\n')
+        # fout.write('  rules:\n')
+        # fout.write('    - length_equal: 4\n')
+        # fout.write('      formula: "AaAbBaBbCaCbDaDbAcDc"\n')
+        # fout.write('  rules:\n')
+        # fout.write('    - length_equal: 5\n')
+        # fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbAcEc"\n')
+        # fout.write('  rules:\n')
+        # fout.write('    - length_equal: 6\n')
+        # fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbFaFbAcFc"\n')
+        # fout.write('  rules:\n')
+        # fout.write('    - length_equal: 7\n')
+        # fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbFaFbGaGbAcGc"\n')
+        # fout.write('  rules:\n')
+        # fout.write('    - length_equal: 8\n')
+        # fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbFaFbGaGbHaHbAcHc"\n')
 
         fout.write("...\n")
 
@@ -195,33 +190,18 @@ if __name__ == "__main__":
         for item in top_single_chars_items:
             fout.write(f"{item}\n")
 
-        for item in CharPhoneTable.select().order_by(CharPhoneTable.priority.desc()):
-            if item.char in char_to_shape:
-                fout.write(f"{item.char}\t{item.xhe}\n")
-                for shape in char_to_shape[item.char]:
-                    fout.write(f"{item.char}\t{item.xhe}{shape}\n")
-            else:
-                fout.write(f"{item.char}\t{item.xhe}\n")
+        for item in generate_single_chars(char_to_shape):
+            fout.write(f"{item}\n")
 
         fout.write("\n# 词语\n")
 
-        del_words = get_del_words()
+        # high_freq_words, low_freq_words = generate_simpler_words(char_to_shape, 100, 2000)
+        # for item in high_freq_words:
+        #     fout.write(f"{item}\n")
+        # for item in low_freq_words:
+        #     fout.write(f"{item}\n")
 
-        exit_word_phones = set()
-        for item in WordPhoneTable.select().where(WordPhoneTable.priority >= 1).order_by(fn.LENGTH(WordPhoneTable.word),
-                                                                                         WordPhoneTable.priority.desc()):
-            if item.word in del_words:
-                continue
-            if item.word + ":" + item.xhe in exit_word_phones:
-                continue
-            exit_word_phones.add(item.word + ":" + item.xhe)
-            if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
-                fout.write(f"{item.word}\t{item.xhe}\n")
-                for shape_first in char_to_shape[item.word[0]]:
-                    for shape_last in char_to_shape[item.word[-1]]:
-                        if mode == 'ff':
-                            fout.write(f"{item.word}\t{item.xhe}{shape_first[0]}{shape_last[0]}\n")
-                        else:
-                            fout.write(f"{item.word}\t{item.xhe}{shape_first[0]}{shape_last[-1]}\n")
-            else:
-                pass
+        for item in generate_full_words(char_to_shape):
+            fout.write(f"{item[0:-2]}\n")
+            fout.write(f"{item}\n")
+
