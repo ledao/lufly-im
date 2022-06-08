@@ -1,4 +1,5 @@
 from collections import defaultdict
+from dataclasses import dataclass
 from typing import Tuple, List, Dict, Set
 
 from peewee import fn
@@ -367,9 +368,15 @@ def get_dd_cmds():
     ]
     return cmds
 
+@dataclass
+class EncodDecode(object):
+    encode: str
+    decode: str
+    weight: float
 
-def generate_single_chars(char_to_shape: Dict[str, List[str]]) -> List[str]:
-    result = []
+
+def generate_single_chars(char_to_shape: Dict[str, List[str]]) -> List[EncodDecode]:
+    result: List[EncodDecode] = []
     for item in CharPhoneTable.select().order_by(
             CharPhoneTable.priority.desc()):
         if item.char in char_to_shape:
@@ -378,10 +385,10 @@ def generate_single_chars(char_to_shape: Dict[str, List[str]]) -> List[str]:
                 if shape in used_shapes:
                     continue
                 used_shapes.add(shape)
-                result.append(f"{item.char}\t{item.xhe + shape}")
+                result.append(EncodDecode(decode=item.char, encode=item.xhe + shape, weight=item.priority))
         else:
             print(f"drop {item} shapes")
-            result.append(f"{item.char}\t{item.xhe}")
+            result.append(EncodDecode(decode=item.char, encode=item.xhe, weight=item.priority))
     return result
 
 
