@@ -7,13 +7,7 @@ from tables import *
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 2 or sys.argv[1] not in ['ff', 'fb']:
-        print(f"USAGE: python3 {sys.argv[0]} mode[ff|fb] ")
-        sys.exit(1)
-
-    mode = sys.argv[1]
-    fname, output_dir = sys.argv[0], "rime_xhe_" + mode
-
+    fname, output_dir = sys.argv[0], "rime_xhe"
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
     version = int(time.time())
@@ -77,7 +71,7 @@ if __name__ == "__main__":
         #fout.write("  finals: '/'\n")
         fout.write("  auto_select: true\n")
         fout.write(
-            "  auto_select_pattern: ^\w{4}$|^\w{5}$|^\w{6}$|^\w{7}$|^\w{8}$|^\w{9}$|^\w{10}$|^\w{11}$|^\w{12}$|^\w{13}$|^\w{14}$|^\w{15}$|^\w{16}$|^\w{17}$|^\w{18}$\n")
+            "  auto_select_pattern: ^\w{5}$|^\w{6}$|^\w{7}$|^\w{8}$|^\w{9}$|^\w{10}$|^\w{11}$|^\w{12}$|^\w{13}$|^\w{14}$|^\w{15}$|^\w{16}$|^\w{17}$|^\w{18}$\n")
 
         fout.write("\n")
 
@@ -88,9 +82,7 @@ if __name__ == "__main__":
         fout.write("  enable_completion: true\n")
         fout.write("  enable_user_dict: true\n")
 
-        fout.write("\n")
-
-        fout.write("\n")
+        fout.write("\n\n")
 
         fout.write("punctuator:\n")
         fout.write("  import_preset: default\n")
@@ -111,7 +103,6 @@ if __name__ == "__main__":
         fout.write("    - {accept: bar, send: 2, when: composing}\n")
         fout.write("    - {accept: Release+bar, send: comma, when: composing}\n")
         fout.write("    - {accept: Release+comma, send: comma, when: composing}\n")
-        fout.write("\n")
         fout.write('    - {accept: "Tab", send: Page_Down, when: has_menu}\n')
         fout.write('    - {accept: "Tab", send: Escape, when: composing}\n')
         fout.write('    - {accept: "Caps_Lock", send: Escape, when: composing}\n')
@@ -143,37 +134,32 @@ if __name__ == "__main__":
         fout.write("\n---\n")
         fout.write("name: luyinxing\n")
         fout.write(f'version: "{version}"\n')
-        # fout.write(f'sort: original\n')
-        fout.write(f'sort: by_weight\n')
-        fout.write(f'use_preset_vocabulary: false\n')
+        fout.write(f'sort: original\n')
+        #fout.write(f'sort: by_weight\n')
+        fout.write(f'use_preset_vocabulary: false\n') #是否使用预设词表
+
         fout.write('columns:\n')
         fout.write('  - text\n')
         fout.write('  - code\n')
 
-        # fout.write('encoder:\n')
-        # fout.write('  exclude_patterns:\n')
-        # fout.write("    - '^z.*$'\n")
-        # fout.write('  rules:\n')
-        # fout.write('    - length_equal: 2\n')
-        # fout.write('      formula: "AaAbBaBbAcBc"\n')
-        # fout.write('  rules:\n')
-        # fout.write('    - length_equal: 3\n')
-        # fout.write('      formula: "AaAbBaBbCaCbAcCc"\n')
-        # fout.write('  rules:\n')
-        # fout.write('    - length_equal: 4\n')
-        # fout.write('      formula: "AaAbBaBbCaCbDaDbAcDc"\n')
-        # fout.write('  rules:\n')
-        # fout.write('    - length_equal: 5\n')
-        # fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbAcEc"\n')
-        # fout.write('  rules:\n')
-        # fout.write('    - length_equal: 6\n')
-        # fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbFaFbAcFc"\n')
-        # fout.write('  rules:\n')
-        # fout.write('    - length_equal: 7\n')
-        # fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbFaFbGaGbAcGc"\n')
-        # fout.write('  rules:\n')
-        # fout.write('    - length_equal: 8\n')
-        # fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbFaFbGaGbHaHbAcHc"\n')
+        fout.write('encoder:\n')
+        fout.write('  exclude_patterns:\n')
+        fout.write("    - '^z.*$'\n")
+        fout.write('  rules:\n')
+        fout.write('    - length_equal: 2\n')
+        fout.write('      formula: "AaAbBaBbAcBc"\n')
+        fout.write('    - length_equal: 3\n')
+        fout.write('      formula: "AaAbBaBbCaCbAcCc"\n')
+        fout.write('    - length_equal: 4\n')
+        fout.write('      formula: "AaAbBaBbCaCbDaDbAcDc"\n')
+        fout.write('    - length_equal: 5\n')
+        fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbAcEc"\n')
+        fout.write('    - length_equal: 6\n')
+        fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbFaFbAcFc"\n')
+        fout.write('    - length_equal: 7\n')
+        fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbFaFbGaGbAcGc"\n')
+        fout.write('    - length_equal: 8\n')
+        fout.write('      formula: "AaAbBaBbCaCbDaDbEaEbFaFbGaGbHaHbAcHc"\n')
 
         fout.write("...\n")
 
