@@ -56,8 +56,6 @@ if __name__ == "__main__":
         fout.write("  translators:\n")
         fout.write("    - punct_translator\n")
         fout.write("    - table_translator\n")
-        # fout.write("    - reverse_lookup_translator\n")
-        # fout.write("    - history_translator@history\n")
         fout.write("  filters:\n")
         fout.write("    - simplifier\n")
         fout.write("    - uniquifier\n")
@@ -65,13 +63,11 @@ if __name__ == "__main__":
         fout.write("\n")
 
         fout.write("speller:\n")
-        #fout.write("  alphabet: ';zyxwvutsrqponmlkjihgfedcba'\n")
         fout.write("  alphabet: ';zyxwvutsrqponmlkjihgfedcba'\n")
         fout.write("  initials: 'abcdefghijklmnopqrstuvwxyz;'\n")
-        #fout.write("  finals: '/'\n")
         fout.write("  auto_select: true\n")
         fout.write(
-            "  auto_select_pattern: ^\w{5}$|^\w{6}$|^\w{7}$|^\w{8}$|^\w{9}$|^\w{10}$|^\w{11}$|^\w{12}$|^\w{13}$|^\w{14}$|^\w{15}$|^\w{16}$|^\w{17}$|^\w{18}$\n")
+            "  auto_select_pattern: ^\w{6}$|^\w{7}$|^\w{8}$|^\w{9}$|^\w{10}$|^\w{11}$|^\w{12}$|^\w{13}$|^\w{14}$|^\w{15}$|^\w{16}$|^\w{17}$|^\w{18}$\n")
 
         fout.write("\n")
 
@@ -97,6 +93,7 @@ if __name__ == "__main__":
         fout.write("    - {accept: comma, send: comma, when: paging} #注销逗号翻页\n")
         fout.write("    - {accept: period, send: period, when: has_menu} #注销句号翻页\n")
         fout.write("    - {accept: semicolon, send: 2, when: has_menu} #分号次选\n")
+        fout.write("    - {accept: apostrophe, send: 3, when: has_menu} #分号次选\n")
         fout.write("    - {accept: dollar, send: 2, when: composing}\n")
         fout.write("    - {accept: Release+dollar, send: period, when: composing}\n")
         fout.write("    - {accept: Release+period, send: period, when: composing}\n")
@@ -135,7 +132,6 @@ if __name__ == "__main__":
         fout.write("name: luyinxing\n")
         fout.write(f'version: "{version}"\n')
         fout.write(f'sort: original\n')
-        #fout.write(f'sort: by_weight\n')
         fout.write(f'use_preset_vocabulary: false\n') #是否使用预设词表
 
         fout.write('columns:\n')
@@ -168,25 +164,21 @@ if __name__ == "__main__":
         one_hit_char_items = generate_one_hit_char()
         top_single_chars_items = generate_topest_char(char_to_phones)
         for item in one_hit_char_items:
-            fout.write(f"{item}\n")
-        # for item in top_single_chars_items:
-        #     fout.write(f"{item}\n")
+            fout.write(f"{item.decode}\t{item.encode}\n")
+        for item in top_single_chars_items:
+            fout.write(f"{item.decode}\t{item.encode}\n")
 
         for item in generate_single_chars(char_to_shape):
-            fout.write(f"{item[0:-2]}\n")
-            fout.write(f"{item}\n")
+            fout.write(f"{item.decode}\t{item.encode[:-2]}\n")
+            fout.write(f"{item.decode}\t{item.encode[:-1]}\n")
+            fout.write(f"{item.decode}\t{item.encode}\n")
 
         fout.write("\n# 词语\n")
 
-        # high_freq_words, low_freq_words = generate_simpler_words(char_to_shape, 100, 2000)
-        # for item in high_freq_words:
-        #     fout.write(f"{item}\n")
-        # for item in low_freq_words:
-        #     fout.write(f"{item}\n")
-
         for item in generate_full_words(char_to_shape):
-            fout.write(f"{item[0:-2]}\n")
-            fout.write(f"{item}\n")
+            fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
+            fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
+            fout.write(f"{item.decode}\t{item.encode}\n")
 
     with open(output_dir + "/luyinxing.custom.yaml", 'w', encoding='utf8') as fout:
         fout.write("# luyinxing custom config\n")
