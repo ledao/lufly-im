@@ -1,14 +1,9 @@
 # encoding=utf8
-import os
 import sys
 import time
-from pathlib import Path
-from collections import defaultdict
-from tables import *
-from peewee import fn
-from toolz.curried import *
-from datetime import datetime
+
 from common import *
+from tables import *
 
 if __name__ == "__main__":
 
@@ -76,9 +71,10 @@ if __name__ == "__main__":
         fout.write("\n")
 
         fout.write("speller:\n")
-        fout.write("  alphabet: '/;zyxwvutsrqponmlkjihgfedcba'\n")
+        #fout.write("  alphabet: ';zyxwvutsrqponmlkjihgfedcba'\n")
+        fout.write("  alphabet: ';zyxwvutsrqponmlkjihgfedcba'\n")
         fout.write("  initials: 'abcdefghijklmnopqrstuvwxyz;'\n")
-        fout.write("  finals: '/'\n")
+        #fout.write("  finals: '/'\n")
         fout.write("  auto_select: true\n")
         fout.write(
             "  auto_select_pattern: ^\w{4}$|^\w{5}$|^\w{6}$|^\w{7}$|^\w{8}$|^\w{9}$|^\w{10}$|^\w{11}$|^\w{12}$|^\w{13}$|^\w{14}$|^\w{15}$|^\w{16}$|^\w{17}$|^\w{18}$\n")
@@ -187,10 +183,11 @@ if __name__ == "__main__":
         top_single_chars_items = generate_topest_char(char_to_phones)
         for item in one_hit_char_items:
             fout.write(f"{item}\n")
-        for item in top_single_chars_items:
-            fout.write(f"{item}\n")
+        # for item in top_single_chars_items:
+        #     fout.write(f"{item}\n")
 
         for item in generate_single_chars(char_to_shape):
+            fout.write(f"{item[0:-2]}\n")
             fout.write(f"{item}\n")
 
         fout.write("\n# 词语\n")
@@ -205,3 +202,13 @@ if __name__ == "__main__":
             fout.write(f"{item[0:-2]}\n")
             fout.write(f"{item}\n")
 
+    with open(output_dir + "/luyinxing.custom.yaml", 'w', encoding='utf8') as fout:
+        fout.write("# luyinxing custom config\n")
+        fout.write("# encoding: utf-8\n")
+        fout.write("# \n")
+        fout.write("# 鹭音形输入方案\n")
+        fout.write("# 机器生成，请勿修改\n")
+
+        fout.write(f"patch:\n")
+        fout.write(f"  punctuator/half_shape:\n")
+        fout.write(f"    '/': '、'\n")
