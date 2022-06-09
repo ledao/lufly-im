@@ -77,6 +77,9 @@ if __name__ == "__main__":
         fout.write("  enable_sentence: false\n")
         fout.write("  enable_completion: true\n")
         fout.write("  enable_user_dict: true\n")
+        fout.write("  enable_encoder: true\n")
+        fout.write("  encode_commit_history: true\n")
+        fout.write("  max_phrase_length: 3\n")
 
         fout.write("\n\n")
 
@@ -139,8 +142,8 @@ if __name__ == "__main__":
         fout.write('  - code\n')
 
         fout.write('encoder:\n')
-        fout.write('  exclude_patterns:\n')
-        fout.write("    - '^z.*$'\n")
+        # fout.write('  exclude_patterns:\n')
+        # fout.write("    - '^z.*$'\n")
         fout.write('  rules:\n')
         fout.write('    - length_equal: 2\n')
         fout.write('      formula: "AaAbBaBbAcBc"\n')
