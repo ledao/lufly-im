@@ -93,7 +93,7 @@ if __name__ == "__main__":
         fout.write("    - {accept: comma, send: comma, when: paging} #注销逗号翻页\n")
         fout.write("    - {accept: period, send: period, when: has_menu} #注销句号翻页\n")
         fout.write("    - {accept: semicolon, send: 2, when: has_menu} #分号次选\n")
-        fout.write("    - {accept: apostrophe, send: 3, when: has_menu} #分号次选\n")
+        fout.write("    - {accept: apostrophe, send: 3, when: has_menu} #单引号3选\n")
         fout.write("    - {accept: dollar, send: 2, when: composing}\n")
         fout.write("    - {accept: Release+dollar, send: period, when: composing}\n")
         fout.write("    - {accept: Release+period, send: period, when: composing}\n")
@@ -192,6 +192,8 @@ if __name__ == "__main__":
         fout.write(f"    '/': '、'\n")
         fout.write(f"    '<': '《'\n")
         fout.write(f"    '>': '》'\n")
+
+        fout.write(f'\n')
 
         fout.write(f'  "ascii_composer/switch_key/Shift_L": commit_code\n')
         fout.write(f'  "ascii_composer/switch_key/Shift_R": commit_code\n')
