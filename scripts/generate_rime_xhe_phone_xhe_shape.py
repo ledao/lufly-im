@@ -10,7 +10,7 @@ if __name__ == "__main__":
     fname, output_dir = sys.argv[0], "rime_xhe"
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
-    version = int(time.time())
+    version = datetime.datetime.now().strftime('%Y%m%d.%H%M%S')
 
     with open(output_dir + "/luyinxing.schema.yaml", 'w', encoding='utf8') as fout:
         fout.write(f"# 鹭音形输入方案\n")
@@ -190,3 +190,52 @@ if __name__ == "__main__":
         fout.write(f"patch:\n")
         fout.write(f"  punctuator/half_shape:\n")
         fout.write(f"    '/': '、'\n")
+        fout.write(f"    '<': '《'\n")
+        fout.write(f"    '>': '》'\n")
+
+        fout.write(f'  "ascii_composer/switch_key/Shift_L": commit_code\n')
+        fout.write(f'  "ascii_composer/switch_key/Shift_R": commit_code\n')
+
+        fout.write(f'\n')
+
+        fout.write(f'  "style/display_tray_icon": true\n')
+        fout.write(f'  "style/horizontal": true\n')  # 横排显示
+        fout.write(f'  "style/font_face": "Microsoft YaHei"\n')  # 字体
+        fout.write(f'  "style/font_point": 12\n')  # 字体大小
+        fout.write(f'  "style/inline_preedit": true\n')  # 嵌入式候选窗单行显示
+        fout.write(f'  "style/layout/border_width": 0\n')
+        fout.write(f'  "style/layout/border": 0\n')
+        fout.write(f'  "style/layout/margin_x": 7\n')  # 候选字左右边距
+        fout.write(f'  "style/layout/margin_y": 7\n')  # 候选字上下边距
+        fout.write(f'  "style/layout/hilite_padding": 8\n')  # 候选字背景色色块高度 若想候选字背景色块无边界填充候选框，仅需其高度和候选字上下边距一致即可
+        fout.write(f'  "style/layout/hilite_spacing": 1\n')  # 序号和候选字之间的间隔
+        fout.write(f'  "style/layout/spacing": 7\n')  # 作用不明
+        fout.write(f'  "style/layout/candidate_spacing": 8\n')  # 候选字间隔
+        fout.write(f'  "style/layout/round_corner": 5\n')  # 候选字背景色块圆角幅度
+
+    with open(output_dir + "/weasel.custom.yaml", 'w', encoding='utf8') as fout:
+        fout.write(f'customization:\n')
+        fout.write(f'  distribution_code_name: Weasel\n')
+        fout.write(f'  distribution_version: 0.14.3\n')
+        fout.write(f'  generator: "Rime::SwitcherSettings"\n')
+        fout.write(f'  modified_time: "Mon Jun  6 16:28:09 2022"\n')
+        fout.write(f'  rime_version: 1.5.3\n')
+
+        fout.write(f'\n')
+
+        fout.write(f'patch:\n')
+        fout.write(f'  "style/color_scheme": LuColor\n')
+        fout.write(f'  "preset_color_schemes/LuColor":\n')
+        fout.write(f'    name: "LuColor"\n')
+        fout.write(f'    author: "ledao"\n')
+        fout.write(f'    back_color: 0xffffff\n')  # 候选框 背景色
+        fout.write(f'    corner_redius: 5\n')
+        fout.write(f'    border_color: 0xE6E6E6\n')  # 候选框 边框颜色
+        fout.write(f'    text_color: 0x000000\n')  # 已选择字 文字颜色
+        fout.write(f'    hilited_text_color: 0x000000\n')  # 已选择字右侧拼音 文字颜色
+        fout.write(f'    hilited_back_color: 0xffffff\n')  # 已选择字右侧拼音 背景色
+        fout.write(f'    hilited_candidate_text_color: 0x000000\n')  # 候选字颜色
+        fout.write(f'    hilited_candidate_back_color: 0xE6E6E6\n')  # 候选字背景色
+        fout.write(f'    hilited_corner_radius: 5\n')
+        fout.write(f'    candidate_text_color: 0x000000\n')  # 未候选字颜ch色
+
