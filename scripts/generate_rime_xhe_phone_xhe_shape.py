@@ -25,7 +25,7 @@ if __name__ == "__main__":
         fout.write(f'  author: \n')
         fout.write(f'    - ledao <790717479@qq.com> \n')
         fout.write(f'  description: |\n')
-        fout.write(f'     一款简单、舒服的音形输入方案\n')
+        fout.write(f'     简单舒适音形方案\n')
 
         fout.write("\nswitches:\n")
         fout.write("  - name: ascii_mode \n")
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         fout.write("  initials: 'abcdefghijklmnopqrstuvwxyz;'\n")
         fout.write("  auto_select: true\n")
         fout.write(
-            "  auto_select_pattern: ^\w{6}$|^\w{7}$|^\w{8}$|^\w{9}$|^\w{10}$|^\w{11}$|^\w{12}$|^\w{13}$|^\w{14}$|^\w{15}$|^\w{16}$|^\w{17}$|^\w{18}$\n")
+            "  auto_select_pattern: ^\w{6}$|^\w{8}$|^\w{10}$|^\w{12}$|^\w{14}$|^\w{16}$|^\w{18}$\n")
 
         fout.write("\n")
 
@@ -79,7 +79,7 @@ if __name__ == "__main__":
         fout.write("  enable_user_dict: true\n")
         fout.write("  enable_encoder: true\n")
         fout.write("  encode_commit_history: true\n")
-        fout.write("  max_phrase_length: 3\n")
+        fout.write("  max_phrase_length: 4\n")
 
         fout.write("\n\n")
 
