@@ -6,7 +6,7 @@
 schema:
   schema_id: luyinxing
   name: 鹭音形输入方案
-  version: "20220610.090634"
+  version: "20220610.133009"
   author: 
     - ledao <790717479@qq.com> 
   description: |
@@ -68,12 +68,12 @@ punctuator:
 key_binder:
   import_preset: default
   bindings:
-    - {accept: bracketleft, send: Page_Up, when: paging} # [上翻页
-    - {accept: bracketright, send: Page_Down, when: has_menu} # ]下翻页
     - {accept: comma, send: comma, when: paging} #注销逗号翻页
     - {accept: period, send: period, when: has_menu} #注销句号翻页
     - {accept: semicolon, send: 2, when: has_menu} #分号次选
     - {accept: apostrophe, send: 3, when: has_menu} #单引号3选
+    - {accept: bracketleft, send: 4, when: has_menu} #单引号4选
+    - {accept: bracketright, send: 5, when: has_menu} #单引号5选
     - {accept: dollar, send: 2, when: composing}
     - {accept: Release+dollar, send: period, when: composing}
     - {accept: Release+period, send: period, when: composing}
