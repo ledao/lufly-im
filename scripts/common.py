@@ -439,17 +439,33 @@ def generate_full_words(char_to_shape: Dict[str, List[str]]) -> List[EncodeDecod
         if item.word + ":" + item.xhe in exit_word_phones:
             continue
         exit_word_phones.add(item.word + ":" + item.xhe)
+        # if item.word[-1] in char_to_shape:
+        #     used_shapes = set()
+        #     for shape_last in char_to_shape[item.word[-1]]:
+        #         shape = shape_last[0] + ":" + shape_last[-1]
+        #         if shape in used_shapes:
+        #             continue
+        #         used_shapes.add(shape)
+        #         encode = item.xhe + shape_last[0] + shape_last[-1]
+        #         decode = item.word
+        #         result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
+
         if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
             used_shapes = set()
             for shape_first in char_to_shape[item.word[0]]:
                 for shape_last in char_to_shape[item.word[-1]]:
-                    shape = shape_first[0] + ":" + shape_last[0]
-                    if shape in used_shapes:
-                        continue
-                    used_shapes.add(shape)
-                    encode = item.xhe + shape_first[0] + shape_last[0]
-                    decode = item.word
-                    result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
+                    shapes = [
+                        shape_first[0] + shape_last[0],
+                        # shape_first[0] + shape_first[-1],
+                        # shape_last[0] + shape_last[-1],
+                    ]
+                    for shape in shapes:
+                        if shape in used_shapes:
+                            continue
+                        used_shapes.add(shape)
+                        encode = item.xhe + shape
+                        decode = item.word
+                        result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
         else:
             print(f"drop {item}, no shapes found")
             continue
