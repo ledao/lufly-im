@@ -63,8 +63,8 @@ if __name__ == "__main__":
         fout.write("\n")
 
         fout.write("speller:\n")
-        fout.write("  alphabet: ';zyxwvutsrqponmlkjihgfedcba'\n")
-        fout.write("  initials: 'abcdefghijklmnopqrstuvwxyz;'\n")
+        fout.write("  alphabet: 'zyxwvutsrqponmlkjihgfedcba'\n")
+        fout.write("  initials: 'abcdefghijklmnopqrstuvwxyz'\n")
         fout.write("  auto_select: true\n")
         fout.write(
             "  auto_select_pattern: ^\w{6}$|^\w{8}$|^\w{10}$|^\w{12}$|^\w{14}$|^\w{16}$|^\w{18}$\n")
