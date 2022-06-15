@@ -7,10 +7,6 @@ from tables import *
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 1:
-        print(f"USAGE: python3 {sys.argv[0]}")
-        sys.exit(1)
-
     file_name, output_dir = sys.argv[0], "xhe_phone_xhe_shape"
 
     if not Path(output_dir).exists():
