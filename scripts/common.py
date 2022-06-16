@@ -124,7 +124,7 @@ def get_full(word: str) -> List[str]:
     for full in lazy_pinyin(word):
         for e in full:
             if e not in "abcdefghijklmnopqrstuvwxyz":
-                raise RuntimeError(f"{e} not alphe, word is: {word}")
+                raise RuntimeError(f"{e} not alphe, word is: {word}, pinyin is: {full}")
         fulls.append(full)
     return fulls
 
