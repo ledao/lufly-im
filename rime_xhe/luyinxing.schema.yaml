@@ -6,7 +6,7 @@
 schema:
   schema_id: luyinxing
   name: 鹭音形输入方案
-  version: "20220615.091954"
+  version: "20220615.131332"
   author: 
     - ledao <790717479@qq.com> 
   description: |
@@ -49,7 +49,7 @@ speller:
   alphabet: 'zyxwvutsrqponmlkjihgfedcba'
   initials: 'abcdefghijklmnopqrstuvwxyz'
   auto_select: true
-  auto_select_pattern: ^\w{6}$|^\w{7}$|^\w{8}$|^\w{9}$^\w{10}$|^\w{11}$^\w{12}$|^\w{13}$^\w{14}$|^\w{15}$^\w{16}$|^\w{17}$^\w{18}$
+  auto_select_pattern: ^\w{6}$|^\w{8}$|^\w{10}$|^\w{12}$|^\w{14}$|^\w{16}$|^\w{18}$
 
 translator:
   dictionary: luyinxing
