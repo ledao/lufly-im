@@ -1,5 +1,7 @@
-from common import *
-from tables import db
+from typing import Dict
+
+from tables import db, CharPhoneTable, WordPhoneTable
+from common import get_full_to_lu_transformmer, split_sy
 
 
 def check_lu_char(transformer: Dict[str, str]):
