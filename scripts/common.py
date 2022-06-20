@@ -11,6 +11,23 @@ from tables import CharPhoneTable, CharHeShapeTable, WordPhoneTable, EngWordTabl
 from tables import FullToTwoTable, SimplerTable
 
 
+class ShuangPinSchema:
+    def __init__(self, name: str):
+        super(ShuangPinSchema, self).__init__()
+        self.name = name
+
+    def __str__(self) -> str:
+        return f"shuang pin schema {self.name}"
+
+    def __eq__(self, other):
+        return self.name == other.name
+
+
+XHE_SP_SCHEMA = ShuangPinSchema("xiao he")
+LU_SP_SCHEMA = ShuangPinSchema("xiao lu")
+ZRM_SP_SCHEMA = ShuangPinSchema("zi ran ma")
+
+
 @curry
 def for_each(proc, eles):
     if type(eles) is dict:
@@ -58,7 +75,7 @@ def split_sy(pinyin: str) -> Tuple[str, str]:
     else:
         s = pinyin[0]
         y = pinyin[1:]
-    return (s, y)
+    return s, y
 
 
 def split_sy_bingji(pinyin: str) -> Tuple[str, str]:
@@ -240,11 +257,21 @@ def get_char_to_bingji_phones() -> Dict[str, List[str]]:
     return char_to_phones
 
 
+def get_char_to_lu_phones() -> Dict[str, List[str]]:
+    char_to_phones = pipe(CharPhoneTable.select(),
+                          map(lambda e: (e.char, e.lu)),
+                          filter(lambda e: e[0] != '' and e[1] != ''),
+                          groupby(lambda e: e[0]),
+                          valmap(lambda phones: [e[1] for e in phones]), dict)
+    return char_to_phones
+
+
 def get_del_words() -> Set[str]:
     # del_words = pipe(DelWordTable.select(), map(lambda e: e.word),
     #                  filter(lambda e: e != ''), set)
     # return del_words
     return set()
+
 
 @dataclass
 class EncodeDecode(object):
@@ -375,40 +402,63 @@ def get_dd_cmds():
     return cmds
 
 
-
-def generate_single_chars(char_to_shape: Dict[str, List[str]]) -> List[EncodeDecode]:
+def generate_single_chars(char_to_shape: Dict[str, List[str]], schema: ShuangPinSchema = XHE_SP_SCHEMA) -> List[EncodeDecode]:
     result: List[EncodeDecode] = []
     for item in CharPhoneTable.select().order_by(
             CharPhoneTable.priority.desc()):
+        if schema == XHE_SP_SCHEMA:
+            phones = item.xhe
+        elif schema == LU_SP_SCHEMA:
+            phones = item.lu
+        elif schema == ZRM_SP_SCHEMA:
+            phones = item.zrm
+        else:
+            raise RuntimeError(f"schema not found {schema}")
+
+        if phones == "":
+            raise RuntimeError(f"empty phones, {item}")
+
         if item.char in char_to_shape:
             used_shapes = set()
             for shape in char_to_shape[item.char]:
                 if shape in used_shapes:
                     continue
                 used_shapes.add(shape)
-                result.append(EncodeDecode(decode=item.char, encode=item.xhe + shape, weight=item.priority))
+                result.append(EncodeDecode(decode=item.char, encode=phones + shape, weight=item.priority))
         else:
-            print(f"drop {item} shapes")
-            result.append(EncodeDecode(decode=item.char, encode=item.xhe, weight=item.priority))
+            print(f"没有形码的字：{item}")
+            result.append(EncodeDecode(decode=item.char, encode=phones, weight=item.priority))
     return result
 
 
-def generate_simpler_words(char_to_shape: Dict[str, List[str]], char_threshold: int, word_threshold: int) -> \
+def generate_simpler_words(char_to_shape: Dict[str, List[str]], char_threshold: int, word_threshold: int, schema: ShuangPinSchema = XHE_SP_SCHEMA) -> \
         Tuple[
             List[EncodeDecode], List[EncodeDecode]]:
     single_chars: Dict[str, CharPhoneTable] = {}
     for item in CharPhoneTable.select().order_by(
             CharPhoneTable.priority.desc()):
+        if schema == XHE_SP_SCHEMA:
+            phones = item.xhe
+        elif schema == LU_SP_SCHEMA:
+            phones = item.lu
+        elif schema == ZRM_SP_SCHEMA:
+            phones = item.zrm
+        else:
+            raise RuntimeError(f"schema not found {schema}")
+
+        if phones == "":
+            raise RuntimeError(f"empty phones, {item}")
+
         if item.char in char_to_shape:
             used_shapes = set()
             for shape in char_to_shape[item.char]:
                 if shape in used_shapes:
                     continue
                 used_shapes.add(shape)
-                single_chars[item.xhe + shape] = item
+                single_chars[phones + shape] = item
         else:
             print(f"{item}, have no shapes")
-            single_chars[item.xhe] = item
+            single_chars[phones] = item
 
     high_pri_simpler_words: List[EncodeDecode] = []
     low_pri_simpler_words: List[EncodeDecode] = []
@@ -416,47 +466,70 @@ def generate_simpler_words(char_to_shape: Dict[str, List[str]], char_threshold: 
     for item in WordPhoneTable.select().order_by(
             fn.LENGTH(WordPhoneTable.word),
             WordPhoneTable.priority.desc()):
-        if item.word + ":" + item.xhe in exit_word_phones:
+        if schema == XHE_SP_SCHEMA:
+            phones = item.xhe
+        elif schema == LU_SP_SCHEMA:
+            phones = item.lu
+        elif schema == ZRM_SP_SCHEMA:
+            phones = item.zrm
+        else:
+            raise RuntimeError(f"schema not found {schema}")
+
+        if phones == "":
+            raise RuntimeError(f"empty phones, {item}")
+
+        if item.word + ":" + phones in exit_word_phones:
             continue
-        exit_word_phones.add(item.word + ":" + item.xhe)
+        exit_word_phones.add(item.word + ":" + phones)
         if len(item.word) > 2:
             continue
-        phone = item.xhe
-        if phone in single_chars:
-            if item.priority >= word_threshold and single_chars[phone].priority < char_threshold:
-                high_pri_simpler_words.append(EncodeDecode(encode=phone, decode=item.word, weight=item.priority))
+        if phones in single_chars:
+            if item.priority >= word_threshold and single_chars[phones].priority < char_threshold:
+                high_pri_simpler_words.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
             else:
-                low_pri_simpler_words.append(EncodeDecode(encode=phone, decode=item.word, weight=item.priority))
+                low_pri_simpler_words.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
     return high_pri_simpler_words, low_pri_simpler_words
 
 
-def generate_full_words(char_to_shape: Dict[str, List[str]]) -> List[EncodeDecode]:
+def generate_full_words(char_to_shape: Dict[str, List[str]], schema: ShuangPinSchema = XHE_SP_SCHEMA) -> List[EncodeDecode]:
     result: List[EncodeDecode] = []
     exit_word_phones = set()
     for item in WordPhoneTable.select().order_by(
             fn.LENGTH(WordPhoneTable.word),
             WordPhoneTable.priority.desc()):
-        if item.word + ":" + item.xhe in exit_word_phones:
+        if schema == XHE_SP_SCHEMA:
+            phones = item.xhe
+        elif schema == LU_SP_SCHEMA:
+            phones = item.lu
+        elif schema == ZRM_SP_SCHEMA:
+            phones = item.zrm
+        else:
+            raise RuntimeError(f"schema not found {schema}")
+
+        if phones == "":
+            raise RuntimeError(f"empty phones, {item}")
+
+        if item.word + ":" + phones in exit_word_phones:
+            print(f"重复的记录: {item}")
             continue
-        exit_word_phones.add(item.word + ":" + item.xhe)
+        exit_word_phones.add(item.word + ":" + phones)
         if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
             used_shapes = set()
             for shape_first in char_to_shape[item.word[0]]:
                 for shape_last in char_to_shape[item.word[-1]]:
                     shapes = [
                         shape_first[0] + shape_last[0],
-                        # shape_first[0] + shape_first[-1],
-                        # shape_last[0] + shape_last[-1],
                     ]
                     for shape in shapes:
                         if shape in used_shapes:
                             continue
                         used_shapes.add(shape)
-                        encode = item.xhe + shape
+                        encode = phones + shape
                         decode = item.word
                         result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
         else:
-            print(f"drop {item}, no shapes found")
+            print(f"没有形码的词：{item}")
+            result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
             continue
 
     return result
