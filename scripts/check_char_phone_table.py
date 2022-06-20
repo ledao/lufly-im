@@ -1,10 +1,5 @@
-import sys
-from typing import Dict, List, Tuple
-from toolz.curried import pipe, map, filter
-from pypinyin import lazy_pinyin
-from tables import db, CharPhoneTable
-from common import for_each, get_full, full_to_two, get_full_to_xhe_transformer, split_sy, get_full_to_zrm_transformmer
 from common import *
+from tables import db
 
 
 def update_full(item: CharPhoneTable, full: str) -> CharPhoneTable:
@@ -39,6 +34,24 @@ def fill_bingji(item: CharPhoneTable,
     y = transformer[sy[1]] if sy[0] != "a" else sy[1]
     item.bingji = s + y
     return item
+
+
+def check_lu():
+    full_to_lu_transformer = get_full_to_lu_transformmer()
+    to_update_lu_items = pipe(
+        CharPhoneTable.select(),
+        map(lambda e: fill_lu(e, full_to_lu_transformer)),
+    )
+    with db.atomic():
+        CharPhoneTable.bulk_update(to_update_lu_items,
+                                   fields=['lu'],
+                                   batch_size=100)
+    del to_update_lu_items
+    del full_to_lu_transformer
+    null_lu_count = CharPhoneTable.select().where(
+        CharPhoneTable.lu == '').count()
+    if null_lu_count != 0:
+        print(f'{null_lu_count} null items, please check mannually.')
 
 
 if __name__ == "__main__":
@@ -87,42 +100,27 @@ if __name__ == "__main__":
     #    if null_zrm_count != 0:
     #        print(f'{null_zrm_count} null items, please check mannually.')
 
-    #null_lu_count = CharPhoneTable.select().where(
-    #    CharPhoneTable.lu == '').count()
-    #if null_lu_count != 0:
-    #    full_to_lu_transformaer = get_full_to_lu_transformmer()
-    #    to_update_lu_items = pipe(
-    #        CharPhoneTable.select().where(CharPhoneTable.lu == ''),
-    #        map(lambda e: fill_lu(e, full_to_lu_transformaer)),
-    #    )
-    #    with db.atomic():
-    #        CharPhoneTable.bulk_update(to_update_lu_items,
-    #                                   fields=['lu'],
-    #                                   batch_size=100)
-    #    del to_update_lu_items
-    #    del full_to_lu_transformaer
-    #    null_lu_count = CharPhoneTable.select().where(
-    #        CharPhoneTable.lu == '').count()
-    #    if null_lu_count != 0:
-    #        print(f'{null_lu_count} null items, please check mannually.')
 
-    null_bingji_count = CharPhoneTable.select().where(
-        CharPhoneTable.bingji == '').count()
-    if null_bingji_count != 0:
-        print(null_bingji_count)
-        full_to_bingji_transformaer = get_full_to_bingji_transformer()
-        to_update_bingji_items = pipe(
-            CharPhoneTable.select().where(CharPhoneTable.bingji == ''),
-            map(lambda e: fill_bingji(e, full_to_bingji_transformaer)),
-        )
-        with db.atomic():
-            CharPhoneTable.bulk_update(to_update_bingji_items,
-                                       fields=['bingji'],
-                                       batch_size=100)
-        del to_update_bingji_items
-        del full_to_bingji_transformaer
-        null_bingji_count = CharPhoneTable.select().where(
-            CharPhoneTable.bingji == '').count()
-        if null_bingji_count != 0:
-            print(f'{null_bingji_count} null items, please check mannually.')
+    # null_bingji_count = CharPhoneTable.select().where(
+    #     CharPhoneTable.bingji == '').count()
+    # if null_bingji_count != 0:
+    #     print(null_bingji_count)
+    #     full_to_bingji_transformaer = get_full_to_bingji_transformer()
+    #     to_update_bingji_items = pipe(
+    #         CharPhoneTable.select().where(CharPhoneTable.bingji == ''),
+    #         map(lambda e: fill_bingji(e, full_to_bingji_transformaer)),
+    #     )
+    #     with db.atomic():
+    #         CharPhoneTable.bulk_update(to_update_bingji_items,
+    #                                    fields=['bingji'],
+    #                                    batch_size=100)
+    #     del to_update_bingji_items
+    #     del full_to_bingji_transformaer
+    #     null_bingji_count = CharPhoneTable.select().where(
+    #         CharPhoneTable.bingji == '').count()
+    #     if null_bingji_count != 0:
+    #         print(f'{null_bingji_count} null items, please check mannually.')
+
+    check_lu()
+
     print("done")
