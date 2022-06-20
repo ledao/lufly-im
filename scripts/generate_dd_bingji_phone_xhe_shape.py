@@ -1,8 +1,8 @@
 import shutil
 import sys
 
-from common import *
 from tables import *
+from generator import *
 
 
 if __name__ == "__main__":
