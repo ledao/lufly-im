@@ -319,6 +319,10 @@ def generate_topest_char(schema: ShuangPinSchema) -> List[EncodeDecode]:
         char_to_phones = get_char_to_xhe_phones()
     elif schema == LU_SP_SCHEMA:
         char_to_phones = get_char_to_lu_phones()
+    elif schema == ZRM_SP_SCHEMA:
+        char_to_phones = get_char_to_zrm_phones()
+    elif schema == BINGJI_SP_SCHEMA:
+        char_to_phones = get_char_to_bingji_phones()
     else:
         raise RuntimeError(f"{schema} not found")
 
@@ -421,6 +425,8 @@ def generate_single_chars(schema: ShuangPinSchema) -> List[EncodeDecode]:
             phones = item.lu
         elif schema == ZRM_SP_SCHEMA:
             phones = item.zrm
+        elif schema == BINGJI_SP_SCHEMA:
+            phones = item.bingji
         else:
             raise RuntimeError(f"schema not found {schema}")
 
@@ -452,6 +458,8 @@ def generate_simpler_words(char_threshold: int, word_threshold: int, schema: Shu
             phones = item.lu
         elif schema == ZRM_SP_SCHEMA:
             phones = item.zrm
+        elif schema == BINGJI_SP_SCHEMA:
+            phones = item.bingji
         else:
             raise RuntimeError(f"schema not found {schema}")
 
@@ -481,6 +489,8 @@ def generate_simpler_words(char_threshold: int, word_threshold: int, schema: Shu
             phones = item.lu
         elif schema == ZRM_SP_SCHEMA:
             phones = item.zrm
+        elif schema == BINGJI_SP_SCHEMA:
+            phones = item.bingji
         else:
             raise RuntimeError(f"schema not found {schema}")
 
@@ -513,6 +523,8 @@ def generate_full_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
             phones = item.lu
         elif schema == ZRM_SP_SCHEMA:
             phones = item.zrm
+        elif schema == BINGJI_SP_SCHEMA:
+            phones = item.bingji
         else:
             raise RuntimeError(f"schema not found {schema}")
 
