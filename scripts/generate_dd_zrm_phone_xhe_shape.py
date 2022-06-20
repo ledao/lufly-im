@@ -5,7 +5,7 @@ from common import *
 from tables import *
 
 if __name__ == "__main__":
-    fname, output_dir = sys.argv[0], "zrm_phone_xhe_shape"
+    fname, output_dir = sys.argv[0], "dd_zrm_shuangpin_he_xing"
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
