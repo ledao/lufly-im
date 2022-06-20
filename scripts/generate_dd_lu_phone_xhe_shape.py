@@ -1,8 +1,10 @@
+import os
 import shutil
 import sys
+from pathlib import Path
 
-from common import *
-from tables import *
+from common import LU_SP_SCHEMA
+from generator import generate_dd
 
 
 if __name__ == "__main__":

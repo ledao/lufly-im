@@ -1,7 +1,7 @@
 import sys
 
-from common import *
 from tables import *
+from generator import *
 
 if __name__ == "__main__":
 
@@ -21,7 +21,4 @@ if __name__ == "__main__":
         shuangpin_schema=LU_SP_SCHEMA,
     )
 
-    generate_schema(schema_config, output_dir + f"/{schema_config.schema_id}.schema.yaml")
-    generate_dict(schema_config, output_dir + f"/{schema_config.schema_id}.dict.yaml")
-    generate_schema_custom(schema_config, output_dir + f"/{schema_config.schema_id}.custom.yaml")
-    generate_weasel_custom(schema_config, output_dir + f"/weasel.custom.yaml")
+    generate_rime(schema_config, output_dir)
