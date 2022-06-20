@@ -12,9 +12,8 @@ from common import get_full_to_bingji_transformer, get_full_to_xhe_transformer, 
 from tables import db, WordPhoneTable
 
 
-@curry
 def cols_to_word_phone_table(cols: List[str], xhe_transformer, zrm_transformer,
-                             bingji_transformer) -> WordPhoneTable:
+                             bingji_transformer, lu_transformer) -> WordPhoneTable:
     if len(cols) == 1:
         word = cols[0]
         priority = 100
@@ -36,7 +35,7 @@ def cols_to_word_phone_table(cols: List[str], xhe_transformer, zrm_transformer,
         full=' '.join(full),
         xhe=''.join([full_to_two(e, xhe_transformer) for e in full]),
         zrm=''.join([full_to_two(e, zrm_transformer) for e in full]),
-        lu="",
+        lu=''.join([full_to_two(e, lu_transformer) for e in full]),
         priority=priority,
         updatedt=datetime.now(),
         bingji=''.join(
@@ -83,7 +82,7 @@ def load_words(filepath: str):
             if len(cols) > 5: continue
             if contain_alpha(cols[0]) or contain_symbols(cols[0]): continue
             if cols[0] in exist_words: continue
-            words.append(cols_to_word_phone_table(cols, xhe_transformer, zrm_transformer, bingji_transformer))
+            words.append(cols_to_word_phone_table(cols, xhe_transformer, zrm_transformer, bingji_transformer, lu_transformer))
 
     return words
 

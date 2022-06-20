@@ -108,7 +108,7 @@ venv.bak/
 .vscode/*
 lufly/win-dd/生成结果/setup.exe
 sys_data.txt
-words.txt
+to_add_words.txt
 tmp/*
 lufly/sys_data/sys_table.sqlitedb
 lufly/win-dd/生成结果/*.exe
