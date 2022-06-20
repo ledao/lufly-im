@@ -1,20 +1,15 @@
 # encoding=utf8
-from genericpath import exists
-import os
-import sys
 import re
-from typing import List
+import sys
 from datetime import datetime
-from pathlib import Path
-from collections import defaultdict
-from tables import db, CharPhoneTable, CharHeShapeTable, WordPhoneTable
-from tables import DelWordTable
-from peewee import fn
-from toolz.curried import pipe, map, groupby, filter, keymap, curry, take
-from common import get_full_to_bingji_transformer, get_full_to_xhe_transformer, get_full_to_zrm_transformmer, \
-    get_full_to_lu_transformmer, get_full, word_to_two
+from typing import List
+
+from toolz.curried import filter, curry
+
 from common import full_to_two
-from pypinyin import lazy_pinyin
+from common import get_full_to_bingji_transformer, get_full_to_xhe_transformer, get_full_to_zrm_transformmer, \
+    get_full_to_lu_transformmer, get_full
+from tables import db, WordPhoneTable
 
 
 @curry
@@ -38,7 +33,7 @@ def cols_to_word_phone_table(cols: List[str], xhe_transformer, zrm_transformer,
 
     item = WordPhoneTable(
         word=word,
-        full=''.join(full),
+        full=' '.join(full),
         xhe=''.join([full_to_two(e, xhe_transformer) for e in full]),
         zrm=''.join([full_to_two(e, zrm_transformer) for e in full]),
         lu="",

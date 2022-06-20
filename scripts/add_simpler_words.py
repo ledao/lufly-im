@@ -32,7 +32,7 @@ def cols_to_word_phone_table(cols: List[str], xhe_transformer, zrm_transformer,
 
     item = WordPhoneTable(
         word=word,
-        full=''.join(full),
+        full=' '.join(full),
         xhe=''.join([full_to_two(e, xhe_transformer) for e in full]),
         zrm=''.join([full_to_two(e, zrm_transformer) for e in full]),
         lu="",
