@@ -7,7 +7,7 @@ from tables import *
 
 if __name__ == "__main__":
 
-    file_name, output_dir = sys.argv[0], "xhe_phone_xhe_shape"
+    file_name, output_dir = sys.argv[0], "dd_he_shuangpin_he_xing"
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
