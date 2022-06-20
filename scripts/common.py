@@ -26,6 +26,7 @@ class ShuangPinSchema:
 XHE_SP_SCHEMA = ShuangPinSchema("xiao he")
 LU_SP_SCHEMA = ShuangPinSchema("xiao lu")
 ZRM_SP_SCHEMA = ShuangPinSchema("zi ran ma")
+BINGJI_SP_SCHEMA = ShuangPinSchema("bing ji")
 
 
 @curry
@@ -402,7 +403,8 @@ def get_dd_cmds():
     return cmds
 
 
-def generate_single_chars(char_to_shape: Dict[str, List[str]], schema: ShuangPinSchema = XHE_SP_SCHEMA) -> List[EncodeDecode]:
+def generate_single_chars(char_to_shape: Dict[str, List[str]], schema: ShuangPinSchema = XHE_SP_SCHEMA) -> List[
+    EncodeDecode]:
     result: List[EncodeDecode] = []
     for item in CharPhoneTable.select().order_by(
             CharPhoneTable.priority.desc()):
@@ -431,7 +433,8 @@ def generate_single_chars(char_to_shape: Dict[str, List[str]], schema: ShuangPin
     return result
 
 
-def generate_simpler_words(char_to_shape: Dict[str, List[str]], char_threshold: int, word_threshold: int, schema: ShuangPinSchema = XHE_SP_SCHEMA) -> \
+def generate_simpler_words(char_to_shape: Dict[str, List[str]], char_threshold: int, word_threshold: int,
+                           schema: ShuangPinSchema = XHE_SP_SCHEMA) -> \
         Tuple[
             List[EncodeDecode], List[EncodeDecode]]:
     single_chars: Dict[str, CharPhoneTable] = {}
@@ -491,7 +494,8 @@ def generate_simpler_words(char_to_shape: Dict[str, List[str]], char_threshold: 
     return high_pri_simpler_words, low_pri_simpler_words
 
 
-def generate_full_words(char_to_shape: Dict[str, List[str]], schema: ShuangPinSchema = XHE_SP_SCHEMA) -> List[EncodeDecode]:
+def generate_full_words(char_to_shape: Dict[str, List[str]], schema: ShuangPinSchema = XHE_SP_SCHEMA) -> List[
+    EncodeDecode]:
     result: List[EncodeDecode] = []
     exit_word_phones = set()
     for item in WordPhoneTable.select().order_by(
@@ -555,3 +559,261 @@ def generate_simpler() -> List[str]:
         result.append(f"{rule}")
 
     return result
+
+
+@dataclass
+class SchemaConfig(object):
+    schema_id: str
+    name: str
+    version: str
+    authors: List[str]
+    description: str
+    auto_select_pattern: str
+    shuangpin_schema: ShuangPinSchema
+
+
+def generate_schema(config: SchemaConfig, outpath: str):
+    with open(outpath, 'w', encoding='utf8') as fout:
+        fout.write(f"# 小鹭音形系列方案\n")
+        fout.write(f"# encoding: utf-8\n")
+        fout.write(f"# 机器生成，请勿修改\n")
+        fout.write(f"\n")
+
+        fout.write(f"\nschema:\n")
+        fout.write(f"  schema_id: {config.schema_id}\n")
+        fout.write(f"  name: {config.name}\n")
+        fout.write(f'  version: "{config.version}"\n')
+        fout.write(f'  author: \n')
+        for author in config.authors:
+            fout.write(f'    - {author} \n')
+        fout.write(f'  description: |\n')
+        fout.write(f'     {config.description}\n')
+
+        fout.write(f"\nswitches:\n")
+        fout.write(f"  - name: ascii_mode \n")
+        fout.write(f"    reset: 0\n")
+        fout.write(f"  - name: full_shape\n")
+        fout.write(f"  - name: zh_simp\n")
+        fout.write(f"    reset: 1\n")
+        fout.write(f"    states: [ 繁, 简 ]\n")
+        fout.write(f"  - name: ascii_punct\n")
+        fout.write(f"    reset: 0\n")
+
+        fout.write(f"\nengine:\n")
+        fout.write(f"  processors:\n")
+        fout.write(f"    - ascii_composer\n")
+        fout.write(f"    - recognizer\n")
+        fout.write(f"    - key_binder\n")
+        fout.write(f"    - speller\n")
+        fout.write(f"    - punctuator\n")
+        fout.write(f"    - selector\n")
+        fout.write(f"    - navigator\n")
+        fout.write(f"    - express_editor\n")
+        fout.write(f"  segmentors:\n")
+        fout.write(f"    - ascii_segmentor\n")
+        fout.write(f"    - matcher\n")
+        fout.write(f"    - abc_segmentor\n")
+        fout.write(f"    - punct_segmentor\n")
+        fout.write(f"    - fallback_segmentor\n")
+        fout.write(f"  translators:\n")
+        fout.write(f"    - punct_translator\n")
+        fout.write(f"    - table_translator\n")
+        fout.write(f"  filters:\n")
+        fout.write(f"    - simplifier\n")
+        fout.write(f"    - uniquifier\n")
+
+        fout.write("\n")
+
+        fout.write(f"speller:\n")
+        fout.write(f"  alphabet: 'zyxwvutsrqponmlkjihgfedcba'\n")
+        fout.write(f"  initials: 'abcdefghijklmnopqrstuvwxyz'\n")
+        fout.write(f"  auto_select: true\n")
+        fout.write(f"  auto_select_pattern: {config.auto_select_pattern}\n")
+
+        fout.write(f"\n")
+
+        fout.write(f"translator:\n")
+        fout.write(f"  dictionary: {config.schema_id}\n")
+        fout.write(f"  enable_charset_filter: false\n")
+        fout.write(f"  enable_sentence: false\n")
+        fout.write(f"  enable_completion: true\n")
+        fout.write(f"  enable_user_dict: true\n")
+        fout.write(f"  enable_encoder: true\n")
+        fout.write(f"  encode_commit_history: true\n")
+        fout.write(f"  max_phrase_length: 3\n")
+
+        fout.write(f"\n\n")
+
+        fout.write(f"punctuator:\n")
+        fout.write(f"  import_preset: default\n")
+
+        fout.write(f"\n")
+
+        fout.write(f"key_binder:\n")
+        fout.write(f"  import_preset: default\n")
+        fout.write(f"  bindings:\n")
+        fout.write(f"    - {{accept: comma, send: comma, when: paging}} #注销逗号翻页\n")
+        fout.write(f"    - {{accept: period, send: period, when: has_menu}} #注销句号翻页\n")
+        fout.write(f"    - {{accept: semicolon, send: 2, when: has_menu}} #分号次选\n")
+        fout.write(f"    - {{accept: apostrophe, send: 3, when: has_menu}} #单引号3选\n")
+        fout.write(f"    - {{accept: bracketleft, send: 4, when: has_menu}} #单引号4选\n")
+        fout.write(f"    - {{accept: bracketright, send: 5, when: has_menu}} #单引号5选\n")
+        fout.write(f"    - {{accept: dollar, send: 2, when: composing}}\n")
+        fout.write(f"    - {{accept: Release+dollar, send: period, when: composing}}\n")
+        fout.write(f"    - {{accept: Release+period, send: period, when: composing}}\n")
+        fout.write(f"    - {{accept: bar, send: 2, when: composing}}\n")
+        fout.write(f"    - {{accept: Release+bar, send: comma, when: composing}}\n")
+        fout.write(f"    - {{accept: Release+comma, send: comma, when: composing}}\n")
+        fout.write(f'    - {{accept: "Tab", send: Page_Down, when: has_menu}}\n')
+        fout.write(f'    - {{accept: "Tab", send: Escape, when: composing}}\n')
+        fout.write(f'    - {{accept: "Caps_Lock", send: Escape, when: composing}}\n')
+        fout.write(f'    - {{accept: "Shift_R", send: Escape, when: composing}}\n')
+        fout.write(f'    - {{accept: "Shift+space", toggle: full_shape, when: always}} #切换全半角\n')
+        fout.write(f'    - {{accept: "Control+period", toggle: ascii_punct, when: always}}\n')
+
+        fout.write(f"\n")
+
+        fout.write(f"menu:\n")
+        fout.write(f"  page_size: 5\n")
+
+        fout.write(f"style:\n")
+        fout.write(f"  horizontal: true\n")
+
+
+def generate_dict(config: SchemaConfig, outpath: str):
+    char_to_phones = {}
+    if config.shuangpin_schema == XHE_SP_SCHEMA:
+        char_to_phones = get_char_to_xhe_phones()
+    elif config.shuangpin_schema == LU_SP_SCHEMA:
+        char_to_phones = get_char_to_lu_phones()
+    elif config.shuangpin_schema == ZRM_SP_SCHEMA:
+        char_to_phones = get_char_to_zrm_phones()
+    elif config.shuangpin_schema == BINGJI_SP_SCHEMA:
+        char_to_phones = get_char_to_bingji_phones()
+
+    print(f"total {len(char_to_phones)} char phones")
+
+    char_to_shape = get_char_to_xhe_shapes()
+    print(f"total {len(char_to_shape)} char shapes")
+
+    with open(outpath, 'w', encoding='utf8') as fout:
+        fout.write(f"# {config.schema_id} dictionary\n")
+        fout.write(f"# encoding: utf-8\n")
+        fout.write(f"# \n")
+        fout.write(f"# {config.name}码表\n")
+        fout.write(f"# 机器生成，请勿修改\n")
+
+        fout.write(f"\n---\n")
+        fout.write(f"name: {config.schema_id}\n")
+        fout.write(f'version: "{config.version}"\n')
+        fout.write(f'sort: original\n')
+        fout.write(f'use_preset_vocabulary: false\n')  # 是否使用预设词表
+
+        fout.write(f'columns:\n')
+        fout.write(f'  - text\n')
+        fout.write(f'  - code\n')
+
+        fout.write(f'encoder:\n')
+        fout.write(f'  rules:\n')
+        fout.write(f'    - length_equal: 2\n')
+        fout.write(f'      formula: "AaAbBaBb"\n')
+        fout.write(f'    - length_equal: 3\n')
+        fout.write(f'      formula: "AaAbBaBbCaCb"\n')
+        fout.write(f'    - length_equal: 4\n')
+        fout.write(f'      formula: "AaAbBaBbCaCbDaDb"\n')
+        fout.write(f'    - length_equal: 5\n')
+        fout.write(f'      formula: "AaAbBaBbCaCbDaDbEaEb"\n')
+        fout.write(f'    - length_equal: 6\n')
+        fout.write(f'      formula: "AaAbBaBbCaCbDaDbEaEbFaFb"\n')
+        fout.write(f'    - length_equal: 7\n')
+        fout.write(f'      formula: "AaAbBaBbCaCbDaDbEaEbFaFbGaGb"\n')
+        fout.write(f'    - length_equal: 8\n')
+        fout.write(f'      formula: "AaAbBaBbCaCbDaDbEaEbFaFbGaGbHaHb"\n')
+
+        fout.write(f"...\n")
+
+        fout.write(f"\n# 单字\n")
+
+        one_hit_char_items = generate_one_hit_char()
+        top_single_chars_items = generate_topest_char(char_to_phones)
+        for item in one_hit_char_items:
+            fout.write(f"{item.decode}\t{item.encode}\n")
+        for item in top_single_chars_items:
+            fout.write(f"{item.decode}\t{item.encode}\n")
+
+        for item in generate_single_chars(char_to_shape):
+            fout.write(f"{item.decode}\t{item.encode[:-2]}\n")
+            fout.write(f"{item.decode}\t{item.encode[:-1]}\n")
+            fout.write(f"{item.decode}\t{item.encode}\n")
+
+        fout.write(f"\n# 词语\n")
+
+        for item in generate_full_words(char_to_shape):
+            fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
+            fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
+            fout.write(f"{item.decode}\t{item.encode}\n")
+
+
+def generate_schema_custom(config: SchemaConfig, outpath: str):
+    with open(outpath, 'w', encoding='utf8') as fout:
+        fout.write(f"# {config.schema_id} custom settings\n")
+        fout.write(f"# encoding: utf-8\n")
+        fout.write(f"# \n")
+        fout.write(f"# {config.name} custom settings\n")
+        fout.write(f"# 机器生成，请勿修改\n")
+
+        fout.write(f"patch:\n")
+        fout.write(f"  punctuator/half_shape:\n")
+        fout.write(f"    '/': '、'\n")
+        fout.write(f"    '<': '《'\n")
+        fout.write(f"    '>': '》'\n")
+
+        fout.write(f'\n')
+
+        fout.write(f'  "ascii_composer/switch_key/Shift_L": commit_code\n')
+        fout.write(f'  "ascii_composer/switch_key/Shift_R": commit_code\n')
+
+        fout.write(f'\n')
+
+        fout.write(f'  "style/display_tray_icon": true\n')
+        fout.write(f'  "style/horizontal": true\n')  # 横排显示
+        fout.write(f'  "style/font_face": "Microsoft YaHei"\n')  # 字体
+        fout.write(f'  "style/font_point": 12\n')  # 字体大小
+        fout.write(f'  "style/inline_preedit": true\n')  # 嵌入式候选窗单行显示
+        fout.write(f'  "style/layout/border_width": 0\n')
+        fout.write(f'  "style/layout/border": 0\n')
+        fout.write(f'  "style/layout/margin_x": 7\n')  # 候选字左右边距
+        fout.write(f'  "style/layout/margin_y": 7\n')  # 候选字上下边距
+        fout.write(f'  "style/layout/hilite_padding": 8\n')  # 候选字背景色色块高度 若想候选字背景色块无边界填充候选框，仅需其高度和候选字上下边距一致即可
+        fout.write(f'  "style/layout/hilite_spacing": 1\n')  # 序号和候选字之间的间隔
+        fout.write(f'  "style/layout/spacing": 7\n')  # 作用不明
+        fout.write(f'  "style/layout/candidate_spacing": 8\n')  # 候选字间隔
+        fout.write(f'  "style/layout/round_corner": 5\n')  # 候选字背景色块圆角幅度
+
+
+def generate_weasel_custom(config: SchemaConfig, outpath: str):
+    with open(outpath, 'w', encoding='utf8') as fout:
+        fout.write(f'customization:\n')
+        fout.write(f'  distribution_code_name: Weasel\n')
+        fout.write(f'  distribution_version: 0.14.3\n')
+        fout.write(f'  generator: "Rime::SwitcherSettings"\n')
+        fout.write(f'  modified_time: "Mon Jun  6 16:28:09 2022"\n')
+        fout.write(f'  rime_version: 1.5.3\n')
+
+        fout.write(f'\n')
+
+        fout.write(f'patch:\n')
+        fout.write(f'  "style/color_scheme": LuColor\n')
+        fout.write(f'  "preset_color_schemes/LuColor":\n')
+        fout.write(f'    name: "LuColor"\n')
+        fout.write(f'    author: "ledao"\n')
+        fout.write(f'    back_color: 0xffffff\n')  # 候选框 背景色
+        fout.write(f'    corner_redius: 5\n')
+        fout.write(f'    border_color: 0xE6E6E6\n')  # 候选框 边框颜色
+        fout.write(f'    text_color: 0x000000\n')  # 已选择字 文字颜色
+        fout.write(f'    hilited_text_color: 0x000000\n')  # 已选择字右侧拼音 文字颜色
+        fout.write(f'    hilited_back_color: 0xffffff\n')  # 已选择字右侧拼音 背景色
+        fout.write(f'    hilited_candidate_text_color: 0x000000\n')  # 候选字颜色
+        fout.write(f'    hilited_candidate_back_color: 0xE6E6E6\n')  # 候选字背景色
+        fout.write(f'    hilited_corner_radius: 5\n')
+        fout.write(f'    candidate_text_color: 0x000000\n')  # 未候选字颜ch色
