@@ -6,7 +6,7 @@ from generator import *
 
 
 if __name__ == "__main__":
-    file_name, output_dir = sys.argv[0], "dd_bingji_shuangpin_he_xing"
+    file_name, output_dir = sys.argv[0], "dd_bingji_shuangpin_xiaohe_xing"
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)

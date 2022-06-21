@@ -1,11 +1,13 @@
+import os
 import shutil
 import sys
+from pathlib import Path
 
-from common import *
-from tables import *
+from generator import generate_dd
+from common import ZRM_SP_SCHEMA
 
 if __name__ == "__main__":
-    fname, output_dir = sys.argv[0], "dd_zrm_shuangpin_he_xing"
+    fname, output_dir = sys.argv[0], "dd_ziranma_shuangpin_xiaohe_xing"
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
