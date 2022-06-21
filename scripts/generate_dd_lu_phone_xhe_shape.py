@@ -9,7 +9,7 @@ from generator import generate_dd
 
 if __name__ == "__main__":
 
-    file_name, output_dir = sys.argv[0], "dd_lu_shuangpin_xhe_xing"
+    file_name, output_dir = sys.argv[0], "dd_xiaolu_shuangpin_xiaohe_xing"
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
