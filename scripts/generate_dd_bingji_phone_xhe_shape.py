@@ -1,9 +1,10 @@
+import os
 import shutil
 import sys
+from pathlib import Path
 
-from tables import *
-from generator import *
-
+from generator import generate_dd
+from common import BINGJI_SP_SCHEMA
 
 if __name__ == "__main__":
     file_name, output_dir = sys.argv[0], "dd_bingji_shuangpin_xiaohe_xing"
