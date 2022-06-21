@@ -1,18 +1,21 @@
+import os
 import sys
+from datetime import datetime
+from pathlib import Path
 
-from tables import *
-from generator import *
+from common import SchemaConfig, LU_SP_SCHEMA
+from generator import generate_rime
 
 if __name__ == "__main__":
 
-    fname, output_dir = sys.argv[0], "rime_lu_shuangpin_lu_xing"
+    fname, output_dir = sys.argv[0], "rime_xoaolu_shuangpin_xiaohe_xing"
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
 
     schema_config = SchemaConfig(
         schema_id="xiaolu_lu_shuangpin_he_xing",
-        name="小鹭:鹭拼:鹤形:方案",
-        version=datetime.datetime.now().strftime('%Y%m%d.%H%M%S'),
+        name="小鹭音形系列·小鹭双拼+小鹤双形",
+        version=datetime.now().strftime('%Y%m%d.%H%M%S'),
         authors=[
             "ledao <790717479@qq.com>"
         ],
