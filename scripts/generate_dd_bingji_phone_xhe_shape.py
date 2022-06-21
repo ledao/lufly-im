@@ -14,7 +14,7 @@ if __name__ == "__main__":
 
     generate_dd(BINGJI_SP_SCHEMA, output_dir)
 
-    dd_dir = 'lufly/win-dd/lufly-im-v4/$码表文件/'
+    dd_dir = 'lufly/win-dd/lufly-im-v4-bingji/$码表文件/'
     if os.path.exists(dd_dir):
         shutil.rmtree(dd_dir)
     shutil.copytree(output_dir, dd_dir)

@@ -11,7 +11,7 @@
 謇 bk
 痦 bk
 秫 hu
-馀 ux
+馀 uh
 霑 yv
 粢 dm
 俬 rs
@@ -37,7 +37,7 @@
 澍 dc
 畑 ht
 環 wy
-珮 wb
+珮 wj
 穂 hx
 纡 sy
 曱 ll
@@ -54,21 +54,21 @@
 蒺 cu
 蝥 mi
 褙 po
-苲
-蕰
-獕
-螈
-挼
-跫
-榠
-吰
-痃
-昽
-鸱
-崿
-僬
-匂
-浐
-僝
-僽
-剞
+苲 cv
+蕰 cm
+獕 cv
+螈 ix
+挼 fn
+跫 gr
+榠 mb
+吰 ks
+痃 by
+昽 ol
+鸱 un
+崿 ek
+僬 rh
+匂 bb
+浐 ui
+僝 rz
+僽 rx
+剞 dd
