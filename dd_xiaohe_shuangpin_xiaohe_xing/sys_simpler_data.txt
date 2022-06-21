@@ -1,0 +1,18 @@
+---config@码表分类=主码-7
+---config@允许编辑=是
+---config@码表别名=系统简码
+C/C++	ccp	#序40000
+CMake	cmake	#序40000
+CMakeLists.txt	cmakel	#序40000
+Java	java	#序40000
+Python	python	#序40000
+Rust	rust	#序40000
+Golang	gol	#序40000
+Unity3D	unity	#序40000
+Android	android	#序40000
+APK	apk	#序40000
+CUDA	cuda	#序40000
+C++	cpp	#序40000
+Gradle	gradle	#序40000
+GPU	gpu	#序40000
+GoRoutinE	goroutine	#序40000
