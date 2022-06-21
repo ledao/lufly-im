@@ -1,5 +1,7 @@
-from common import *
-from tables import db
+from typing import Dict
+
+from common import split_sy, get_full_to_bingji_transformer
+from tables import db, CharPhoneTable, WordPhoneTable
 
 
 def check_bingji_char(transformer: Dict[str, str]):
