@@ -8,7 +8,7 @@ from generator import generate_rime
 
 if __name__ == "__main__":
 
-    fname, output_dir = sys.argv[0], "rime_xoaolu_shuangpin_xiaohe_xing"
+    fname, output_dir = sys.argv[0], "rime_xiaolu_shuangpin_xiaohe_xing"
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
 

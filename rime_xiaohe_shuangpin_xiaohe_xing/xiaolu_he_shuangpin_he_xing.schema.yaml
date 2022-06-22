@@ -4,9 +4,9 @@
 
 
 schema:
-  schema_id: xiaolu_lu_shuangpin_he_xing
-  name: 小鹭音形系列·小鹭双拼+小鹤双形
-  version: "20220622.090059"
+  schema_id: xiaolu_he_shuangpin_he_xing
+  name: 小鹭音形系列·小鹤双拼+小鹤双形
+  version: "20220622.084006"
   author: 
     - ledao <790717479@qq.com> 
   description: |
@@ -52,7 +52,7 @@ speller:
   auto_select_pattern: ^\w{6}$|^\w{8}$|^\w{10}$|^\w{12}$|^\w{14}$|^\w{16}$|^\w{18}$
 
 translator:
-  dictionary: xiaolu_lu_shuangpin_he_xing
+  dictionary: xiaolu_he_shuangpin_he_xing
   enable_charset_filter: false
   enable_sentence: false
   enable_completion: true
