@@ -1,10 +1,14 @@
 import sys
 from typing import List
 
+from tables import WordPhoneTable
+
 
 def load_rime_export_words(path: str, out_path) -> List[str]:
     all_words = []
     exists_words = set()
+    for item in WordPhoneTable.select():
+        exists_words.add(item.word)
     with open(path, 'r', encoding='utf8') as fin:
         for line in fin:
             line = line.strip()
@@ -41,6 +45,14 @@ def load_rime_export_words(path: str, out_path) -> List[str]:
                 continue
             if line.startswith("要"):
                 continue
+            if line.startswith("被"):
+                continue
+            if line.startswith("否"):
+                continue
+            if line.startswith("和"):
+                continue
+            if line.startswith("克"):
+                continue
 
             if line.endswith("的"):
                 continue
@@ -63,6 +75,12 @@ def load_rime_export_words(path: str, out_path) -> List[str]:
             if line.endswith("有"):
                 continue
             if line.endswith("都"):
+                continue
+            if line.endswith("对"):
+                continue
+            if line.endswith("很"):
+                continue
+            if line.endswith("想"):
                 continue
 
             cols = line.split('\t')
