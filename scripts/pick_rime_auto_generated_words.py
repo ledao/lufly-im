@@ -4,84 +4,91 @@ from typing import List
 from tables import WordPhoneTable
 
 
-def load_rime_export_words(path: str, out_path) -> List[str]:
+def load_rime_export_words(path: str, sikp_words_path: str, out_path) -> List[str]:
     all_words = []
     exists_words = set()
     for item in WordPhoneTable.select():
         exists_words.add(item.word)
+
+    with open(sikp_words_path, 'r', encoding='utf8') as fin:
+        for line in fin:
+            line = line.strip()
+            if line == '': continue
+            exists_words.add(line)
+
     with open(path, 'r', encoding='utf8') as fin:
         for line in fin:
             line = line.strip()
             if "enc" not in line:
                 continue
             line = line.split("\t")[0]
-            if line.startswith("把"):
-                continue
-            if line.startswith("了"):
-                continue
-            if line.startswith("在"):
-                continue
-            if line.startswith("的"):
-                continue
-            if line.startswith("不"):
-                continue
-            if line.startswith("等"):
-                continue
-            if line.startswith("到"):
-                continue
-            if line.startswith("但"):
-                continue
-            if line.startswith("对"):
-                continue
-            if line.startswith("跟"):
-                continue
-            if line.startswith("就"):
-                continue
-            if line.startswith("是"):
-                continue
-            if line.startswith("我"):
-                continue
-            if line.startswith("为"):
-                continue
-            if line.startswith("要"):
-                continue
-            if line.startswith("被"):
-                continue
-            if line.startswith("否"):
-                continue
-            if line.startswith("和"):
-                continue
-            if line.startswith("克"):
-                continue
-
-            if line.endswith("的"):
-                continue
-            if line.endswith("在"):
-                continue
-            if line.endswith("是"):
-                continue
-            if line.endswith("了"):
-                continue
-            if line.endswith("在"):
-                continue
-            if line.endswith("有"):
-                continue
-            if line.endswith("不"):
-                continue
-            if line.endswith("就"):
-                continue
-            if line.endswith("么"):
-                continue
-            if line.endswith("有"):
-                continue
-            if line.endswith("都"):
-                continue
-            if line.endswith("对"):
-                continue
-            if line.endswith("很"):
-                continue
-            if line.endswith("想"):
-                continue
+            # if line.startswith("把"):
+            #     continue
+            # if line.startswith("了"):
+            #     continue
+            # if line.startswith("在"):
+            #     continue
+            # if line.startswith("的"):
+            #     continue
+            # if line.startswith("不"):
+            #     continue
+            # if line.startswith("等"):
+            #     continue
+            # if line.startswith("到"):
+            #     continue
+            # if line.startswith("但"):
+            #     continue
+            # if line.startswith("对"):
+            #     continue
+            # if line.startswith("跟"):
+            #     continue
+            # if line.startswith("就"):
+            #     continue
+            # if line.startswith("是"):
+            #     continue
+            # if line.startswith("我"):
+            #     continue
+            # if line.startswith("为"):
+            #     continue
+            # if line.startswith("要"):
+            #     continue
+            # if line.startswith("被"):
+            #     continue
+            # if line.startswith("否"):
+            #     continue
+            # if line.startswith("和"):
+            #     continue
+            # if line.startswith("克"):
+            #     continue
+            #
+            # if line.endswith("的"):
+            #     continue
+            # if line.endswith("在"):
+            #     continue
+            # if line.endswith("是"):
+            #     continue
+            # if line.endswith("了"):
+            #     continue
+            # if line.endswith("在"):
+            #     continue
+            # if line.endswith("有"):
+            #     continue
+            # if line.endswith("不"):
+            #     continue
+            # if line.endswith("就"):
+            #     continue
+            # if line.endswith("么"):
+            #     continue
+            # if line.endswith("有"):
+            #     continue
+            # if line.endswith("都"):
+            #     continue
+            # if line.endswith("对"):
+            #     continue
+            # if line.endswith("很"):
+            #     continue
+            # if line.endswith("想"):
+            #     continue
 
             cols = line.split('\t')
             if len(cols) <= 0:
@@ -109,7 +116,8 @@ def load_rime_export_words(path: str, out_path) -> List[str]:
 
 def main():
     filepath = sys.argv[1]
-    items = load_rime_export_words(filepath, "to_add_rime_words.txt")
+    skip_words_path = sys.argv[2]
+    items = load_rime_export_words(filepath, skip_words_path, "to_add_rime_words.txt")
 
     pass
 
