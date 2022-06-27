@@ -616,6 +616,10 @@ def generate_dd(schema: ShuangPinSchema, output_dir: str):
         for item in generate_full_words(schema):
             fout.write(f"{item.decode}\t{item.encode}#序{60000}\n")
 
+        #FIXME: 后续添加新的词表文件
+        for item in generate_simpler_encopde_words(schema):
+            fout.write(f"{item.decode}\t{item.encode}#序{55000}\n")
+
     with open(f'{output_dir}/sys_eng_data.txt', 'w', encoding='utf8') as fout:
         fout.write("---config@码表分类=主码-6\n")
         fout.write("---config@允许编辑=是\n")
@@ -656,3 +660,58 @@ def generate_rime(schema_config: SchemaConfig, output_dir:str):
     generate_dict(schema_config, output_dir + f"/{schema_config.schema_id}.dict.yaml")
     generate_schema_custom(schema_config, output_dir + f"/{schema_config.schema_id}.custom.yaml")
     generate_weasel_custom(schema_config, output_dir + f"/weasel.custom.yaml")
+
+
+def generate_simpler_encopde_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
+    char_to_shape = get_char_to_xhe_shapes()
+    result: List[EncodeDecode] = []
+    exit_word_phones = set()
+    for item in WordPhoneTable.select().order_by(
+            fn.LENGTH(WordPhoneTable.word),
+            WordPhoneTable.priority.desc()):
+        if len(item.word) <= 3:
+            continue
+        if schema == XHE_SP_SCHEMA:
+            phones = item.xhe
+        elif schema == LU_SP_SCHEMA:
+            phones = item.lu
+        elif schema == ZRM_SP_SCHEMA:
+            phones = item.zrm
+        elif schema == BINGJI_SP_SCHEMA:
+            phones = item.bingji
+        else:
+            raise RuntimeError(f"schema not found {schema}")
+
+        simpler_phones = ""
+        for i in range(len(phones)):
+            if i % 2 == 0:
+                simpler_phones += phones[i]
+        phones = simpler_phones
+
+        if phones == "":
+            raise RuntimeError(f"empty phones, {item}")
+
+        if item.word + ":" + phones in exit_word_phones:
+            print(f"重复的记录: {item}")
+            continue
+        exit_word_phones.add(item.word + ":" + phones)
+        if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
+            used_shapes = set()
+            for shape_first in char_to_shape[item.word[0]]:
+                for shape_last in char_to_shape[item.word[-1]]:
+                    shapes = [
+                        shape_first[0] + shape_last[0],
+                    ]
+                    for shape in shapes:
+                        if shape in used_shapes:
+                            continue
+                        used_shapes.add(shape)
+                        encode = phones + shape
+                        decode = item.word
+                        result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
+        else:
+            print(f"没有形码的词：{item}")
+            result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
+            continue
+
+    return result
