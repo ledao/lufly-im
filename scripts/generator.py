@@ -80,7 +80,6 @@ def generate_topest_char(schema: ShuangPinSchema) -> List[EncodeDecode]:
     return items
 
 
-
 def get_dd_cmds():
     cmds = [
         '$ddcmd(<date.z> <time.hh>时<time.mm>分)\touj',
@@ -178,7 +177,7 @@ def generate_single_chars(schema: ShuangPinSchema) -> List[EncodeDecode]:
 
 
 def generate_simpler_words(char_threshold: int, word_threshold: int, schema: ShuangPinSchema) -> Tuple[
-            List[EncodeDecode], List[EncodeDecode]]:
+    List[EncodeDecode], List[EncodeDecode]]:
     char_to_shape = get_char_to_xhe_shapes()
     single_chars: Dict[str, CharPhoneTable] = {}
     for item in CharPhoneTable.select().order_by(
@@ -493,6 +492,12 @@ def generate_dict(config: SchemaConfig, outpath: str):
             fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
             fout.write(f"{item.decode}\t{item.encode}\n")
 
+        # TODO:: keep or not??
+        for item in generate_simpler_encopde_words(config.shuangpin_schema):
+            fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
+            fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
+            fout.write(f"{item.decode}\t{item.encode}\n")
+
 
 def generate_schema_custom(config: SchemaConfig, outpath: str):
     with open(outpath, 'w', encoding='utf8') as fout:
@@ -559,9 +564,6 @@ def generate_weasel_custom(config: SchemaConfig, outpath: str):
         fout.write(f'    candidate_text_color: 0x000000\n')  # 未候选字颜ch色
 
 
-
-
-
 def generate_dd(schema: ShuangPinSchema, output_dir: str):
     if schema == XHE_SP_SCHEMA:
         check_xhe_shuangpin.main()
@@ -616,7 +618,7 @@ def generate_dd(schema: ShuangPinSchema, output_dir: str):
         for item in generate_full_words(schema):
             fout.write(f"{item.decode}\t{item.encode}#序{60000}\n")
 
-        #FIXME: 后续添加新的词表文件
+        # FIXME: 后续添加新的词表文件
         for item in generate_simpler_encopde_words(schema):
             fout.write(f"{item.decode}\t{item.encode}#序{55000}\n")
 
@@ -644,7 +646,7 @@ def generate_dd(schema: ShuangPinSchema, output_dir: str):
             fout.write(f"{cmd}\n")
 
 
-def generate_rime(schema_config: SchemaConfig, output_dir:str):
+def generate_rime(schema_config: SchemaConfig, output_dir: str):
     if schema_config.shuangpin_schema == XHE_SP_SCHEMA:
         check_xhe_shuangpin.main()
     elif schema_config.shuangpin_schema == LU_SP_SCHEMA:
