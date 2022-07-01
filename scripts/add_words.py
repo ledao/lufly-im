@@ -90,7 +90,7 @@ def load_words(filepath: str):
     return words
 
 
-if __name__ == "__main__":
+def main():
     if len(sys.argv) != 2:
         print(f"使用方法: python3 {sys.argv[0]} words.txt", file=sys.stderr)
         print("文件行格式:word [prioroty w1_yin w2_yin ...]")
@@ -106,3 +106,7 @@ if __name__ == "__main__":
         WordPhoneTable.bulk_create(add_words, batch_size=100)
 
     print(f'done, add {len(add_words)} items')
+
+
+if __name__ == "__main__":
+    main()
