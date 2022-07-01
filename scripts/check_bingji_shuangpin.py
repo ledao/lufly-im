@@ -1,59 +1,15 @@
 from typing import Dict
 
-from common import split_sy, get_full_to_bingji_transformer
+from common import split_sy, get_full_to_bingji_transformer, BINGJI_SP_SCHEMA, check_words_pinyin, check_chars_pinyin
 from tables import db, CharPhoneTable, WordPhoneTable
 
 
 def check_bingji_char(transformer: Dict[str, str]):
-    to_update_bingji_items = []
-    for item in CharPhoneTable.select():
-        full = item.full
-        bingji = item.bingji
-        s, y = split_sy(full)
-        full_bingji = transformer[s] + transformer[y]
-        if bingji != full_bingji:
-            to_update_bingji_items.append(item)
-            item.bingji = full_bingji
-
-    with db.atomic():
-        CharPhoneTable.bulk_update(to_update_bingji_items,
-                                   fields=['bingji'],
-                                   batch_size=100)
-    null_bingji_count = CharPhoneTable.select().where(
-        CharPhoneTable.bingji == '').count()
-    if null_bingji_count != 0:
-        print(f'{null_bingji_count} null items, please check mannually.')
-
-    print(to_update_bingji_items)
-    print(f'update {len(to_update_bingji_items)} char items')
+    check_chars_pinyin(transformer, BINGJI_SP_SCHEMA)
 
 
 def check_bingji_word(transformer: Dict[str, str]):
-    to_update_bingji_items = []
-    for item in WordPhoneTable.select():
-        fulls = item.full
-        bingji = item.bingji
-        full_bingjis_arr = []
-        for full in fulls.split(' '):
-            s, y = split_sy(full)
-            full_bingji = transformer[s] + transformer[y]
-            full_bingjis_arr.append(full_bingji)
-        full_bingjis = ''.join(full_bingjis_arr)
-        if bingji != full_bingjis:
-            to_update_bingji_items.append(item)
-            item.bingji = full_bingjis
-
-    with db.atomic():
-        WordPhoneTable.bulk_update(to_update_bingji_items,
-                                   fields=['bingji'],
-                                   batch_size=100)
-    null_bingji_count = WordPhoneTable.select().where(
-        WordPhoneTable.bingji == '').count()
-    if null_bingji_count != 0:
-        print(f'{null_bingji_count} null items, please check mannually.')
-
-    print(to_update_bingji_items)
-    print(f'update {len(to_update_bingji_items)} word items')
+    check_words_pinyin(transformer, BINGJI_SP_SCHEMA)
 
 
 def main():
