@@ -6,7 +6,7 @@ from pypinyin import lazy_pinyin
 from toolz.curried import curry, pipe, map, filter, groupby, valmap
 from toolz.curried import itemmap, valfilter
 
-from tables import CharPhoneTable, CharHeShapeTable, CharLuShapeTable, WordPhoneTable, TangshiTable
+from tables import CharPhoneTable, CharHeShapeTable, CharLuShapeTable, WordPhoneTable, TangshiTable, db
 from tables import FullToTwoTable
 
 
@@ -300,7 +300,6 @@ def get_exists_chars() -> Set[str]:
     return exist_chars
 
 
-
 def get_exists_words() -> Set[str]:
     exist_words = set()
 
@@ -313,3 +312,114 @@ def get_exists_words() -> Set[str]:
         exist_words.add(e.word)
 
     return exist_words
+
+
+def check_words_pinyin(transformer: Dict[str, str], schema: ShuangPinSchema):
+    to_update_items = []
+    for item in WordPhoneTable.select():
+        fulls = item.full
+        if schema == XHE_SP_SCHEMA:
+            shuangpin = item.xhe
+        elif schema == LU_SP_SCHEMA:
+            shuangpin = item.lu
+        elif schema == ZRM_SP_SCHEMA:
+            shuangpin = item.zrm
+        elif schema == BINGJI_SP_SCHEMA:
+            shuangpin = item.bingji
+        else:
+            raise RuntimeError(f'unknown schema: {schema}')
+
+        full_shuangpins_arr = []
+        for full in fulls.split(' '):
+            s, y = split_sy(full)
+            sp = transformer[s] + transformer[y]
+            full_shuangpins_arr.append(sp)
+        full_shuangpins = ''.join(full_shuangpins_arr)
+        if full_shuangpins != shuangpin:
+            if schema == XHE_SP_SCHEMA:
+                item.xhe = full_shuangpins
+            elif schema == LU_SP_SCHEMA:
+                item.lu = full_shuangpins
+            elif schema == ZRM_SP_SCHEMA:
+                item.zrm = full_shuangpins
+            elif schema == BINGJI_SP_SCHEMA:
+                item.bingji = full_shuangpins
+            else:
+                raise RuntimeError(f'unknown schema: {schema}')
+            to_update_items.append(item)
+
+    with db.atomic():
+        if schema == XHE_SP_SCHEMA:
+            WordPhoneTable.bulk_update(to_update_items,
+                                       fields=['xhe'],
+                                       batch_size=100)
+        elif schema == LU_SP_SCHEMA:
+            WordPhoneTable.bulk_update(to_update_items,
+                                       fields=['lu'],
+                                       batch_size=100)
+        elif schema == ZRM_SP_SCHEMA:
+            WordPhoneTable.bulk_update(to_update_items,
+                                       fields=['zrm'],
+                                       batch_size=100)
+        elif schema == BINGJI_SP_SCHEMA:
+            WordPhoneTable.bulk_update(to_update_items,
+                                       fields=['bingji'],
+                                       batch_size=100)
+        else:
+            raise RuntimeError(f'unknown schema: {schema}')
+
+    print(to_update_items)
+    print(f'update {len(to_update_items)} word items')
+
+
+def check_chars_pinyin(transformer: Dict[str, str], schema: ShuangPinSchema):
+    to_update_items = []
+    for item in CharPhoneTable.select():
+        full = item.full
+        if schema == XHE_SP_SCHEMA:
+            shuangpin = item.xhe
+        elif schema == LU_SP_SCHEMA:
+            shuangpin = item.lu
+        elif schema == ZRM_SP_SCHEMA:
+            shuangpin = item.zrm
+        elif schema == BINGJI_SP_SCHEMA:
+            shuangpin = item.bingji
+        else:
+            raise RuntimeError(f"unkonwn schame {schema}")
+        s, y = split_sy(full)
+        sp = transformer[s] + transformer[y]
+        if shuangpin != sp:
+            if schema == XHE_SP_SCHEMA:
+                item.xhe = sp
+            elif schema == LU_SP_SCHEMA:
+                item.lu = sp
+            elif schema == ZRM_SP_SCHEMA:
+                item.zrm = sp
+            elif schema == BINGJI_SP_SCHEMA:
+                item.bingji = sp
+            else:
+                raise RuntimeError(f"unkonwn schame {schema}")
+            to_update_items.append(item)
+
+    with db.atomic():
+        if schema == XHE_SP_SCHEMA:
+            CharPhoneTable.bulk_update(to_update_items,
+                                       fields=['xhe'],
+                                       batch_size=100)
+        elif schema == LU_SP_SCHEMA:
+            CharPhoneTable.bulk_update(to_update_items,
+                                       fields=['lu'],
+                                       batch_size=100)
+        elif schema == ZRM_SP_SCHEMA:
+            CharPhoneTable.bulk_update(to_update_items,
+                                       fields=['zrm'],
+                                       batch_size=100)
+        elif schema == BINGJI_SP_SCHEMA:
+            CharPhoneTable.bulk_update(to_update_items,
+                                       fields=['bingji'],
+                                       batch_size=100)
+        else:
+            raise RuntimeError(f"unkonwn schame {schema}")
+
+    print(to_update_items)
+    print(f'update {len(to_update_items)} char items')
