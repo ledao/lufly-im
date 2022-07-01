@@ -9,8 +9,8 @@ import check_bingji_shuangpin
 import check_zrm_shuangpin
 from common import ShuangPinSchema, XHE_SP_SCHEMA, get_char_to_xhe_phones, LU_SP_SCHEMA, get_char_to_lu_phones, \
     ZRM_SP_SCHEMA, get_char_to_zrm_phones, BINGJI_SP_SCHEMA, get_char_to_bingji_phones, get_char_to_xhe_shapes, \
-    is_all_alpha, SchemaConfig
-from tables import CharPhoneTable, WordPhoneTable, EngWordTable, SimplerTable
+    is_all_alpha, SchemaConfig, get_exists_words
+from tables import CharPhoneTable, WordPhoneTable, EngWordTable, SimplerTable, TangshiTable
 
 
 @dataclass
@@ -418,7 +418,6 @@ def generate_schema(config: SchemaConfig, outpath: str):
 
 
 def generate_dict(config: SchemaConfig, outpath: str):
-    char_to_phones = {}
     if config.shuangpin_schema == XHE_SP_SCHEMA:
         char_to_phones = get_char_to_xhe_phones()
     elif config.shuangpin_schema == LU_SP_SCHEMA:
@@ -492,8 +491,12 @@ def generate_dict(config: SchemaConfig, outpath: str):
             fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
             fout.write(f"{item.decode}\t{item.encode}\n")
 
-        # TODO:: keep or not??
-        for item in generate_simpler_encopde_words(config.shuangpin_schema):
+        for item in generate_tangshi_words(config.shuangpin_schema):
+            fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
+            fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
+            fout.write(f"{item.decode}\t{item.encode}\n")
+
+        for item in generate_4_len_word_simpler_items(config.shuangpin_schema):
             fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
             fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
             fout.write(f"{item.decode}\t{item.encode}\n")
@@ -619,7 +622,7 @@ def generate_dd(schema: ShuangPinSchema, output_dir: str):
             fout.write(f"{item.decode}\t{item.encode}#序{60000}\n")
 
         # FIXME: 后续添加新的词表文件
-        for item in generate_simpler_encopde_words(schema):
+        for item in generate_4_len_word_simpler_items(schema):
             fout.write(f"{item.decode}\t{item.encode}#序{55000}\n")
 
     with open(f'{output_dir}/sys_eng_data.txt', 'w', encoding='utf8') as fout:
@@ -664,7 +667,7 @@ def generate_rime(schema_config: SchemaConfig, output_dir: str):
     generate_weasel_custom(schema_config, output_dir + f"/weasel.custom.yaml")
 
 
-def generate_simpler_encopde_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
+def generate_4_len_wordphonetable_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
     char_to_shape = get_char_to_xhe_shapes()
     result: List[EncodeDecode] = []
     exit_word_phones = set()
@@ -697,6 +700,116 @@ def generate_simpler_encopde_words(schema: ShuangPinSchema) -> List[EncodeDecode
             print(f"重复的记录: {item}")
             continue
         exit_word_phones.add(item.word + ":" + phones)
+        if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
+            used_shapes = set()
+            for shape_first in char_to_shape[item.word[0]]:
+                for shape_last in char_to_shape[item.word[-1]]:
+                    shapes = [
+                        shape_first[0] + shape_last[0],
+                    ]
+                    for shape in shapes:
+                        if shape in used_shapes:
+                            continue
+                        used_shapes.add(shape)
+                        encode = phones + shape
+                        decode = item.word
+                        result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
+        else:
+            print(f"没有形码的词：{item}")
+            result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
+            continue
+
+    return result
+
+
+def generate_4_len_tangshi_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
+    char_to_shape = get_char_to_xhe_shapes()
+    result: List[EncodeDecode] = []
+    exit_word_phones = set()
+    for item in TangshiTable.select().order_by(
+            fn.LENGTH(TangshiTable.word),
+            TangshiTable.priority.desc(), TangshiTable.id.asc()):
+        if len(item.word) <= 3:
+            continue
+        if schema == XHE_SP_SCHEMA:
+            phones = item.xhe
+        elif schema == LU_SP_SCHEMA:
+            phones = item.lu
+        elif schema == ZRM_SP_SCHEMA:
+            phones = item.zrm
+        elif schema == BINGJI_SP_SCHEMA:
+            phones = item.bingji
+        else:
+            raise RuntimeError(f"schema not found {schema}")
+
+        simpler_phones = ""
+        for i in range(len(phones)):
+            if i % 2 == 0:
+                simpler_phones += phones[i]
+        phones = simpler_phones
+
+        if phones == "":
+            raise RuntimeError(f"empty phones, {item}")
+
+        if item.word + ":" + phones in exit_word_phones:
+            print(f"重复的记录: {item}")
+            continue
+        exit_word_phones.add(item.word + ":" + phones)
+        if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
+            used_shapes = set()
+            for shape_first in char_to_shape[item.word[0]]:
+                for shape_last in char_to_shape[item.word[-1]]:
+                    shapes = [
+                        shape_first[0] + shape_last[0],
+                    ]
+                    for shape in shapes:
+                        if shape in used_shapes:
+                            continue
+                        used_shapes.add(shape)
+                        encode = phones + shape
+                        decode = item.word
+                        result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
+        else:
+            print(f"没有形码的词：{item}")
+            result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
+            continue
+
+    return result
+
+
+def generate_4_len_word_simpler_items(schema: ShuangPinSchema) -> List[EncodeDecode]:
+    result = []
+    result.extend(generate_4_len_wordphonetable_words(schema))
+    result.extend(generate_4_len_tangshi_words(schema))
+    return result
+
+
+def generate_tangshi_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
+    char_to_shape = get_char_to_xhe_shapes()
+    result: List[EncodeDecode] = []
+    exit_word_phones = set()
+    for item in TangshiTable.select().order_by(
+            fn.LENGTH(TangshiTable.word),
+            TangshiTable.priority.desc(), TangshiTable.id.asc()):
+        if schema == XHE_SP_SCHEMA:
+            phones = item.xhe
+        elif schema == LU_SP_SCHEMA:
+            phones = item.lu
+        elif schema == ZRM_SP_SCHEMA:
+            phones = item.zrm
+        elif schema == BINGJI_SP_SCHEMA:
+            phones = item.bingji
+        else:
+            raise RuntimeError(f"schema not found {schema}")
+
+        if phones == "":
+            raise RuntimeError(f"empty phones, {item}")
+
+        if item.word + ":" + phones in exit_word_phones:
+            print(f"重复的记录: {item}")
+            continue
+        exit_word_phones.add(item.word + ":" + phones)
+
         if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
             used_shapes = set()
             for shape_first in char_to_shape[item.word[0]]:
