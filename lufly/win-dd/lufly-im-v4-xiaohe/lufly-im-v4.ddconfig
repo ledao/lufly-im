@@ -13,9 +13,11 @@
 原始码表文件名3=".\$码表文件\sys_single_char_data.txt"
 原始码表文件名4=".\$码表文件\sys_low_word_data.txt"
 原始码表文件名5=".\$码表文件\sys_word_data.txt"
-原始码表文件名6=".\$码表文件\sys_eng_data.txt"
-原始码表文件名7=".\$码表文件\sys_simpler_data.txt"
-原始码表文件名8=".\$码表文件\sys_cmd_data.txt"
+原始码表文件名6=".\$码表文件\sys_simpler_word_data.txt"
+原始码表文件名7=".\$码表文件\sys_tangshi_word_data.txt"
+原始码表文件名8=".\$码表文件\sys_simpler_data.txt"
+原始码表文件名9=".\$码表文件\sys_eng_data.txt"
+原始码表文件名10=".\$码表文件\sys_cmd_data.txt"
 构词用单字编码表=".\$码表文件\sys_single_char_data.txt"
 
 码表调试模式=否
@@ -45,7 +47,7 @@
 
 //---------特殊使用项请勿修改---------
 LAST_EDIT_VERSION=4.0.0.423
-MAKE_COUNT=104
+MAKE_COUNT=105
 //---------特殊使用项定义结束---------
 //------------------------------------------------------
 //  　　　　　　　 软件选项
