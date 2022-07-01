@@ -1,14 +1,13 @@
 import sys
 from typing import List
 
+from common import get_exists_words
 from tables import WordPhoneTable
 
 
-def load_rime_export_words(path: str, sikp_words_path: str, out_path) -> List[str]:
+def load_rime_export_words(path: str, sikp_words_path: str, out_path):
     all_words = []
-    exists_words = set()
-    for item in WordPhoneTable.select():
-        exists_words.add(item.word)
+    exists_words = get_exists_words()
 
     with open(sikp_words_path, 'r', encoding='utf8') as fin:
         for line in fin:
@@ -48,12 +47,10 @@ def load_rime_export_words(path: str, sikp_words_path: str, out_path) -> List[st
             fout.write(f"{word}\n")
 
 
-
-
 def main():
     filepath = sys.argv[1]
     skip_words_path = sys.argv[2]
-    items = load_rime_export_words(filepath, skip_words_path, "to_add_rime_words.txt")
+    load_rime_export_words(filepath, skip_words_path, "to_add_rime_words.txt")
 
     pass
 
