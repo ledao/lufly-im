@@ -6,7 +6,7 @@ from typing import List
 
 from toolz.curried import filter, curry
 
-from common import full_to_two
+from common import full_to_two, get_exists_words
 from common import get_full_to_bingji_transformer, get_full_to_xhe_transformer, get_full_to_zrm_transformmer, \
     get_full_to_lu_transformmer, get_full
 from tables import db, WordPhoneTable
@@ -62,9 +62,7 @@ def contain_symbols(word: str) -> bool:
 
 
 def load_words(filepath: str):
-    exist_words = set()
-    for e in WordPhoneTable.select():
-        exist_words.add(e.word)
+    exist_words = get_exists_words()
 
     xhe_transformer = get_full_to_xhe_transformer()
     zrm_transformer = get_full_to_zrm_transformmer()

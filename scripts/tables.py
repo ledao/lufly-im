@@ -114,6 +114,21 @@ class SimplerTable(BaseModel):
         return f"<{self.id},{self.keys},{self.words},{self.priority},{self.create_date}>"
 
 
+class TangshiTable(BaseModel):
+    id = IntegerField(primary_key=True)
+    word = CharField()
+    full = CharField()
+    xhe = CharField()
+    zrm = CharField()
+    lu = CharField()
+    priority = IntegerField()
+    updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
+    bingji = CharField()
+
+    def __str__(self):
+        return f"<{self.id},{self.word},{self.full},{self.xhe},{self.zrm},{self.lu},{self.priority},{self.updatedt},{self.bingji}>"
+
+
 def create_tables():
     if not CharPhoneTable.table_exists():
         CharPhoneTable.create_table()
@@ -135,6 +150,8 @@ def create_tables():
         YeFengWordTable.create_table()
     if not SimplerTable.table_exists():
         SimplerTable.create_table()
+    if not TangshiTable.table_exists():
+        TangshiTable.create_table()
 
 
 create_tables()

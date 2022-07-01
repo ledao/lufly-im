@@ -92,6 +92,8 @@ if __name__ == "__main__":
             if words in exist_words: continue
             new_items.append(
                 SimplerTable(words=words, keys=keys, priority=priority))
+            exist_words.add(words)
+
     print(new_items)
     with db.atomic():
         SimplerTable.bulk_create(new_items, batch_size=100)
