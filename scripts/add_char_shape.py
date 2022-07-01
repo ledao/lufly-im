@@ -27,6 +27,7 @@ def load_chars(filepath: str):
                 priority=1,
                 updatedt=datetime.now(),
             ))
+            exist_chars.add(cols[0])
 
     return chars
 

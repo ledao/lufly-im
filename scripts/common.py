@@ -6,7 +6,7 @@ from pypinyin import lazy_pinyin
 from toolz.curried import curry, pipe, map, filter, groupby, valmap
 from toolz.curried import itemmap, valfilter
 
-from tables import CharPhoneTable, CharHeShapeTable, CharLuShapeTable
+from tables import CharPhoneTable, CharHeShapeTable, CharLuShapeTable, WordPhoneTable, TangshiTable
 from tables import FullToTwoTable
 
 
@@ -273,7 +273,6 @@ def get_del_words() -> Set[str]:
     return set()
 
 
-
 def is_all_alpha(s: str) -> bool:
     for e in s:
         if e.lower() in "abcdefghijklmnopqrstuvwxyz":
@@ -281,7 +280,6 @@ def is_all_alpha(s: str) -> bool:
         else:
             return False
     return True
-
 
 
 @dataclass
@@ -294,3 +292,24 @@ class SchemaConfig(object):
     auto_select_pattern: str
     shuangpin_schema: ShuangPinSchema
 
+
+def get_exists_chars() -> Set[str]:
+    exist_chars = set()
+    for e in CharPhoneTable.select():
+        exist_chars.add(e.char)
+    return exist_chars
+
+
+
+def get_exists_words() -> Set[str]:
+    exist_words = set()
+
+    exist_words.union(get_exists_chars())
+
+    for e in WordPhoneTable.select():
+        exist_words.add(e.word)
+
+    for e in TangshiTable.select():
+        exist_words.add(e.word)
+
+    return exist_words
