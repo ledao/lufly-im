@@ -65,8 +65,6 @@ def load_words(filepath: str):
     exist_words = set()
     for e in WordPhoneTable.select():
         exist_words.add(e.word)
-    # for e in DelWordTable.select():
-    #     exist_words.add(e.word)
 
     xhe_transformer = get_full_to_xhe_transformer()
     zrm_transformer = get_full_to_zrm_transformmer()
@@ -79,10 +77,15 @@ def load_words(filepath: str):
             line = line.strip()
             if len(line) == 0: continue
             cols = line.split(" ")
-            if len(cols) > 5: continue
-            if contain_alpha(cols[0]) or contain_symbols(cols[0]): continue
+            if len(cols) > 5:
+                print(f"wrong line {line}")
+                continue
+            if contain_alpha(cols[0]) or contain_symbols(cols[0]):
+                print(f"contains num or symbols {line}")
+                continue
             if cols[0] in exist_words: continue
             words.append(cols_to_word_phone_table(cols, xhe_transformer, zrm_transformer, bingji_transformer, lu_transformer))
+            exist_words.add(cols[0])
 
     return words
 
@@ -102,4 +105,4 @@ if __name__ == "__main__":
     with db.atomic():
         WordPhoneTable.bulk_create(add_words, batch_size=100)
 
-    print('done')
+    print(f'done, add {len(add_words)} items')
