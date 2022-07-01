@@ -1,4 +1,4 @@
----config@码表分类=主码-8
+---config@码表分类=主码-10
 ---config@允许编辑=是
 ---config@码表别名=直通车
 $ddcmd(<date.z> <time.hh>时<time.mm>分)	ouj

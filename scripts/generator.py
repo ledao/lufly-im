@@ -621,12 +621,24 @@ def generate_dd(schema: ShuangPinSchema, output_dir: str):
         for item in generate_full_words(schema):
             fout.write(f"{item.decode}\t{item.encode}#序{60000}\n")
 
-        # FIXME: 后续添加新的词表文件
+    sys_simpler_word_data = f"{output_dir}/sys_simpler_word_data.txt"
+    with open(sys_simpler_word_data, 'w', encoding='utf8') as fout:
+        fout.write("---config@码表分类=主码-6\n")
+        fout.write("---config@允许编辑=是\n")
+        fout.write(f"---config@码表别名=系统简词\n")
         for item in generate_4_len_word_simpler_items(schema):
             fout.write(f"{item.decode}\t{item.encode}#序{55000}\n")
 
+    sys_tangshi_data = f"{output_dir}/sys_tangshi_word_data.txt"
+    with open(sys_tangshi_data, 'w', encoding='utf8') as fout:
+        fout.write("---config@码表分类=主码-7\n")
+        fout.write("---config@允许编辑=是\n")
+        fout.write(f"---config@码表别名=系统唐诗\n")
+        for item in generate_tangshi_words(schema):
+            fout.write(f"{item.decode}\t{item.encode}#序{52000}\n")
+
     with open(f'{output_dir}/sys_eng_data.txt', 'w', encoding='utf8') as fout:
-        fout.write("---config@码表分类=主码-6\n")
+        fout.write("---config@码表分类=主码-8\n")
         fout.write("---config@允许编辑=是\n")
         fout.write(f"---config@码表别名=系统英文\n")
         for item in generate_eng():
@@ -634,14 +646,14 @@ def generate_dd(schema: ShuangPinSchema, output_dir: str):
 
     with open(f'{output_dir}/sys_simpler_data.txt', 'w',
               encoding='utf8') as fout:
-        fout.write("---config@码表分类=主码-7\n")
+        fout.write("---config@码表分类=主码-9\n")
         fout.write("---config@允许编辑=是\n")
         fout.write(f"---config@码表别名=系统简码\n")
         for item in generate_simpler():
             fout.write(f"{item}\t#序{40000}\n")
 
     with open(f'{output_dir}/sys_cmd_data.txt', 'w', encoding='utf8') as fout:
-        fout.write("---config@码表分类=主码-8\n")
+        fout.write("---config@码表分类=主码-10\n")
         fout.write("---config@允许编辑=是\n")
         fout.write(f"---config@码表别名=直通车\n")
         cmds = get_dd_cmds()
