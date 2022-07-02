@@ -1,3 +1,7 @@
+import imp
+import re
+
+import tables
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Tuple, List, Dict, Set
@@ -300,6 +304,13 @@ def get_exists_chars() -> Set[str]:
     return exist_chars
 
 
+def get_exists_charyinpins() -> Set[str]:
+    results = set()
+    for item in tables.CharPhoneTable.select():
+        results.add(f"{item.char}{item.full}")
+    return results
+
+
 def get_exists_words() -> Set[str]:
     exist_words = set()
 
@@ -485,3 +496,21 @@ def check_chars_pinyin(transformer: Dict[str, str], schema: ShuangPinSchema):
 
     print(to_update_items)
     print(f'update {len(to_update_items)} char items')
+
+
+def contain_alpha(word: str) -> bool:
+    for c in word:
+        if c.lower() in "abcdefghijklmnopqrstuvwxyz":
+            return True
+
+    return False
+
+
+def contain_symbols(word: str) -> bool:
+    if re.match(
+            '[1234567890’!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~，。！@#$%^&*………_+}{}]+',
+            word) is None:
+        return False
+    else:
+        return True
+
