@@ -1,0 +1,60 @@
+---config@码表分类=主码-10
+---config@允许编辑=是
+---config@码表别名=直通车
+$ddcmd(<date.z> <time.hh>时<time.mm>分)	ouj
+$ddcmd(run(calc.exe),[计算器])	ojsq
+$ddcmd(<last.1>,★)	z
+$ddcmd(run(%apppath%\),[安装目录])	oav
+$ddcmd(<date.yyyy>年<date.m>月<date.d>日,<date.yyyy>年<date.m>月<date.d>日)	orq
+$ddcmd(<date.YYYY>年<date.M>月<date.D>日,<date.YYYY>年<date.M>月<date.D>日)	orq
+$ddcmd(<date.yyyy>-<date.mm>-<date.dd>,<date.yyyy>-<date.mm>-<date.dd>)	orq
+$ddcmd(<date.z> <time.h>:<time.mm>,<date.z> <time.h>:<time.mm>)	ouj
+$ddcmd(run(https://www.baidu.com/s?wd=<last.0>),[百度]：<last.0>)	oss
+$ddcmd(run(https://www.zdic.net/hans/?q=<last.1>),[汉典]：<last.1>)	ohd
+$ddcmd(run(http://www.xhup.club/?search_word=<last.1>),[小鹤查形]：<last.1>)	ohd
+$ddcmd(run(cmd.exe),[命令提示行])	ocm
+$ddcmd(run(::{20D04FE0-3AEA-1069-A2D8-08002B30309D}),[我的电脑])	odn
+$ddcmd(run(control.exe),[控制面板])	okv
+$ddcmd(run(::{450D8FBA-AD25-11D0-98A8-0800361B1103}),[我的文档])	owd
+$ddcmd(run(winword.exe),[word])	owd
+$ddcmd(run(excel.exe),[excel])	oec
+$ddcmd(run(mspaint.exe),[画图])	oht
+$ddcmd(run(notepad.exe),[记事本])	oju
+$ddcmd(keyboard(<32+Alt><78>),[最小化])	ozx
+$ddcmd(keyboard(<83+Shift+Win>),[截屏])	ojp
+$ddcmd(keyboard(<68+Win>),[桌面])	ovm
+$ddcmd(help(keyboardmap.html,600,500),[键盘图])	ojp
+$ddcmd(config(/do anjianshezhi),[按键定义])	oaj
+$ddcmd(config(/do 常用),[常用项])	oiy
+$ddcmd(config(/do 界面),[界面项])	ojm
+$ddcmd(config(/do 码表),[码表项])	omb
+$ddcmd(config(/do 高级),[高级项])	ogj
+$ddcmd(config(/do gaojishezhi),[高级设置])	ogj
+$ddcmd(config(/do about),[关于项])	ogy
+$ddcmd(set([-IME设置-],嵌入文本内容=嵌入编码),[嵌入编码])	oiq
+$ddcmd(set([-IME设置-],嵌入文本内容=嵌入首选),[嵌入首选])	oiq
+$ddcmd(set([-IME设置-],嵌入文本内容=传统样式),[传统样式])	oiq
+$ddcmd(set([-IME设置-],隐藏候选窗口=切换),[显隐候选窗])	oic
+$ddcmd(set([-SKIN设置-],候选列表排列样式=横排),[横排窗口])	oih
+$ddcmd(set([-SKIN设置-],候选列表排列样式=竖排),[竖排窗口])	oih
+$ddcmd(set([-DME设置-],查询输入只查单字=切换),[万能键查字词切换])	oiz
+$ddcmd(config(/do 输出反查),[反查]：<last.1>)	ofi
+$ddcmd(config(/do 剪贴板反查),[剪贴板反查])	ofi
+$ddcmd(config(/do 在线加词),[在线加词])	ojc
+$ddcmd(convert(中英文标点,切换),[中英文标点切换])	ovy
+$ddcmd(convert(全半角,切换),[全半角切换])	oqb
+$ddcmd(convert(繁体输出,切换),[简繁切换])	ojf
+$ddcmd(keyboard(<35><36+Shift><46>),[删当前行])	oui
+$ddcmd(keyboard(<35><36+Shift><46>),[删当前行])	oiu
+$ddcmd(config(/dict <last.1>),[字典]：<last.1>)	ozd
+$ddcmd(set([-IME设置-],禁用鼠标悬停词典=切换),[候选窗字典开关])	ozd
+$ddcmd(set([-IME设置-],检索次显码表=是),[启用单字全码])	oqm
+$ddcmd(set([-IME设置-],检索次显码表=否),[关闭])	oqm
+$ddcmd(set([-IME设置-],输入方案=主+辅),[启用词语辅助])	ocf
+$ddcmd(set([-IME设置-],输入方案=主),[关闭])	ocf
+$ddcmd(set([-SKIN设置-],使用皮肤名称=切换),[换肤])	ohf
+$ddcmd(set([-SKIN设置-],使用皮肤名称=fw.col),[默认])	ohf
+$ddcmd(keyboard(<173>),[静音开关])	ojy
+$ddcmd(run(https://flypy.com),[小鹤官网])	xhgw
+$ddcmd(run(https://bbs.flypy.com),[小鹤论坛])	xhlt
+$ddcmd(run(http://flypy.ys168.com),[小鹤网盘])	xhwp
