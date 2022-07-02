@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List
 
 from toolz.curried import filter, curry
-
+import common
 from common import full_to_two, get_exists_words
 from common import get_full_to_bingji_transformer, get_full_to_xhe_transformer, get_full_to_zrm_transformmer, \
     get_full_to_lu_transformmer, get_full
@@ -44,23 +44,6 @@ def cols_to_word_phone_table(cols: List[str], xhe_transformer, zrm_transformer,
     return item
 
 
-def contain_alpha(word: str) -> bool:
-    for c in word:
-        if c.lower() in "abcdefghijklmnopqrstuvwxyz":
-            return True
-
-    return False
-
-
-def contain_symbols(word: str) -> bool:
-    if re.match(
-            '[1234567890’!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~，。！@#$%^&*………_+}{}]+',
-            word) is None:
-        return False
-    else:
-        return True
-
-
 def load_words(filepath: str):
     exist_words = get_exists_words()
 
@@ -78,7 +61,7 @@ def load_words(filepath: str):
             if len(cols) > 5:
                 print(f"wrong line {line}")
                 continue
-            if contain_alpha(cols[0]) or contain_symbols(cols[0]):
+            if common.contain_alpha(cols[0]) or common.contain_symbols(cols[0]):
                 print(f"contains num or symbols {line}")
                 continue
             if cols[0] in exist_words: continue
