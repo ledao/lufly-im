@@ -148,7 +148,7 @@ def generate_single_chars(schema: ShuangPinSchema) -> List[EncodeDecode]:
 
     result: List[EncodeDecode] = []
     for item in CharPhoneTable.select().order_by(
-            CharPhoneTable.priority.desc()):
+            CharPhoneTable.priority.desc(), CharPhoneTable.id.asc()):
         if schema == XHE_SP_SCHEMA:
             phones = item.xhe
         elif schema == LU_SP_SCHEMA:
@@ -181,7 +181,7 @@ def generate_simpler_words(char_threshold: int, word_threshold: int, schema: Shu
     char_to_shape = get_char_to_xhe_shapes()
     single_chars: Dict[str, CharPhoneTable] = {}
     for item in CharPhoneTable.select().order_by(
-            CharPhoneTable.priority.desc()):
+            CharPhoneTable.priority.desc(), CharPhoneTable.id.asc()):
         if schema == XHE_SP_SCHEMA:
             phones = item.xhe
         elif schema == LU_SP_SCHEMA:
@@ -212,7 +212,7 @@ def generate_simpler_words(char_threshold: int, word_threshold: int, schema: Shu
     exit_word_phones = set()
     for item in WordPhoneTable.select().order_by(
             fn.LENGTH(WordPhoneTable.word),
-            WordPhoneTable.priority.desc()):
+            WordPhoneTable.priority.desc(), WordPhoneTable.id.asc()):
         if schema == XHE_SP_SCHEMA:
             phones = item.xhe
         elif schema == LU_SP_SCHEMA:
@@ -246,7 +246,7 @@ def generate_full_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
     exit_word_phones = set()
     for item in WordPhoneTable.select().order_by(
             fn.LENGTH(WordPhoneTable.word),
-            WordPhoneTable.priority.desc()):
+            WordPhoneTable.priority.desc(), WordPhoneTable.id.asc()):
         if schema == XHE_SP_SCHEMA:
             phones = item.xhe
         elif schema == LU_SP_SCHEMA:
@@ -685,7 +685,7 @@ def generate_4_len_wordphonetable_words(schema: ShuangPinSchema) -> List[EncodeD
     exit_word_phones = set()
     for item in WordPhoneTable.select().order_by(
             fn.LENGTH(WordPhoneTable.word),
-            WordPhoneTable.priority.desc()):
+            WordPhoneTable.priority.desc(), WordPhoneTable.id.asc()):
         if len(item.word) <= 3:
             continue
         if schema == XHE_SP_SCHEMA:
