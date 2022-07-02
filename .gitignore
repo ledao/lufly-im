@@ -126,4 +126,7 @@ lufly/win-dd/$码表文件/sys_top_chars_data.txt
 .idea
 lufly/win-dd/*/*/*.exe
 lufly/sys_data/sys_table.sqlite-journal
-*.txt
+/*.txt
+/lufly/win-dd/lufly-im-v4-xiaohe/$码表文件/*.txt
+/lufly/win-dd/lufly-im-v4-xiaolu/$码表文件/*.txt
+/lufly/win-dd/lufly-im-v4-ziranma/$码表文件/*.txt
