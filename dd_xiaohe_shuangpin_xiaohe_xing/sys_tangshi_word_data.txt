@@ -1335,7 +1335,7 @@
 岂力能制敌欤	qilingvidiyuey#序52000
 念天地之悠悠	nmtmdiviyzyzrr#序52000
 独怆然而泪下	duilrjerlwxxqa#序52000
-四郊秋叶摵摵	sijnqqyeueue#序52000
+四郊秋叶摵摵	sijnqqyeueuekf#序52000
 夜归鹿门山歌	yegvlumfujgewa#序52000
 云青青兮欲雨	yyqkqkxiyuyuea#序52000
 水澹澹兮生烟	uvdjdjxiugyjlh#序52000
@@ -1589,7 +1589,7 @@
 轻纨细绮相追飞	qkwjxiqixlvvfwiv#序52000
 贵戚权门得笔迹	gvqiqrmfdebijivz#序52000
 始觉屏障生光辉	uijtpkvhugglhvnx#序52000
-昔日太宗拳毛騧	xiritdzsqrmcgx#序52000
+昔日太宗拳毛騧	xiritdzsqrmcgxcm#序52000
 近时郭家狮子花	jbuigojxuizihxzc#序52000
 今之新图有二马	jbvixbtuyzermarv#序52000
 复令识者久叹嗟	fulkuivejqtjjppk#序52000
@@ -1741,7 +1741,7 @@
 当流赤足踏涧石	dhlqiizutajmuixa#序52000
 水声激激风吹衣	uvugjijifgivyilw#序52000
 人生如此自可乐	rfugrucizikelepp#序52000
-岂必局束为人靰	qibijuuuwwrfwu#序52000
+岂必局束为人靰	qibijuuuwwrfwuen#序52000
 嗟哉吾党二三子	jpzdwudhersjzikv#序52000
 安得至老不更归	andevilcbugggvbl#序52000
 纤云四卷天无河	xmyysijrtmwuhesd#序52000
@@ -2094,7 +2094,7 @@
 贼斫不死神扶持	zwvobusiuffuiikf#序52000
 腰悬相印作都统	ycxrxlybzodutsos#序52000
 阴风惨澹天王旗	ybfgcjdjtmwhqief#序52000
-愬武古通作牙爪	suwugutszoyavc#序52000
+愬武古通作牙爪	suwugutszoyavcbp#序52000
 仪曹外郎载笔随	yiccwdlhzdbisvre#序52000
 行军司马智且勇	xkjysimaviqpysis#序52000
 十四万众犹虎貔	uisiwjvsyzhupiav#序52000
@@ -2137,7 +2137,7 @@
 汉将辞家破残贼	hjjlcijxpocjzwdk#序52000
 男儿本自重横行	njerbfzivshgxkti#序52000
 天子非常赐颜色	tmzifwihciyjsead#序52000
-摐金伐鼓下榆关	iljbfaguxxyugr#序52000
+摐金伐鼓下榆关	iljbfaguxxyugrfb#序52000
 旌旗逶迤碣石间	jkqiwwyijpuijmfm#序52000
 校尉羽书飞瀚海	xnwwyuuufwhjhdmd#序52000
 单于猎火照狼山	ijyulphovclhujbl#序52000
@@ -2274,7 +2274,7 @@
 使人听此凋朱颜	uirftkcidnvuyjri#序52000
 连峰去天不盈尺	lmfgqutmbuykiizu#序52000
 枯松倒挂倚绝壁	kussdcgxyijtbimu#序52000
-飞湍瀑流争喧豗	fwtrpulqvgxrhv#序52000
+飞湍瀑流争喧豗	fwtrpulqvgxrhvvw#序52000
 剑阁峥嵘而崔嵬	jmgevgrsercvwwre#序52000
 侧身西望长咨嗟	ceufxiwhvhzijprk#序52000
 络纬秋啼金井阑	lowwqqtijbjkljsm#序52000
@@ -2503,7 +2503,7 @@
 为乘阳气行时令	wwigyhqixkuilkdr#序52000
 不是宸游玩物华	buuiifyzwjwuhxar#序52000
 积雨空林烟火迟	jiyukslbyjhoiihz#序52000
-蒸藜炊黍饷东菑	vgliivuuxldszd#序52000
+蒸藜炊黍饷东菑	vgliivuuxldszdcc#序52000
 漠漠水田飞白鹭	momouvtmfwbdludz#序52000
 阴阴夏木啭黄鹂	ybybxxmuvrhlliel#序52000
 山中习静观朝槿	ujvsxijkgricjblm#序52000
