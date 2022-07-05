@@ -18,17 +18,22 @@ def cols_to_word_phone_table(cols: List[str], xhe_transformer, zrm_transformer,
         word = cols[0]
         priority = 100
         full = get_full(word)
-    elif len(cols) == 2:
+    # elif len(cols) == 2:
+    #     word = cols[0]
+    #     priority = cols[1]
+    #     full = get_full(word)
+    elif len(cols) == 1 + len(cols[0]):
         word = cols[0]
-        priority = cols[1]
-        full = get_full(word)
+        priority = 100
+        full = list(filter(lambda e: len(e) > 0,
+                           [e.strip() for e in cols[1:]]))
     elif len(cols) == 2 + len(cols[0]):
         word = cols[0]
-        priority = cols[1]
+        priority = int(cols[-1])
         full = list(filter(lambda e: len(e) > 0,
-                           [e.strip() for e in cols[2:]]))
+                           [e.strip() for e in cols[1:len(cols)]]))
     else:
-        raise RuntimeError("word item should be: 你好 [priority ni hao]")
+        raise RuntimeError("word item should be: 你好 [ni hao 100]")
 
     item = WordPhoneTable(
         word=word,
@@ -58,9 +63,6 @@ def load_words(filepath: str):
             line = line.strip()
             if len(line) == 0: continue
             cols = line.split(" ")
-            if len(cols) > 5:
-                print(f"wrong line {line}")
-                continue
             if common.contain_alpha(cols[0]) or common.contain_symbols(cols[0]):
                 print(f"contains num or symbols {line}")
                 continue
@@ -74,8 +76,8 @@ def load_words(filepath: str):
 def main():
     if len(sys.argv) != 2:
         print(f"使用方法: python3 {sys.argv[0]} words.txt", file=sys.stderr)
-        print("文件行格式:word [prioroty w1_yin w2_yin ...]")
-        print("举例:你好 [10 ni hao]")
+        print("文件行格式:word [w1_yin w2_yin ... prioroty]")
+        print("举例:你好 [ni hao 100]")
         print("中括号内为可选内容")
         sys.exit(1)
 
