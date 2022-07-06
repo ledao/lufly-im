@@ -2,7 +2,7 @@
 import re
 import sys
 from datetime import datetime
-from typing import List
+from typing import List, Union
 
 from toolz.curried import filter, curry
 import common
@@ -13,11 +13,15 @@ from tables import db, WordPhoneTable
 
 
 def cols_to_word_phone_table(cols: List[str], xhe_transformer, zrm_transformer,
-                             bingji_transformer, lu_transformer) -> WordPhoneTable:
+                             bingji_transformer, lu_transformer) -> Union[WordPhoneTable, None]:
     if len(cols) == 1:
         word = cols[0]
         priority = 100
-        full = get_full(word)
+        try:
+            full = get_full(word)
+        except Exception as e:
+            print(e)
+            return None
     # elif len(cols) == 2:
     #     word = cols[0]
     #     priority = cols[1]
@@ -67,8 +71,10 @@ def load_words(filepath: str):
                 print(f"contains num or symbols {line}")
                 continue
             if cols[0] in exist_words: continue
-            words.append(cols_to_word_phone_table(cols, xhe_transformer, zrm_transformer, bingji_transformer, lu_transformer))
-            exist_words.add(cols[0])
+            item = cols_to_word_phone_table(cols, xhe_transformer, zrm_transformer, bingji_transformer, lu_transformer)
+            if item is not None:
+                words.append(item)
+                exist_words.add(cols[0])
 
     return words
 
