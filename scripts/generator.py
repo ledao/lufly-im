@@ -171,7 +171,7 @@ def generate_single_chars(schema: ShuangPinSchema) -> List[EncodeDecode]:
                 used_shapes.add(shape)
                 result.append(EncodeDecode(decode=item.char, encode=phones + shape, weight=item.priority))
         else:
-            print(f"没有形码的字：{item}")
+            print(f"没有形码的字：{item.char}")
             result.append(EncodeDecode(decode=item.char, encode=phones, weight=item.priority))
     return result
 
@@ -280,7 +280,7 @@ def generate_full_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
                         decode = item.word
                         result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
         else:
-            print(f"没有形码的词：{item}")
+            print(f"没有形码的词：{item.word}")
             result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
             continue
 
@@ -730,7 +730,7 @@ def generate_4_len_wordphonetable_words(schema: ShuangPinSchema) -> List[EncodeD
                         decode = item.word
                         result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
         else:
-            print(f"没有形码的词：{item}")
+            print(f"没有形码的词：{item.word}")
             result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
             continue
 
@@ -785,7 +785,7 @@ def generate_4_len_tangshi_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
                         decode = item.word
                         result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
         else:
-            print(f"没有形码的词：{item}")
+            print(f"没有形码的词：{item.word}")
             result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
             continue
 
@@ -840,7 +840,7 @@ def generate_tangshi_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
                         decode = item.word
                         result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
         else:
-            print(f"没有形码的词：{item}")
+            print(f"没有形码的词：{item.word}")
             result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
             continue
 
