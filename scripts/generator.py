@@ -297,14 +297,14 @@ def generate_eng() -> List[str]:
     return result
 
 
-def generate_simpler() -> List[str]:
+def generate_simpler() -> List[EncodeDecode]:
     result = []
     for item in SimplerTable.select().where(
             SimplerTable.priority > 0).order_by(SimplerTable.priority.desc()):
         encode = item.keys
         decode = item.words
         rule = f"{decode}\t{encode}"
-        result.append(f"{rule}")
+        result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
 
     return result
 
@@ -501,6 +501,9 @@ def generate_dict(config: SchemaConfig, outpath: str):
             fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
             fout.write(f"{item.decode}\t{item.encode}\n")
 
+        for item in generate_simpler():
+            fout.write(f"{item.decode}\t{item.encode}\n")
+
 
 def generate_schema_custom(config: SchemaConfig, outpath: str):
     with open(outpath, 'w', encoding='utf8') as fout:
@@ -650,7 +653,7 @@ def generate_dd(schema: ShuangPinSchema, output_dir: str):
         fout.write("---config@允许编辑=是\n")
         fout.write(f"---config@码表别名=系统简码\n")
         for item in generate_simpler():
-            fout.write(f"{item}\t#序{40000}\n")
+            fout.write(f"{item.decode}\t{item.encode}#序{40000}\n")
 
     with open(f'{output_dir}/sys_cmd_data.txt', 'w', encoding='utf8') as fout:
         fout.write("---config@码表分类=主码-10\n")
