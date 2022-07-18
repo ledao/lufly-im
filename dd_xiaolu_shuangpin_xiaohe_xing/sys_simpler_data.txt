@@ -15,7 +15,7 @@ CUDA	cuda#序40000
 C++	cpp#序40000
 Gradle	gradle#序40000
 GPU	gpu#序40000
-GoRoutinE	goroutine#序40000
+GoRoutine	goroutine#序40000
 ω	oxomega#序40000
 ψ	oxpsi#序40000
 χ	oxchi#序40000
