@@ -472,16 +472,23 @@ def generate_dict(config: SchemaConfig, outpath: str):
 
         fout.write(f"\n# 单字\n")
 
-        one_hit_char_items = generate_one_hit_char()
-        top_single_chars_items = generate_topest_char(config.shuangpin_schema)
-        for item in one_hit_char_items:
+        for item in generate_one_hit_char():
             fout.write(f"{item.decode}\t{item.encode}\n")
-        for item in top_single_chars_items:
+        for item in generate_topest_char(config.shuangpin_schema):
             fout.write(f"{item.decode}\t{item.encode}\n")
 
-        for item in generate_single_chars(config.shuangpin_schema):
+        single_chars = generate_single_chars(config.shuangpin_schema)
+        for item in single_chars:
             fout.write(f"{item.decode}\t{item.encode[:-2]}\n")
             fout.write(f"{item.decode}\t{item.encode[:-1]}\n")
+
+        high_word, low_words = generate_simpler_words(100, 2000, config.shuangpin_schema)
+        for item in high_word:
+            fout.write(f"{item.decode}\t{item.encode}\n")
+        for item in low_words:
+            fout.write(f"{item.decode}\t{item.encode}\n")
+
+        for item in single_chars:
             fout.write(f"{item.decode}\t{item.encode}\n")
 
         fout.write(f"\n# 词语\n")
