@@ -479,13 +479,15 @@ def generate_dict(config: SchemaConfig, outpath: str):
 
         single_chars = generate_single_chars(config.shuangpin_schema)
         for item in single_chars:
-            fout.write(f"{item.decode}\t{item.encode[:-2]}\n")
             fout.write(f"{item.decode}\t{item.encode[:-1]}\n")
 
+        special_words = set()
         high_word, low_words = generate_simpler_words(100, 2000, config.shuangpin_schema)
         for item in high_word:
+            special_words.add(item.decode)
             fout.write(f"{item.decode}\t{item.encode}\n")
         for item in low_words:
+            special_words.add(item.decode)
             fout.write(f"{item.decode}\t{item.encode}\n")
 
         for item in single_chars:
@@ -494,7 +496,8 @@ def generate_dict(config: SchemaConfig, outpath: str):
         fout.write(f"\n# 词语\n")
 
         for item in generate_full_words(config.shuangpin_schema):
-            fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
+            if item.decode not in special_words:
+                fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
             fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
             fout.write(f"{item.decode}\t{item.encode}\n")
 
@@ -590,6 +593,7 @@ def generate_dd(schema: ShuangPinSchema, output_dir: str):
         raise RuntimeError(f"{schema} not found")
 
     sys_top_chars_data = f"{output_dir}/sys_top_chars_data.txt"
+    single_chars = generate_single_chars(schema)
     with open(sys_top_chars_data, 'w', encoding='utf8') as fout:
         fout.write("---config@码表分类=主码-1\n")
         fout.write("---config@允许编辑=是\n")
@@ -598,14 +602,8 @@ def generate_dd(schema: ShuangPinSchema, output_dir: str):
             fout.write(f"{item.decode}\t{item.encode}#序{90000}\n")
         for item in generate_topest_char(schema):
             fout.write(f"{item.decode}\t{item.encode}#序{80000}\n")
-
-    sys_single_char_data = f"{output_dir}/sys_single_char_data.txt"
-    with open(sys_single_char_data, 'w', encoding='utf8') as fout:
-        fout.write("---config@码表分类=主码-2\n")
-        fout.write("---config@允许编辑=是\n")
-        fout.write(f"---config@码表别名=系统单字\n")
-        for item in generate_single_chars(schema):
-            fout.write(f"{item.decode}\t{item.encode}#序{70000}\n")
+        for item in single_chars:
+            fout.write(f"{item.decode}\t{item.encode[:-1]}#序{75000}\n")
 
     high_freq_words, low_freq_words = generate_simpler_words(100, 2000, schema)
     sys_high_freq_word_data = f"{output_dir}/sys_high_word_data.txt"
@@ -615,13 +613,25 @@ def generate_dd(schema: ShuangPinSchema, output_dir: str):
         fout.write(f"---config@码表别名=高频简词\n")
         for item in high_freq_words:
             fout.write(f"{item.decode}\t{item.encode}#序{75000}\n")
+        for item in low_freq_words:
+            fout.write(f"{item.decode}\t{item.encode}#序{75000}\n")
+
+    sys_single_char_data = f"{output_dir}/sys_single_char_data.txt"
+    with open(sys_single_char_data, 'w', encoding='utf8') as fout:
+        fout.write("---config@码表分类=主码-2\n")
+        fout.write("---config@允许编辑=是\n")
+        fout.write(f"---config@码表别名=系统单字\n")
+        for item in single_chars:
+            fout.write(f"{item.decode}\t{item.encode}#序{70000}\n")
+
+    #TODO:: 删除此表
     sys_low_freq_word_data = f"{output_dir}/sys_low_word_data.txt"
     with open(sys_low_freq_word_data, 'w', encoding='utf8') as fout:
         fout.write("---config@码表分类=主码-4\n")
         fout.write("---config@允许编辑=是\n")
         fout.write(f"---config@码表别名=低频简词\n")
-        for item in low_freq_words:
-            fout.write(f"{item.decode}\t{item.encode}#序{65000}\n")
+        # for item in low_freq_words:
+        #     fout.write(f"{item.decode}\t{item.encode}#序{65000}\n")
 
     sys_word_data = f"{output_dir}/sys_word_data.txt"
     with open(sys_word_data, 'w', encoding='utf8') as fout:
