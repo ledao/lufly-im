@@ -486,11 +486,12 @@ def generate_dict(config: SchemaConfig, outpath: str):
         for item in high_word:
             special_words.add(item.decode)
             fout.write(f"{item.decode}\t{item.encode}\n")
-        for item in low_words:
-            special_words.add(item.decode)
-            fout.write(f"{item.decode}\t{item.encode}\n")
 
         for item in single_chars:
+            fout.write(f"{item.decode}\t{item.encode}\n")
+
+        for item in low_words:
+            special_words.add(item.decode)
             fout.write(f"{item.decode}\t{item.encode}\n")
 
         fout.write(f"\n# 词语\n")
@@ -613,8 +614,6 @@ def generate_dd(schema: ShuangPinSchema, output_dir: str):
         fout.write(f"---config@码表别名=高频简词\n")
         for item in high_freq_words:
             fout.write(f"{item.decode}\t{item.encode}#序{75000}\n")
-        for item in low_freq_words:
-            fout.write(f"{item.decode}\t{item.encode}#序{75000}\n")
 
     sys_single_char_data = f"{output_dir}/sys_single_char_data.txt"
     with open(sys_single_char_data, 'w', encoding='utf8') as fout:
@@ -624,14 +623,13 @@ def generate_dd(schema: ShuangPinSchema, output_dir: str):
         for item in single_chars:
             fout.write(f"{item.decode}\t{item.encode}#序{70000}\n")
 
-    #TODO:: 删除此表
     sys_low_freq_word_data = f"{output_dir}/sys_low_word_data.txt"
     with open(sys_low_freq_word_data, 'w', encoding='utf8') as fout:
         fout.write("---config@码表分类=主码-4\n")
         fout.write("---config@允许编辑=是\n")
         fout.write(f"---config@码表别名=低频简词\n")
-        # for item in low_freq_words:
-        #     fout.write(f"{item.decode}\t{item.encode}#序{65000}\n")
+        for item in low_freq_words:
+            fout.write(f"{item.decode}\t{item.encode}#序{65000}\n")
 
     sys_word_data = f"{output_dir}/sys_word_data.txt"
     with open(sys_word_data, 'w', encoding='utf8') as fout:
