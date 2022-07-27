@@ -31,6 +31,10 @@ def load_rime_export_words(path: str, sikp_words_path: str, out_path):
                 continue
             if word.endswith('的'):
                 continue
+            if word.startswith('了'):
+                continue
+            if word.endswith('了'):
+                continue
             if len(word) > 3:
                 continue
             if word in exists_words:
