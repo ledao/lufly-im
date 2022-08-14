@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import List, Dict, Tuple
+from tqdm import trange
 
 from peewee import fn
 
@@ -472,48 +473,71 @@ def generate_dict(config: SchemaConfig, outpath: str):
 
         fout.write(f"\n# 单字\n")
 
-        for item in generate_one_hit_char():
-            fout.write(f"{item.decode}\t{item.encode}\n")
-        for item in generate_topest_char(config.shuangpin_schema):
-            fout.write(f"{item.decode}\t{item.encode}\n")
+        with trange(6, desc="writing chars", position=0) as pbar: # 6个单字处理
+            pbar.set_postfix_str("writing one hit chars")
+            for item in generate_one_hit_char():
+                fout.write(f"{item.decode}\t{item.encode}\n")
+            pbar.update()
+            
+            pbar.set_postfix_str("writing topest chars")
+            for item in generate_topest_char(config.shuangpin_schema):
+                fout.write(f"{item.decode}\t{item.encode}\n")
+            pbar.update()
 
-        single_chars = generate_single_chars(config.shuangpin_schema)
-        for item in single_chars:
-            fout.write(f"{item.decode}\t{item.encode[:-1]}\n")
+            pbar.set_postfix_str("writing single chars")
+            single_chars = generate_single_chars(config.shuangpin_schema)
+            for item in single_chars:
+                fout.write(f"{item.decode}\t{item.encode[:-1]}\n")
+            pbar.update()
 
-        special_words = set()
-        high_word, low_words = generate_simpler_words(100, 2000, config.shuangpin_schema)
-        for item in high_word:
-            special_words.add(item.decode)
-            fout.write(f"{item.decode}\t{item.encode}\n")
+            pbar.set_postfix_str("writing simpler words")
+            special_words = set()
+            high_word, low_words = generate_simpler_words(100, 2000, config.shuangpin_schema)
+            for item in high_word:
+                special_words.add(item.decode)
+                fout.write(f"{item.decode}\t{item.encode}\n")
+            pbar.update()
 
-        for item in single_chars:
-            fout.write(f"{item.decode}\t{item.encode}\n")
+            pbar.set_postfix_str("writing single chars (full code)")
+            for item in single_chars:
+                fout.write(f"{item.decode}\t{item.encode}\n")
+            pbar.update()
 
-        for item in low_words:
-            special_words.add(item.decode)
-            fout.write(f"{item.decode}\t{item.encode}\n")
+            pbar.set_postfix_str("writing special words")
+            for item in low_words:
+                special_words.add(item.decode)
+                fout.write(f"{item.decode}\t{item.encode}\n")
+            pbar.update()
 
         fout.write(f"\n# 词语\n")
 
-        for item in generate_full_words(config.shuangpin_schema):
-            if item.decode not in special_words:
+        with trange(4, desc="writing words") as pbar: # 4个词语处理
+            pbar.set_postfix_str("writing full words")
+            for item in generate_full_words(config.shuangpin_schema):
+                if item.decode not in special_words:
+                    fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
+                fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
+                fout.write(f"{item.decode}\t{item.encode}\n")
+            pbar.update()
+
+            pbar.set_postfix_str("writing tangshi words")
+            for item in generate_tangshi_words(config.shuangpin_schema):
                 fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
-            fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
-            fout.write(f"{item.decode}\t{item.encode}\n")
+                fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
+                fout.write(f"{item.decode}\t{item.encode}\n")
+            pbar.update()
 
-        for item in generate_tangshi_words(config.shuangpin_schema):
-            fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
-            fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
-            fout.write(f"{item.decode}\t{item.encode}\n")
+            pbar.set_postfix_str("writing 4 len word simpler items")
+            for item in generate_4_len_word_simpler_items(config.shuangpin_schema):
+                fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
+                fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
+                fout.write(f"{item.decode}\t{item.encode}\n")
+            pbar.update()
 
-        for item in generate_4_len_word_simpler_items(config.shuangpin_schema):
-            fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
-            fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
-            fout.write(f"{item.decode}\t{item.encode}\n")
-
-        for item in generate_simpler():
-            fout.write(f"{item.decode}\t{item.encode}\n")
+            pbar.set_postfix_str("writing simpler words")
+            for item in generate_simpler():
+                fout.write(f"{item.decode}\t{item.encode}\n")
+            pbar.update()
 
 
 def generate_schema_custom(config: SchemaConfig, outpath: str):
