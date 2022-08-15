@@ -1,8 +1,9 @@
 import imp
 import re
+from tqdm import tqdm
 
 import tables
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from dataclasses import dataclass
 from typing import Tuple, List, Dict, Set
 
@@ -326,37 +327,40 @@ def get_exists_words() -> Set[str]:
 
 def check_wordphonetable_pinyin(transformer: Dict[str, str], schema: ShuangPinSchema):
     to_update_items = []
-    for item in WordPhoneTable.select():
-        fulls = item.full
-        if schema == XHE_SP_SCHEMA:
-            shuangpin = item.xhe
-        elif schema == LU_SP_SCHEMA:
-            shuangpin = item.lu
-        elif schema == ZRM_SP_SCHEMA:
-            shuangpin = item.zrm
-        elif schema == BINGJI_SP_SCHEMA:
-            shuangpin = item.bingji
-        else:
-            raise RuntimeError(f'unknown schema: {schema}')
-
-        full_shuangpins_arr = []
-        for full in fulls.split(' '):
-            s, y = split_sy(full)
-            sp = transformer[s] + transformer[y]
-            full_shuangpins_arr.append(sp)
-        full_shuangpins = ''.join(full_shuangpins_arr)
-        if full_shuangpins != shuangpin:
+    with tqdm(total=len(WordPhoneTable), desc="checking word phone table") as pbar:
+        for item in WordPhoneTable.select():
+            fulls = item.full
             if schema == XHE_SP_SCHEMA:
-                item.xhe = full_shuangpins
+                shuangpin = item.xhe
             elif schema == LU_SP_SCHEMA:
-                item.lu = full_shuangpins
+                shuangpin = item.lu
             elif schema == ZRM_SP_SCHEMA:
-                item.zrm = full_shuangpins
+                shuangpin = item.zrm
             elif schema == BINGJI_SP_SCHEMA:
-                item.bingji = full_shuangpins
+                shuangpin = item.bingji
             else:
                 raise RuntimeError(f'unknown schema: {schema}')
-            to_update_items.append(item)
+
+            full_shuangpins_arr = []
+            for full in fulls.split(' '):
+                s, y = split_sy(full)
+                sp = transformer[s] + transformer[y]
+                full_shuangpins_arr.append(sp)
+            full_shuangpins = ''.join(full_shuangpins_arr)
+            if full_shuangpins != shuangpin:
+                if schema == XHE_SP_SCHEMA:
+                    item.xhe = full_shuangpins
+                elif schema == LU_SP_SCHEMA:
+                    item.lu = full_shuangpins
+                elif schema == ZRM_SP_SCHEMA:
+                    item.zrm = full_shuangpins
+                elif schema == BINGJI_SP_SCHEMA:
+                    item.bingji = full_shuangpins
+                else:
+                    raise RuntimeError(f'unknown schema: {schema}')
+                to_update_items.append(item)
+                pbar.set_postfix(OrderedDict(word=item.word, before=shuangpin, after=full_shuangpins))
+            pbar.update()
 
     with db.atomic():
         if schema == XHE_SP_SCHEMA:
@@ -384,37 +388,40 @@ def check_wordphonetable_pinyin(transformer: Dict[str, str], schema: ShuangPinSc
 
 def check_tangshitable_pinyin(transformer: Dict[str, str], schema: ShuangPinSchema):
     to_update_items = []
-    for item in TangshiTable.select():
-        fulls = item.full
-        if schema == XHE_SP_SCHEMA:
-            shuangpin = item.xhe
-        elif schema == LU_SP_SCHEMA:
-            shuangpin = item.lu
-        elif schema == ZRM_SP_SCHEMA:
-            shuangpin = item.zrm
-        elif schema == BINGJI_SP_SCHEMA:
-            shuangpin = item.bingji
-        else:
-            raise RuntimeError(f'unknown schema: {schema}')
-
-        full_shuangpins_arr = []
-        for full in fulls.split(' '):
-            s, y = split_sy(full)
-            sp = transformer[s] + transformer[y]
-            full_shuangpins_arr.append(sp)
-        full_shuangpins = ''.join(full_shuangpins_arr)
-        if full_shuangpins != shuangpin:
+    with tqdm(total=len(TangshiTable), desc="checking tangshi table") as pbar:
+        for item in TangshiTable.select():
+            fulls = item.full
             if schema == XHE_SP_SCHEMA:
-                item.xhe = full_shuangpins
+                shuangpin = item.xhe
             elif schema == LU_SP_SCHEMA:
-                item.lu = full_shuangpins
+                shuangpin = item.lu
             elif schema == ZRM_SP_SCHEMA:
-                item.zrm = full_shuangpins
+                shuangpin = item.zrm
             elif schema == BINGJI_SP_SCHEMA:
-                item.bingji = full_shuangpins
+                shuangpin = item.bingji
             else:
                 raise RuntimeError(f'unknown schema: {schema}')
-            to_update_items.append(item)
+
+            full_shuangpins_arr = []
+            for full in fulls.split(' '):
+                s, y = split_sy(full)
+                sp = transformer[s] + transformer[y]
+                full_shuangpins_arr.append(sp)
+            full_shuangpins = ''.join(full_shuangpins_arr)
+            if full_shuangpins != shuangpin:
+                if schema == XHE_SP_SCHEMA:
+                    item.xhe = full_shuangpins
+                elif schema == LU_SP_SCHEMA:
+                    item.lu = full_shuangpins
+                elif schema == ZRM_SP_SCHEMA:
+                    item.zrm = full_shuangpins
+                elif schema == BINGJI_SP_SCHEMA:
+                    item.bingji = full_shuangpins
+                else:
+                    raise RuntimeError(f'unknown schema: {schema}')
+                to_update_items.append(item)
+                pbar.set_postfix(OrderedDict(word=item.word, before=shuangpin, after=full_shuangpins))
+            pbar.update()
 
     with db.atomic():
         if schema == XHE_SP_SCHEMA:
@@ -447,32 +454,36 @@ def check_words_pinyin(transformer: Dict[str, str], schema: ShuangPinSchema):
 
 def check_chars_pinyin(transformer: Dict[str, str], schema: ShuangPinSchema):
     to_update_items = []
-    for item in CharPhoneTable.select():
-        full = item.full
-        if schema == XHE_SP_SCHEMA:
-            shuangpin = item.xhe
-        elif schema == LU_SP_SCHEMA:
-            shuangpin = item.lu
-        elif schema == ZRM_SP_SCHEMA:
-            shuangpin = item.zrm
-        elif schema == BINGJI_SP_SCHEMA:
-            shuangpin = item.bingji
-        else:
-            raise RuntimeError(f"unkonwn schame {schema}")
-        s, y = split_sy(full)
-        sp = transformer[s] + transformer[y]
-        if shuangpin != sp:
+    with tqdm(total=len(CharPhoneTable), desc="checking char phone table") as pbar:
+        for item in CharPhoneTable.select():
+            full = item.full
             if schema == XHE_SP_SCHEMA:
-                item.xhe = sp
+                shuangpin = item.xhe
             elif schema == LU_SP_SCHEMA:
-                item.lu = sp
+                shuangpin = item.lu
             elif schema == ZRM_SP_SCHEMA:
-                item.zrm = sp
+                shuangpin = item.zrm
             elif schema == BINGJI_SP_SCHEMA:
-                item.bingji = sp
+                shuangpin = item.bingji
             else:
                 raise RuntimeError(f"unkonwn schame {schema}")
-            to_update_items.append(item)
+            s, y = split_sy(full)
+            sp = transformer[s] + transformer[y]
+            if shuangpin != sp:
+                if schema == XHE_SP_SCHEMA:
+                    item.xhe = sp
+                elif schema == LU_SP_SCHEMA:
+                    item.lu = sp
+                elif schema == ZRM_SP_SCHEMA:
+                    item.zrm = sp
+                elif schema == BINGJI_SP_SCHEMA:
+                    item.bingji = sp
+                else:
+                    raise RuntimeError(f"unkonwn schame {schema}")
+                to_update_items.append(item)
+                pbar.set_postfix(to_update=item.char)
+                pbar.set_postfix(OrderedDict(char=item.char, before=shuangpin, after=sp))
+            pbar.update()
 
     with db.atomic():
         if schema == XHE_SP_SCHEMA:
