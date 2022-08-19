@@ -489,7 +489,7 @@ def generate_dict(schema_config: SchemaConfig, outpath: str):
         with tqdm(total=len(single_chars), desc="写入简码单字") as pbar:
             for item in single_chars:
                 fout.write(f"{item.decode}\t{item.encode[:-1]}\n")
-                pbar.update(1)
+                pbar.update()
 
         special_words = set()
         high_word, low_words = generate_simpler_words(100, 2000, schema_config.shuangpin_schema)
