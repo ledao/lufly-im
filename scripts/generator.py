@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from dataclasses import dataclass
 from typing import List, Dict, Tuple
 
 from peewee import fn
@@ -419,17 +418,17 @@ def generate_schema(config: SchemaConfig, outpath: str):
         fout.write(f"  horizontal: true\n")
 
 
-def generate_dict(config: SchemaConfig, outpath: str):
-    if config.shuangpin_schema == XHE_SP_SCHEMA:
+def generate_dict(schema_config: SchemaConfig, outpath: str):
+    if schema_config.shuangpin_schema == XHE_SP_SCHEMA:
         char_to_phones = get_char_to_xhe_phones()
-    elif config.shuangpin_schema == LU_SP_SCHEMA:
+    elif schema_config.shuangpin_schema == LU_SP_SCHEMA:
         char_to_phones = get_char_to_lu_phones()
-    elif config.shuangpin_schema == ZRM_SP_SCHEMA:
+    elif schema_config.shuangpin_schema == ZRM_SP_SCHEMA:
         char_to_phones = get_char_to_zrm_phones()
-    elif config.shuangpin_schema == BINGJI_SP_SCHEMA:
+    elif schema_config.shuangpin_schema == BINGJI_SP_SCHEMA:
         char_to_phones = get_char_to_bingji_phones()
     else:
-        raise RuntimeError(f"{config.shuangpin_schema} not found")
+        raise RuntimeError(f"{schema_config.shuangpin_schema} not found")
 
     print(f"total {len(char_to_phones)} char phones")
 
@@ -437,15 +436,15 @@ def generate_dict(config: SchemaConfig, outpath: str):
     print(f"total {len(char_to_shape)} char shapes")
 
     with open(outpath, 'w', encoding='utf8') as fout:
-        fout.write(f"# {config.schema_id} dictionary\n")
+        fout.write(f"# {schema_config.schema_id} dictionary\n")
         fout.write(f"# encoding: utf-8\n")
         fout.write(f"# \n")
-        fout.write(f"# {config.name}码表\n")
+        fout.write(f"# {schema_config.name}码表\n")
         fout.write(f"# 机器生成，请勿修改\n")
 
         fout.write(f"\n---\n")
-        fout.write(f"name: {config.schema_id}\n")
-        fout.write(f'version: "{config.version}"\n')
+        fout.write(f"name: {schema_config.schema_id}\n")
+        fout.write(f'version: "{schema_config.version}"\n')
         fout.write(f'sort: original\n')
         fout.write(f'use_preset_vocabulary: false\n')  # 是否使用预设词表
 
@@ -475,74 +474,74 @@ def generate_dict(config: SchemaConfig, outpath: str):
         fout.write(f"\n# 单字\n")
 
         one_hit_chars = generate_one_hit_char()
-        with tqdm(total=len(one_hit_chars), desc="写入一简码") as bar:
+        with tqdm(total=len(one_hit_chars), desc="写入一简码") as pbar:
             for item in one_hit_chars:
                 fout.write(f"{item.decode}\t{item.encode}\n")
-                bar.update()
+                pbar.update()
 
-        two_hits_chars = generate_topest_char(config.shuangpin_schema)
-        with tqdm(total=len(two_hits_chars), desc="写入二简码") as bar:
+        two_hits_chars = generate_topest_char(schema_config.shuangpin_schema)
+        with tqdm(total=len(two_hits_chars), desc="写入二简码") as pbar:
             for item in two_hits_chars:
                 fout.write(f"{item.decode}\t{item.encode}\n")
-                bar.update()
+                pbar.update()
 
-        single_chars = generate_single_chars(config.shuangpin_schema)
-        with tqdm(total=len(single_chars), desc="写入简码单字") as bar:
+        single_chars = generate_single_chars(schema_config.shuangpin_schema)
+        with tqdm(total=len(single_chars), desc="写入简码单字") as pbar:
             for item in single_chars:
                 fout.write(f"{item.decode}\t{item.encode[:-1]}\n")
-                bar.update()
+                pbar.update(1)
 
         special_words = set()
-        high_word, low_words = generate_simpler_words(100, 2000, config.shuangpin_schema)
-        with tqdm(total=len(high_word), desc="写入高频词简码") as bar:
+        high_word, low_words = generate_simpler_words(100, 2000, schema_config.shuangpin_schema)
+        with tqdm(total=len(high_word), desc="写入高频词简码") as pbar:
             for item in high_word:
                 special_words.add(item.decode)
                 fout.write(f"{item.decode}\t{item.encode}\n")
-                bar.update()
+                pbar.update()
 
-        with tqdm(total=len(single_chars), desc="写入全码单字") as bar:
+        with tqdm(total=len(single_chars), desc="写入全码单字") as pbar:
             for item in single_chars:
                 fout.write(f"{item.decode}\t{item.encode}\n")
-                bar.update()
+                pbar.update()
 
-        with tqdm(total=len(low_words), desc="写入低频词简码") as bar:
+        with tqdm(total=len(low_words), desc="写入低频词简码") as pbar:
             for item in low_words:
                 special_words.add(item.decode)
                 fout.write(f"{item.decode}\t{item.encode}\n")
-                bar.update()
+                pbar.update()
 
         fout.write(f"\n# 词语\n")
 
-        full_words = generate_full_words(config.shuangpin_schema)
-        with tqdm(total=len(full_words), desc="写入词") as bar:
+        full_words = generate_full_words(schema_config.shuangpin_schema)
+        with tqdm(total=len(full_words), desc="写入词") as pbar:
             for item in full_words:
                 if item.decode not in special_words:
                     fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
                 fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
                 fout.write(f"{item.decode}\t{item.encode}\n")
-                bar.update()
+                pbar.update()
 
-        tangshi_words = generate_tangshi_words(config.shuangpin_schema)
-        with tqdm(total=len(tangshi_words), desc="写入诗词") as bar:
+        tangshi_words = generate_tangshi_words(schema_config.shuangpin_schema)
+        with tqdm(total=len(tangshi_words), desc="写入诗词") as pbar:
             for item in tangshi_words:
                 fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
                 fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
                 fout.write(f"{item.decode}\t{item.encode}\n")
-                bar.update()
+                pbar.update()
 
-        len4_words = generate_4_len_word_simpler_items(config.shuangpin_schema)
-        with tqdm(total=len(len4_words), desc="写入词简码") as bar:
+        len4_words = generate_4_len_word_simpler_items(schema_config.shuangpin_schema)
+        with tqdm(total=len(len4_words), desc="写入词简码") as pbar:
             for item in len4_words:
                 fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
                 fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
                 fout.write(f"{item.decode}\t{item.encode}\n")
-                bar.update()
+                pbar.update()
 
         simpler_words = generate_simpler()
-        with tqdm(total=len(simpler_words), desc="写入简词") as bar:
+        with tqdm(total=len(simpler_words), desc="写入简词") as pbar:
             for item in simpler_words:
                 fout.write(f"{item.decode}\t{item.encode}\n")
-                bar.update()
+                pbar.update()
 
 
 def generate_schema_custom(config: SchemaConfig, outpath: str):
@@ -628,12 +627,18 @@ def generate_dd(schema: ShuangPinSchema, output_dir: str):
         fout.write("---config@码表分类=主码-1\n")
         fout.write("---config@允许编辑=是\n")
         fout.write(f"---config@码表别名=简码单字\n")
-        for item in generate_one_hit_char():
-            fout.write(f"{item.decode}\t{item.encode}#序{90000}\n")
-        for item in generate_topest_char(schema):
-            fout.write(f"{item.decode}\t{item.encode}#序{80000}\n")
-        for item in single_chars:
-            fout.write(f"{item.decode}\t{item.encode[:-1]}#序{75000}\n")
+        one_hit_chars = generate_one_hit_char()
+        topest_chars = generate_topest_char(schema)
+        with tqdm(total=len(one_hit_chars) + len(topest_chars) + len(single_chars), desc="写入简码单字") as pbar:
+            for item in one_hit_chars:
+                fout.write(f"{item.decode}\t{item.encode}#序{90000}\n")
+            pbar.update(len(one_hit_chars))
+            for item in topest_chars:
+                fout.write(f"{item.decode}\t{item.encode}#序{80000}\n")
+            pbar.update(len(topest_chars))
+            for item in single_chars:
+                fout.write(f"{item.decode}\t{item.encode[:-1]}#序{75000}\n")
+            pbar.update(len(single_chars))
 
     high_freq_words, low_freq_words = generate_simpler_words(100, 2000, schema)
     sys_high_freq_word_data = f"{output_dir}/sys_high_word_data.txt"
