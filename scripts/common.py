@@ -327,7 +327,7 @@ def get_exists_words() -> Set[str]:
 
 def check_wordphonetable_pinyin(transformer: Dict[str, str], schema: ShuangPinSchema):
     to_update_items = []
-    with tqdm(total=len(WordPhoneTable), desc="checking word phone table") as pbar:
+    with tqdm(total=len(WordPhoneTable), desc="检查词的拼音") as pbar:
         for item in WordPhoneTable.select():
             fulls = item.full
             if schema == XHE_SP_SCHEMA:
@@ -388,7 +388,7 @@ def check_wordphonetable_pinyin(transformer: Dict[str, str], schema: ShuangPinSc
 
 def check_tangshitable_pinyin(transformer: Dict[str, str], schema: ShuangPinSchema):
     to_update_items = []
-    with tqdm(total=len(TangshiTable), desc="checking tangshi table") as pbar:
+    with tqdm(total=len(TangshiTable), desc="检查诗词的拼音") as pbar:
         for item in TangshiTable.select():
             fulls = item.full
             if schema == XHE_SP_SCHEMA:
@@ -454,7 +454,7 @@ def check_words_pinyin(transformer: Dict[str, str], schema: ShuangPinSchema):
 
 def check_chars_pinyin(transformer: Dict[str, str], schema: ShuangPinSchema):
     to_update_items = []
-    with tqdm(total=len(CharPhoneTable), desc="checking char phone table") as pbar:
+    with tqdm(total=len(CharPhoneTable), desc="检查字的拼音") as pbar:
         for item in CharPhoneTable.select():
             full = item.full
             if schema == XHE_SP_SCHEMA:
