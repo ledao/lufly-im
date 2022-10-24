@@ -53,7 +53,7 @@ def generate_one_hit_char() -> List[EncodeDecode]:
     return [EncodeDecode(encode=e.split("\t")[1], decode=e.split("\t")[0], weight=100000000) for e in items]
 
 
-def generate_topest_char(schema: ShuangPinSchema) -> List[EncodeDecode]:
+def generate_tow_hits_char(schema: ShuangPinSchema) -> List[EncodeDecode]:
     chars = """去 我 二 人 他  一 是 出 哦 平 啊 三 的 非 个 和 就 可 了 小 才 这 不 你 没 阿 爱 安 昂 奥 把 白 办 帮 报 被 本 蹦 比 边 表 别 滨 并 拨 部 擦 菜 参 藏 藏 草 测 岑 曾 拆 产 超 车 陈 成 吃 冲 抽 处 揣 传 窗 吹 纯 戳 次 差 从 凑 粗 窜 催 村 错 大 代 但 当 到 得 得 等 地 点 跌 定 丢 动 都 读 段 对 顿 多 额 欸 恩 嗯 而 法 反 放 费 分 风 佛 否 副 嘎 该 干 刚 高 各 给 跟 更 共 够 古 挂 怪 关 光 贵 滚 过 哈 还 含 行 好 何 黑 很 横 红 后 户 话 坏 换 黄 会 混 或 几 加 间 将 叫 接 进 经 久 据 卷 均 卡 开 看 抗 靠 克 剋 肯 坑 空 口 酷 夸 快 宽 况 亏 困 扩 拉 来 浪 老 月 乐 类 冷 里 连 两 料 列 林 另 刘 龙 楼 路 乱 论 落 率 吗 买 慢 忙 毛 么 每 们 梦 米 面 秒 灭 民 名 末 某 目 那 难 囊 闹 呢 内 嫩 能 泥 年 鸟 捏 您 宁 牛 弄 怒 暖 虐 挪 女 欧 怕 排 盘 旁 跑 配 盆 碰 批 片 票 撇 品 凭 破 剖 普 其 恰 前 强 桥 且 请 亲 穷 求 区 全 却 群 然 让 绕 热 任 仍 日 容 肉 如 软 若 撒 赛 散 扫 色 森 僧 啥 晒 山 上 少 设 深 生 时 受 帅 拴 双 水 顺 四 送 搜 苏 算 岁 所 她 太 谈 汤 套 特 疼 体 天 调 贴 听 同 头 图 团 推 托 挖 外 完 王 为 问 翁 喔 握 无 系 下 先 想 笑 些 新 熊 修 需 选 学 亚 眼 样 要 也 以 因 应 哟 用 有 与 元 云 咋 再 早 则 贼 怎 增 扎 占 长 长 找 着 真 正 只 中 周 主 抓 拽 转 装 追 桌 字 总 走 组 最 做"""
     if schema == XHE_SP_SCHEMA:
         char_to_phones = get_char_to_xhe_phones()
@@ -479,17 +479,17 @@ def generate_dict(schema_config: SchemaConfig, outpath: str):
                 fout.write(f"{item.decode}\t{item.encode}\n")
                 pbar.update()
 
-        two_hits_chars = generate_topest_char(schema_config.shuangpin_schema)
+        two_hits_chars = generate_tow_hits_char(schema_config.shuangpin_schema)
         with tqdm(total=len(two_hits_chars), desc="写入二简码") as pbar:
             for item in two_hits_chars:
                 fout.write(f"{item.decode}\t{item.encode}\n")
                 pbar.update()
 
         single_chars = generate_single_chars(schema_config.shuangpin_schema)
-        with tqdm(total=len(single_chars), desc="写入简码单字") as pbar:
-            for item in single_chars:
-                fout.write(f"{item.decode}\t{item.encode[:-1]}\n")
-                pbar.update()
+        # with tqdm(total=len(single_chars), desc="写入简码单字") as pbar:
+        #     for item in single_chars:
+        #         fout.write(f"{item.decode}\t{item.encode[:-1]}\n")
+        #         pbar.update()
 
         special_words = set()
         high_word, low_words = generate_simpler_words(100, 2000, schema_config.shuangpin_schema)
@@ -628,16 +628,16 @@ def generate_dd(schema: ShuangPinSchema, output_dir: str):
         fout.write("---config@允许编辑=是\n")
         fout.write(f"---config@码表别名=简码单字\n")
         one_hit_chars = generate_one_hit_char()
-        topest_chars = generate_topest_char(schema)
-        with tqdm(total=len(one_hit_chars) + len(topest_chars) + len(single_chars), desc="写入简码单字") as pbar:
+        two_hits_chars = generate_tow_hits_char(schema)
+        with tqdm(total=len(one_hit_chars) + len(two_hits_chars) + len(single_chars), desc="写入简码单字") as pbar:
             for item in one_hit_chars:
                 fout.write(f"{item.decode}\t{item.encode}#序{90000}\n")
             pbar.update(len(one_hit_chars))
-            for item in topest_chars:
+            for item in two_hits_chars:
                 fout.write(f"{item.decode}\t{item.encode}#序{80000}\n")
-            pbar.update(len(topest_chars))
-            for item in single_chars:
-                fout.write(f"{item.decode}\t{item.encode[:-1]}#序{75000}\n")
+            pbar.update(len(two_hits_chars))
+            # for item in single_chars:
+            #     fout.write(f"{item.decode}\t{item.encode[:-1]}#序{75000}\n")
             pbar.update(len(single_chars))
 
     high_freq_words, low_freq_words = generate_simpler_words(100, 2000, schema)
@@ -843,7 +843,7 @@ def generate_4_len_tangshi_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
 
 def generate_4_len_word_simpler_items(schema: ShuangPinSchema) -> List[EncodeDecode]:
     result = []
-    result.extend(generate_4_len_wordphonetable_words(schema))
+    # result.extend(generate_4_len_wordphonetable_words(schema))
     result.extend(generate_4_len_tangshi_words(schema))
     return result
 
