@@ -15,9 +15,9 @@ from tables import CharPhoneTable, CharHeShapeTable, CharLuShapeTable, WordPhone
 from tables import FullToTwoTable
 
 
-class ShuangPinSchema:
+class InputSchema:
     def __init__(self, name: str):
-        super(ShuangPinSchema, self).__init__()
+        super(InputSchema, self).__init__()
         self.name = name
 
     def __str__(self) -> str:
@@ -27,10 +27,11 @@ class ShuangPinSchema:
         return self.name == other.name
 
 
-XHE_SP_SCHEMA = ShuangPinSchema("xiao he")
-LU_SP_SCHEMA = ShuangPinSchema("xiao lu")
-ZRM_SP_SCHEMA = ShuangPinSchema("zi ran ma")
-BINGJI_SP_SCHEMA = ShuangPinSchema("bing ji")
+XHE_SP_SCHEMA = InputSchema("xiao he")
+LU_SP_SCHEMA = InputSchema("xiao lu")
+ZRM_SP_SCHEMA = InputSchema("zi ran ma")
+BINGJI_SP_SCHEMA = InputSchema("bing ji")
+PINYIN_SCHEMA = InputSchema("pinyin")
 
 
 @curry
@@ -295,7 +296,7 @@ class SchemaConfig(object):
     authors: List[str]
     description: str
     auto_select_pattern: str
-    shuangpin_schema: ShuangPinSchema
+    shuangpin_schema: InputSchema
 
 
 def get_exists_chars() -> Set[str]:
@@ -325,7 +326,7 @@ def get_exists_words() -> Set[str]:
 
     return exist_words
 
-def check_wordphonetable_pinyin(transformer: Dict[str, str], schema: ShuangPinSchema):
+def check_wordphonetable_pinyin(transformer: Dict[str, str], schema: InputSchema):
     to_update_items = []
     with tqdm(total=len(WordPhoneTable), desc="检查词的拼音") as pbar:
         for item in WordPhoneTable.select():
@@ -386,7 +387,7 @@ def check_wordphonetable_pinyin(transformer: Dict[str, str], schema: ShuangPinSc
     print(f'update {len(to_update_items)} wordphonetable items')
 
 
-def check_tangshitable_pinyin(transformer: Dict[str, str], schema: ShuangPinSchema):
+def check_tangshitable_pinyin(transformer: Dict[str, str], schema: InputSchema):
     to_update_items = []
     with tqdm(total=len(TangshiTable), desc="检查诗词的拼音") as pbar:
         for item in TangshiTable.select():
@@ -447,12 +448,12 @@ def check_tangshitable_pinyin(transformer: Dict[str, str], schema: ShuangPinSche
     print(f'update {len(to_update_items)} tangshitable items')
 
 
-def check_words_pinyin(transformer: Dict[str, str], schema: ShuangPinSchema):
+def check_words_pinyin(transformer: Dict[str, str], schema: InputSchema):
     check_wordphonetable_pinyin(transformer, schema)
     check_tangshitable_pinyin(transformer, schema)
 
 
-def check_chars_pinyin(transformer: Dict[str, str], schema: ShuangPinSchema):
+def check_chars_pinyin(transformer: Dict[str, str], schema: InputSchema):
     to_update_items = []
     with tqdm(total=len(CharPhoneTable), desc="检查字的拼音") as pbar:
         for item in CharPhoneTable.select():
