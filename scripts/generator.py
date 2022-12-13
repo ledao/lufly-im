@@ -8,9 +8,9 @@ import check_bingji_shuangpin
 import check_lu_shuangpin
 import check_xhe_shuangpin
 import check_zrm_shuangpin
-from common import ShuangPinSchema, XHE_SP_SCHEMA, get_char_to_xhe_phones, LU_SP_SCHEMA, get_char_to_lu_phones, \
+from common import InputSchema, XHE_SP_SCHEMA, get_char_to_xhe_phones, LU_SP_SCHEMA, get_char_to_lu_phones, \
     ZRM_SP_SCHEMA, get_char_to_zrm_phones, BINGJI_SP_SCHEMA, get_char_to_bingji_phones, get_char_to_xhe_shapes, \
-    is_all_alpha, SchemaConfig
+    is_all_alpha, SchemaConfig, PINYIN_SCHEMA
 from tables import CharPhoneTable, WordPhoneTable, EngWordTable, SimplerTable, TangshiTable
 
 
@@ -53,7 +53,7 @@ def generate_one_hit_char() -> List[EncodeDecode]:
     return [EncodeDecode(encode=e.split("\t")[1], decode=e.split("\t")[0], weight=100000000) for e in items]
 
 
-def generate_tow_hits_char(schema: ShuangPinSchema) -> List[EncodeDecode]:
+def generate_tow_hits_char(schema: InputSchema) -> List[EncodeDecode]:
     chars = """去 我 二 人 他  一 是 出 哦 平 啊 三 的 非 个 和 就 可 了 小 才 这 不 你 没 阿 爱 安 昂 奥 把 白 办 帮 报 被 本 蹦 比 边 表 别 滨 并 拨 部 擦 菜 参 藏 藏 草 测 岑 曾 拆 产 超 车 陈 成 吃 冲 抽 处 揣 传 窗 吹 纯 戳 次 差 从 凑 粗 窜 催 村 错 大 代 但 当 到 得 得 等 地 点 跌 定 丢 动 都 读 段 对 顿 多 额 欸 恩 嗯 而 法 反 放 费 分 风 佛 否 副 嘎 该 干 刚 高 各 给 跟 更 共 够 古 挂 怪 关 光 贵 滚 过 哈 还 含 行 好 何 黑 很 横 红 后 户 话 坏 换 黄 会 混 或 几 加 间 将 叫 接 进 经 久 据 卷 均 卡 开 看 抗 靠 克 剋 肯 坑 空 口 酷 夸 快 宽 况 亏 困 扩 拉 来 浪 老 月 乐 类 冷 里 连 两 料 列 林 另 刘 龙 楼 路 乱 论 落 率 吗 买 慢 忙 毛 么 每 们 梦 米 面 秒 灭 民 名 末 某 目 那 难 囊 闹 呢 内 嫩 能 泥 年 鸟 捏 您 宁 牛 弄 怒 暖 虐 挪 女 欧 怕 排 盘 旁 跑 配 盆 碰 批 片 票 撇 品 凭 破 剖 普 其 恰 前 强 桥 且 请 亲 穷 求 区 全 却 群 然 让 绕 热 任 仍 日 容 肉 如 软 若 撒 赛 散 扫 色 森 僧 啥 晒 山 上 少 设 深 生 时 受 帅 拴 双 水 顺 四 送 搜 苏 算 岁 所 她 太 谈 汤 套 特 疼 体 天 调 贴 听 同 头 图 团 推 托 挖 外 完 王 为 问 翁 喔 握 无 系 下 先 想 笑 些 新 熊 修 需 选 学 亚 眼 样 要 也 以 因 应 哟 用 有 与 元 云 咋 再 早 则 贼 怎 增 扎 占 长 长 找 着 真 正 只 中 周 主 抓 拽 转 装 追 桌 字 总 走 组 最 做"""
     if schema == XHE_SP_SCHEMA:
         char_to_phones = get_char_to_xhe_phones()
@@ -144,7 +144,7 @@ def get_dd_cmds():
     return cmds
 
 
-def generate_single_chars(schema: ShuangPinSchema) -> List[EncodeDecode]:
+def generate_single_chars(schema: InputSchema) -> List[EncodeDecode]:
     char_to_shape = get_char_to_xhe_shapes()
 
     result: List[EncodeDecode] = []
@@ -158,13 +158,15 @@ def generate_single_chars(schema: ShuangPinSchema) -> List[EncodeDecode]:
             phones = item.zrm
         elif schema == BINGJI_SP_SCHEMA:
             phones = item.bingji
+        elif schema == PINYIN_SCHEMA:
+            phones = item.full
         else:
             raise RuntimeError(f"schema not found {schema}")
 
         if phones == "":
             raise RuntimeError(f"empty phones, {item}")
 
-        if item.char in char_to_shape:
+        if schema != PINYIN_SCHEMA and item.char in char_to_shape:
             used_shapes = set()
             for shape in char_to_shape[item.char]:
                 if shape in used_shapes:
@@ -172,12 +174,13 @@ def generate_single_chars(schema: ShuangPinSchema) -> List[EncodeDecode]:
                 used_shapes.add(shape)
                 result.append(EncodeDecode(decode=item.char, encode=phones + shape, weight=item.priority))
         else:
-            print(f"没有形码的字：{item.char}")
+            if schema != PINYIN_SCHEMA:
+                print(f"没有形码的字：{item.char}")
             result.append(EncodeDecode(decode=item.char, encode=phones, weight=item.priority))
     return result
 
 
-def generate_simpler_words(char_threshold: int, word_threshold: int, schema: ShuangPinSchema) -> Tuple[
+def generate_simpler_words(char_threshold: int, word_threshold: int, schema: InputSchema) -> Tuple[
     List[EncodeDecode], List[EncodeDecode]]:
     char_to_shape = get_char_to_xhe_shapes()
     single_chars: Dict[str, CharPhoneTable] = {}
@@ -241,7 +244,7 @@ def generate_simpler_words(char_threshold: int, word_threshold: int, schema: Shu
     return high_pri_simpler_words, low_pri_simpler_words
 
 
-def generate_full_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
+def generate_full_words(schema: InputSchema) -> List[EncodeDecode]:
     char_to_shape = get_char_to_xhe_shapes()
     result: List[EncodeDecode] = []
     exit_word_phones = set()
@@ -256,6 +259,8 @@ def generate_full_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
             phones = item.zrm
         elif schema == BINGJI_SP_SCHEMA:
             phones = item.bingji
+        elif schema == PINYIN_SCHEMA:
+            phones = item.full.replace(" ", "")
         else:
             raise RuntimeError(f"schema not found {schema}")
 
@@ -266,7 +271,7 @@ def generate_full_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
             print(f"重复的记录: {item}")
             continue
         exit_word_phones.add(item.word + ":" + phones)
-        if item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
+        if schema != PINYIN_SCHEMA and item.word[0] in char_to_shape and item.word[-1] in char_to_shape:
             used_shapes = set()
             for shape_first in char_to_shape[item.word[0]]:
                 for shape_last in char_to_shape[item.word[-1]]:
@@ -281,7 +286,8 @@ def generate_full_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
                         decode = item.word
                         result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
         else:
-            print(f"没有形码的词：{item.word}")
+            if schema != PINYIN_SCHEMA:
+                print(f"没有形码的词：{item.word}")
             result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
             continue
 
@@ -356,6 +362,7 @@ def generate_schema(config: SchemaConfig, outpath: str):
         fout.write(f"  translators:\n")
         fout.write(f"    - punct_translator\n")
         fout.write(f"    - table_translator\n")
+        fout.write(f"    - reverse_lookup_translator\n")
         fout.write(f"  filters:\n")
         fout.write(f"    - simplifier\n")
         fout.write(f"    - uniquifier\n")
@@ -387,6 +394,15 @@ def generate_schema(config: SchemaConfig, outpath: str):
 
         fout.write(f"\n")
 
+        fout.write(f"reverse_lookup:\n")
+        fout.write(f"  dictionary: pinyin_{config.schema_id}\n")
+        fout.write(f"  prefix: \"`\"\n")
+        fout.write(f"  tips: [拼音]\n")
+        fout.write(f"  comment_format:\n")
+        fout.write(f"    - xfrom/ / /\n")
+
+        fout.write(f"\n")
+
         fout.write(f"key_binder:\n")
         fout.write(f"  import_preset: default\n")
         fout.write(f"  bindings:\n")
@@ -408,6 +424,13 @@ def generate_schema(config: SchemaConfig, outpath: str):
         fout.write(f'    - {{accept: "Shift_R", send: Escape, when: composing}}\n')
         fout.write(f'    - {{accept: "Shift+space", toggle: full_shape, when: always}} #切换全半角\n')
         fout.write(f'    - {{accept: "Control+period", toggle: ascii_punct, when: always}}\n')
+
+        fout.write(f"\n")
+
+        fout.write(f"recognizer:\n")
+        fout.write(f"  import_preset: default\n")
+        fout.write(f"  patterns:\n")
+        fout.write(f'    reverse_lookup: \"[a-z`]*`+[a-z`]*\"\n')
 
         fout.write(f"\n")
 
@@ -544,6 +567,116 @@ def generate_dict(schema_config: SchemaConfig, outpath: str):
                 pbar.update()
 
 
+def generate_pinyin(schema_config: SchemaConfig, outpath: str):
+    with open(outpath, 'w', encoding='utf8') as fout:
+        fout.write(f"# pinyin_{schema_config.schema_id} dictionary\n")
+        fout.write(f"# encoding: utf-8\n")
+        fout.write(f"# \n")
+        fout.write(f"# pinyin_{schema_config.name}码表\n")
+        fout.write(f"# 机器生成，请勿修改\n")
+
+        fout.write(f"\n---\n")
+        fout.write(f"name: pinyin_{schema_config.schema_id}\n")
+        fout.write(f'version: "{schema_config.version}"\n')
+        fout.write(f'sort: original\n')
+        fout.write(f'use_preset_vocabulary: false\n')  # 是否使用预设词表
+
+        fout.write(f'columns:\n')
+        fout.write(f'  - text\n')
+        fout.write(f'  - code\n')
+
+        # fout.write(f'encoder:\n')
+        # fout.write(f'  rules:\n')
+        # fout.write(f'    - length_equal: 2\n')
+        # fout.write(f'      formula: "AaAbBaBb"\n')
+        # fout.write(f'    - length_equal: 3\n')
+        # fout.write(f'      formula: "AaAbBaBbCaCb"\n')
+        # fout.write(f'    - length_equal: 4\n')
+        # fout.write(f'      formula: "AaAbBaBbCaCbDaDb"\n')
+        # fout.write(f'    - length_equal: 5\n')
+        # fout.write(f'      formula: "AaAbBaBbCaCbDaDbEaEb"\n')
+        # fout.write(f'    - length_equal: 6\n')
+        # fout.write(f'      formula: "AaAbBaBbCaCbDaDbEaEbFaFb"\n')
+        # fout.write(f'    - length_equal: 7\n')
+        # fout.write(f'      formula: "AaAbBaBbCaCbDaDbEaEbFaFbGaGb"\n')
+        # fout.write(f'    - length_equal: 8\n')
+        # fout.write(f'      formula: "AaAbBaBbCaCbDaDbEaEbFaFbGaGbHaHb"\n')
+
+        fout.write(f"...\n")
+
+        fout.write(f"\n# 单字\n")
+
+        # one_hit_chars = generate_one_hit_char()
+        # with tqdm(total=len(one_hit_chars), desc="写入一简码") as pbar:
+        #     for item in one_hit_chars:
+        #         fout.write(f"{item.decode}\t{item.encode}\n")
+        #         pbar.update()
+        #
+        # two_hits_chars = generate_tow_hits_char(schema_config.shuangpin_schema)
+        # with tqdm(total=len(two_hits_chars), desc="写入二简码") as pbar:
+        #     for item in two_hits_chars:
+        #         fout.write(f"{item.decode}\t{item.encode}\n")
+        #         pbar.update()
+
+        single_chars = generate_single_chars(PINYIN_SCHEMA)
+        # with tqdm(total=len(single_chars), desc="写入简码单字") as pbar:
+        #     for item in single_chars:
+        #         fout.write(f"{item.decode}\t{item.encode[:-1]}\n")
+        #         pbar.update()
+
+        special_words = set()
+        # high_word, low_words = generate_simpler_words(100, 2000, schema_config.shuangpin_schema)
+        # with tqdm(total=len(high_word), desc="写入高频词简码") as pbar:
+        #     for item in high_word:
+        #         special_words.add(item.decode)
+        #         fout.write(f"{item.decode}\t{item.encode}\n")
+        #         pbar.update()
+
+        with tqdm(total=len(single_chars), desc="写入全码单字") as pbar:
+            for item in single_chars:
+                fout.write(f"{item.decode}\t{item.encode}\n")
+                pbar.update()
+
+        # with tqdm(total=len(low_words), desc="写入低频词简码") as pbar:
+        #     for item in low_words:
+        #         special_words.add(item.decode)
+        #         fout.write(f"{item.decode}\t{item.encode}\n")
+        #         pbar.update()
+
+        fout.write(f"\n# 词语\n")
+
+        full_words = generate_full_words(PINYIN_SCHEMA)
+        with tqdm(total=len(full_words), desc="写入词") as pbar:
+            for item in full_words:
+                # if item.decode not in special_words:
+                #     fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
+                # fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
+                fout.write(f"{item.decode}\t{item.encode}\n")
+                pbar.update()
+
+        # tangshi_words = generate_tangshi_words(schema_config.shuangpin_schema)
+        # with tqdm(total=len(tangshi_words), desc="写入诗词") as pbar:
+        #     for item in tangshi_words:
+        #         fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
+        #         fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
+        #         fout.write(f"{item.decode}\t{item.encode}\n")
+        #         pbar.update()
+        #
+        # len4_words = generate_4_len_word_simpler_items(schema_config.shuangpin_schema)
+        # with tqdm(total=len(len4_words), desc="写入词简码") as pbar:
+        #     for item in len4_words:
+        #         fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
+        #         fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
+        #         fout.write(f"{item.decode}\t{item.encode}\n")
+        #         pbar.update()
+        #
+        # simpler_words = generate_simpler()
+        # with tqdm(total=len(simpler_words), desc="写入简词") as pbar:
+        #     for item in simpler_words:
+        #         fout.write(f"{item.decode}\t{item.encode}\n")
+        #         pbar.update()
+
+
 def generate_schema_custom(config: SchemaConfig, outpath: str):
     with open(outpath, 'w', encoding='utf8') as fout:
         fout.write(f"# {config.schema_id} custom settings\n")
@@ -609,7 +742,7 @@ def generate_weasel_custom(config: SchemaConfig, outpath: str):
         fout.write(f'    candidate_text_color: 0x000000\n')  # 未候选字颜ch色
 
 
-def generate_dd(schema: ShuangPinSchema, output_dir: str):
+def generate_dd(schema: InputSchema, output_dir: str):
     if schema == XHE_SP_SCHEMA:
         check_xhe_shuangpin.main()
     elif schema == LU_SP_SCHEMA:
@@ -727,11 +860,12 @@ def generate_rime(schema_config: SchemaConfig, output_dir: str):
 
     generate_schema(schema_config, output_dir + f"/{schema_config.schema_id}.schema.yaml")
     generate_dict(schema_config, output_dir + f"/{schema_config.schema_id}.dict.yaml")
+    generate_pinyin(schema_config, output_dir + f"/pinyin_{schema_config.schema_id}.dict.yaml")
     generate_schema_custom(schema_config, output_dir + f"/{schema_config.schema_id}.custom.yaml")
     generate_weasel_custom(schema_config, output_dir + f"/weasel.custom.yaml")
 
 
-def generate_4_len_wordphonetable_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
+def generate_4_len_wordphonetable_words(schema: InputSchema) -> List[EncodeDecode]:
     char_to_shape = get_char_to_xhe_shapes()
     result: List[EncodeDecode] = []
     exit_word_phones = set()
@@ -786,7 +920,7 @@ def generate_4_len_wordphonetable_words(schema: ShuangPinSchema) -> List[EncodeD
     return result
 
 
-def generate_4_len_tangshi_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
+def generate_4_len_tangshi_words(schema: InputSchema) -> List[EncodeDecode]:
     char_to_shape = get_char_to_xhe_shapes()
     result: List[EncodeDecode] = []
     exit_word_phones = set()
@@ -841,14 +975,14 @@ def generate_4_len_tangshi_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
     return result
 
 
-def generate_4_len_word_simpler_items(schema: ShuangPinSchema) -> List[EncodeDecode]:
+def generate_4_len_word_simpler_items(schema: InputSchema) -> List[EncodeDecode]:
     result = []
     # result.extend(generate_4_len_wordphonetable_words(schema))
     result.extend(generate_4_len_tangshi_words(schema))
     return result
 
 
-def generate_tangshi_words(schema: ShuangPinSchema) -> List[EncodeDecode]:
+def generate_tangshi_words(schema: InputSchema) -> List[EncodeDecode]:
     char_to_shape = get_char_to_xhe_shapes()
     result: List[EncodeDecode] = []
     exit_word_phones = set()
