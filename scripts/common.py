@@ -296,7 +296,9 @@ class SchemaConfig(object):
     authors: List[str]
     description: str
     auto_select_pattern: str
-    shuangpin_schema: InputSchema
+    input_schema: InputSchema
+    check_db: bool = True
+    reverse_dict: str = ""
 
 
 def get_exists_chars() -> Set[str]:
