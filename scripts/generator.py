@@ -700,9 +700,6 @@ def generate_dd(schema: InputSchema, output_dir: str):
             for item in two_hits_chars:
                 fout.write(f"{item.decode}\t{item.encode}#序{80000}\n")
             pbar.update(len(two_hits_chars))
-            # for item in single_chars:
-            #     fout.write(f"{item.decode}\t{item.encode[:-1]}#序{75000}\n")
-            # pbar.update(len(single_chars))
 
     high_freq_words, low_freq_words = generate_simpler_words(100, 2000, schema)
     sys_high_freq_word_data = f"{output_dir}/sys_high_word_data.txt"
@@ -776,6 +773,16 @@ def generate_dd(schema: InputSchema, output_dir: str):
         cmds = get_dd_cmds()
         for cmd in cmds:
             fout.write(f"{cmd}\n")
+
+    with open(f'{output_dir}/sys_fuzhu_pinyin_data.txt', 'w',
+              encoding='utf8') as fout:
+        fout.write("---config@码表分类=辅码码表\n")
+        fout.write("---config@允许编辑=是\n")
+        fout.write(f"---config@码表别名=辅助拼音\n")
+        for item in generate_single_chars(PINYIN_SCHEMA):
+            fout.write(f"{item.decode}\t{item.encode}#序{30000}\n")
+        for item in generate_full_words(PINYIN_SCHEMA):
+            fout.write(f"{item.decode}\t{item.encode}#序{30000}\n")
 
 
 def generate_rime(schema_config: SchemaConfig, output_dir: str):
