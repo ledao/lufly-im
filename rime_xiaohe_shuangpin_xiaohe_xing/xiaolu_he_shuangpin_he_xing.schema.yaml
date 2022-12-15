@@ -6,7 +6,7 @@
 schema:
   schema_id: xiaolu_he_shuangpin_he_xing
   name: 小鹭音形系列·小鹤双拼+小鹤双形
-  version: "20221202.093220"
+  version: "20221215.085607"
   author: 
     - ledao <790717479@qq.com> 
   description: |
@@ -41,6 +41,7 @@ engine:
   translators:
     - punct_translator
     - table_translator
+    - reverse_lookup_translator
   filters:
     - simplifier
     - uniquifier
@@ -65,6 +66,11 @@ translator:
 punctuator:
   import_preset: default
 
+reverse_lookup:
+  dictionary: xiaolu_fuzhu_pinyin
+  prefix: "`"
+  tips: [拼音]
+
 key_binder:
   import_preset: default
   bindings:
@@ -86,6 +92,11 @@ key_binder:
     - {accept: "Shift_R", send: Escape, when: composing}
     - {accept: "Shift+space", toggle: full_shape, when: always} #切换全半角
     - {accept: "Control+period", toggle: ascii_punct, when: always}
+
+recognizer:
+  import_preset: default
+  patterns:
+    reverse_lookup: "^`[a-z]*'?$"
 
 menu:
   page_size: 5
