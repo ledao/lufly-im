@@ -21,7 +21,7 @@ if __name__ == "__main__":
         ],
         description="简单舒适音形方案",
         auto_select_pattern="^\w{6}$|^\w{8}$|^\w{10}$|^\w{12}$|^\w{14}$|^\w{16}$|^\w{18}$",
-        shuangpin_schema=XHE_SP_SCHEMA,
+        input_schema=XHE_SP_SCHEMA,
     )
 
     generate_rime(schema_config, output_dir)
