@@ -4,13 +4,13 @@
 
 
 schema:
-  schema_id: xiaolu_lu_shuangpin_he_xing
-  name: 小鹭音形系列·小鹭双拼+小鹤双形
-  version: "20221214.140614"
+  schema_id: xiaolu_fuzhu_pinyin
+  name: 小鹭音形系列·拼音辅助
+  version: "20221214.141109"
   author: 
     - ledao <790717479@qq.com> 
   description: |
-     简单舒适音形方案
+     简单舒适音形方案·辅助方案
 
 switches:
   - name: ascii_mode 
@@ -41,7 +41,6 @@ engine:
   translators:
     - punct_translator
     - table_translator
-    - reverse_lookup_translator
   filters:
     - simplifier
     - uniquifier
@@ -50,10 +49,10 @@ speller:
   alphabet: 'zyxwvutsrqponmlkjihgfedcba'
   initials: 'abcdefghijklmnopqrstuvwxyz'
   auto_select: true
-  auto_select_pattern: ^\w{6}$|^\w{8}$|^\w{10}$|^\w{12}$|^\w{14}$|^\w{16}$|^\w{18}$
+  auto_select_pattern: 
 
 translator:
-  dictionary: xiaolu_lu_shuangpin_he_xing
+  dictionary: xiaolu_fuzhu_pinyin
   enable_charset_filter: false
   enable_sentence: false
   enable_completion: true
@@ -66,10 +65,6 @@ translator:
 punctuator:
   import_preset: default
 
-reverse_lookup:
-  dictionary: xiaolu_fuzhu_pinyin
-  prefix: "`"
-  tips: [拼音]
 
 key_binder:
   import_preset: default
@@ -93,10 +88,6 @@ key_binder:
     - {accept: "Shift+space", toggle: full_shape, when: always} #切换全半角
     - {accept: "Control+period", toggle: ascii_punct, when: always}
 
-recognizer:
-  import_preset: default
-  patterns:
-    reverse_lookup: "^`[a-z]*'?$"
 
 menu:
   page_size: 5
