@@ -5,7 +5,7 @@ import common
 
 
 def load_chars(filepath: str):
-    exist_charpinyins = common.get_exists_charyinpins()
+    exist_char_pinyins = common.get_exists_charyinpins()
 
     chars = []
     shapes = []
@@ -53,10 +53,10 @@ def load_chars(filepath: str):
             if priority is None or priority < 1:
                 priority = 1
 
-            if char + pinyin in exist_charpinyins:
+            if char + pinyin in exist_char_pinyins:
                 print(f"already exists {line}")
                 continue
-            exist_charpinyins.add(char+pinyin)
+            exist_char_pinyins.add(char+pinyin)
             chars.append(tables.CharPhoneTable(
                 char=char,
                 full=pinyin,
