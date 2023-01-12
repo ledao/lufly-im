@@ -11,7 +11,7 @@ patch:
     name: "LuColor"
     author: "ledao"
     back_color: 0xffffff
-    corner_redius: 5
+    corner_radius: 5
     border_color: 0xE6E6E6
     text_color: 0x000000
     hilited_text_color: 0x000000
