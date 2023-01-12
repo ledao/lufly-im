@@ -715,6 +715,14 @@ def generate_squirrel_custom(config: SchemaConfig, outpath: str):
         fout.write(f'      ascii_mode: true\n')
 
 
+def generate_default_custom(config: SchemaConfig, outpath: str):
+    with open(outpath, 'w', encoding='utf8') as fout:
+        fout.write(f'patch:\n')
+        fout.write(f'  schema_list: \n')
+        fout.write(f'    - schema: xiaolu_lu_shuangpin_he_xing\n')
+        fout.write(f'    - schema: xiaolu_fuzhu_pinyin\n')
+
+
 def generate_dd(schema: InputSchema, output_dir: str):
     if schema == XHE_SP_SCHEMA:
         check_xhe_shuangpin.main()
@@ -847,6 +855,7 @@ def generate_rime(schema_config: SchemaConfig, output_dir: str):
     generate_schema_custom(schema_config, output_dir + f"/{schema_config.schema_id}.custom.yaml")
     generate_weasel_custom(schema_config, output_dir + f"/weasel.custom.yaml")
     generate_squirrel_custom(schema_config, output_dir + f"/squirrel.custom.yaml")
+    generate_default_custom(schema_config, output_dir + f"/default.custom.yaml")
 
 
 def generate_4_len_wordphonetable_words(schema: InputSchema) -> List[EncodeDecode]:
