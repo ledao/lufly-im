@@ -663,7 +663,7 @@ def generate_weasel_custom(config: SchemaConfig, outpath: str):
         fout.write(f'    name: "LuColor"\n')
         fout.write(f'    author: "ledao"\n')
         fout.write(f'    back_color: 0xffffff\n')  # 候选框 背景色
-        fout.write(f'    corner_redius: 5\n')
+        fout.write(f'    corner_radius: 5\n')
         fout.write(f'    border_color: 0xE6E6E6\n')  # 候选框 边框颜色
         fout.write(f'    text_color: 0x000000\n')  # 已选择字 文字颜色
         fout.write(f'    hilited_text_color: 0x000000\n')  # 已选择字右侧拼音 文字颜色
@@ -672,6 +672,47 @@ def generate_weasel_custom(config: SchemaConfig, outpath: str):
         fout.write(f'    hilited_candidate_back_color: 0xE6E6E6\n')  # 候选字背景色
         fout.write(f'    hilited_corner_radius: 5\n')
         fout.write(f'    candidate_text_color: 0x000000\n')  # 未候选字颜ch色
+
+
+def generate_squirrel_custom(config: SchemaConfig, outpath: str):
+    with open(outpath, 'w', encoding='utf8') as fout:
+        fout.write(f'patch:\n')
+        fout.write(f'  style: \n')
+        fout.write(f'    color_scheme: LuColor\n')
+        fout.write(f'  preset_color_schemes: \n')
+        fout.write(f'    LuColor:\n')
+        fout.write(f'      name: LuColor\n')
+        fout.write(f'      author: "ledao"\n')
+        fout.write(f'      alpha: 1.0\n')
+        fout.write(f'      border_height: 5\n')
+        fout.write(f'      border_width: 0\n')
+        fout.write(f'      border_color: 0xffffff\n')  # 候选框 边框颜色
+        fout.write(f'      back_color: 0xF4F4F6\n')  # 候选框 背景色
+        fout.write(f'      label_color: 0xaaaaaa\n')  # 候选框 背景色
+        fout.write(f'      font_point: 18\n')  # 候选框 背景色
+        fout.write(f'      corner_radius: 5\n')
+        fout.write(f'      candidate_format: "%c %@ "\n')
+        fout.write(f"      horizontal: true\n")
+        fout.write(f"      line_spacing: 5\n")
+        fout.write(f"      base_offset: 0\n")
+        fout.write(f"      preedit_back_color: 0x364572\n")
+        fout.write(f'      hilited_corner_radius: 5\n')
+        fout.write(f'      hilited_candidate_text_color: 0x000000\n')  # 候选字颜色
+        fout.write(f'      hilited_candidate_back_color: 0xE6E6E6\n')  # 候选字背景色
+        fout.write(f'      hilited_candidate_label_color: 0x88000000\n')
+        fout.write(f'      hilited_comment_text_color: 0xF19C38\n')
+        fout.write(f'      candidate_text_color: 0x222222\n')  # 未候选字颜ch色
+        fout.write(f'      comment_text_color: 0x5AC461\n')
+        fout.write(f'      comment_font_face: PingFang SC\n')
+        fout.write(f'      comment_font_point: 14\n')
+        fout.write(f'      inline_preedit: true\n')
+        fout.write(f'      spacing: 5\n')
+        fout.write(f'      hilited_text_color: 0x8E8E93\n')  # 已选择字右侧拼音 文字颜色
+        fout.write(f'      hilited_back_color: 0xEFEFF4\n')  # 已选择字右侧拼音 背景色
+        fout.write(f'\n\n')
+        fout.write(f'  app_options:\n')
+        fout.write(f'    com.termius-dmg.mac: \n')
+        fout.write(f'      ascii_mode: true\n')
 
 
 def generate_dd(schema: InputSchema, output_dir: str):
@@ -805,6 +846,7 @@ def generate_rime(schema_config: SchemaConfig, output_dir: str):
         generate_shuangpin_dict(schema_config, output_dir + f"/{schema_config.schema_id}.dict.yaml")
     generate_schema_custom(schema_config, output_dir + f"/{schema_config.schema_id}.custom.yaml")
     generate_weasel_custom(schema_config, output_dir + f"/weasel.custom.yaml")
+    generate_squirrel_custom(schema_config, output_dir + f"/squirrel.custom.yaml")
 
 
 def generate_4_len_wordphonetable_words(schema: InputSchema) -> List[EncodeDecode]:
