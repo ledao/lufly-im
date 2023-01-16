@@ -768,6 +768,10 @@ def generate_dd(schema: InputSchema, output_dir: str):
                 fout.write(f"{item.decode}\t{item.encode}#序{80000}\n")
             pbar.update(len(two_hits_chars))
 
+        single_chars = generate_single_chars(schema)
+        for item in single_chars:
+            fout.write(f"{item.decode}\t{item.encode[:-1]}#序{78000}\n")
+
     high_freq_words, low_freq_words = generate_simpler_words(100, 2000, schema)
     sys_high_freq_word_data = f"{output_dir}/sys_high_word_data.txt"
     with open(sys_high_freq_word_data, 'w', encoding='utf8') as fout:
@@ -778,7 +782,6 @@ def generate_dd(schema: InputSchema, output_dir: str):
             fout.write(f"{item.decode}\t{item.encode}#序{75000}\n")
 
     sys_single_char_data = f"{output_dir}/sys_single_char_data.txt"
-    single_chars = generate_single_chars(schema)
     with open(sys_single_char_data, 'w', encoding='utf8') as fout:
         fout.write("---config@码表分类=主码-2\n")
         fout.write("---config@允许编辑=是\n")
