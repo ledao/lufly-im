@@ -7,7 +7,7 @@ from common import SchemaConfig, XHE_SP_SCHEMA, PINYIN_SCHEMA
 from generator import generate_rime
 
 
-if __name__ == "__main__":
+def main():
     _, output_dir = sys.argv[0], "rime_xiaohe_shuangpin_xiaohe_xing"
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
@@ -39,3 +39,7 @@ if __name__ == "__main__":
         check_db=False,
     )
     generate_rime(assistant_schema_config, output_dir)
+
+
+if __name__ == "__main__":
+    main()
