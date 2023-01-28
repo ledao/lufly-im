@@ -325,7 +325,7 @@ def generate_schema(config: SchemaConfig, outpath: str):
 
         fout.write(f"\nschema:\n")
         fout.write(f"  schema_id: {config.schema_id}\n")
-        fout.write(f"  name: {config.name}\n")
+        fout.write(f"  name: 🦩{config.name}\n")
         fout.write(f'  version: "{config.version}"\n')
         fout.write(f'  author: \n')
         for author in config.authors:
@@ -737,7 +737,7 @@ def generate_default_custom(config: SchemaConfig, outpath: str):
     with open(outpath, 'w', encoding='utf8') as fout:
         fout.write(f'patch:\n')
         fout.write(f'  schema_list: \n')
-        fout.write(f'    - {{schema: xiaolu_lu_shuangpin_he_xing}}\n')
+        fout.write(f'    - {{schema: {config.schema_id}}}\n')
         fout.write(f'    - {{schema: xiaolu_fuzhu_pinyin}}\n')
 
 
@@ -869,14 +869,14 @@ def generate_rime(schema_config: SchemaConfig, output_dir: str):
             raise RuntimeError(f"{schema_config.input_schema} not found")
 
     generate_schema(schema_config, output_dir + f"/{schema_config.schema_id}.schema.yaml")
+    generate_schema_custom(schema_config, output_dir + f"/{schema_config.schema_id}.custom.yaml")
     if schema_config.input_schema == PINYIN_SCHEMA:
         generate_pinyin_dict(schema_config, output_dir + f"/{schema_config.schema_id}.dict.yaml")
     else:
         generate_shuangpin_dict(schema_config, output_dir + f"/{schema_config.schema_id}.dict.yaml")
-    generate_schema_custom(schema_config, output_dir + f"/{schema_config.schema_id}.custom.yaml")
-    generate_weasel_custom(schema_config, output_dir + f"/weasel.custom.yaml")
-    generate_squirrel_custom(schema_config, output_dir + f"/squirrel.custom.yaml")
-    generate_default_custom(schema_config, output_dir + f"/default.custom.yaml")
+        generate_weasel_custom(schema_config, output_dir + f"/weasel.custom.yaml")
+        generate_squirrel_custom(schema_config, output_dir + f"/squirrel.custom.yaml")
+        generate_default_custom(schema_config, output_dir + f"/default.custom.yaml")
 
 
 def generate_4_len_wordphonetable_words(schema: InputSchema) -> List[EncodeDecode]:

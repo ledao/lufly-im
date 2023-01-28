@@ -6,8 +6,8 @@ from pathlib import Path
 from common import XHE_SP_SCHEMA
 from generator import generate_dd
 
-if __name__ == "__main__":
 
+def main():
     file_name, output_dir = sys.argv[0], "dd_xiaohe_shuangpin_xiaohe_xing"
 
     if not Path(output_dir).exists():
@@ -22,3 +22,7 @@ if __name__ == "__main__":
     shutil.copytree(output_dir, dd_dir)
 
     print('done')
+
+
+if __name__ == "__main__":
+    main()
