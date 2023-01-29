@@ -1,0 +1,4 @@
+patch:
+  schema_list: 
+    - {schema: xiaolu_zrm_shuangpin_he_xing}
+    - {schema: xiaolu_fuzhu_pinyin}
