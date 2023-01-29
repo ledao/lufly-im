@@ -5,8 +5,8 @@
 
 schema:
   schema_id: xiaolu_zrm_shuangpin_he_xing
-  name: 小鹭音形系列·自然码双拼+小鹤双形
-  version: "20221215.090503"
+  name: 🦩小鹭音形系列·自然码双拼+小鹤双形
+  version: "20230128.152452"
   author: 
     - ledao <790717479@qq.com> 
   description: |
