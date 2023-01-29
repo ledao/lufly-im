@@ -12,4 +12,4 @@ q群：958293407
 
 重点优化了韵母```in```位置。
 
-![小鹭双拼键位图](https://github.com/ledao/lufly-im/blob/master/images/xiaolu_shuangpin.png)
+![小鹭双拼键位图](https://gitee.com/ledao/lufly-im/blob/master/images/xiaolu_shuangpin.png)
