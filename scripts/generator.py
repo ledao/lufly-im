@@ -424,6 +424,8 @@ def generate_schema(config: SchemaConfig, outpath: str):
         fout.write(f'    - {{accept: "Shift_R", send: Escape, when: composing}}\n')
         fout.write(f'    - {{accept: "Shift+space", toggle: full_shape, when: always}} #切换全半角\n')
         fout.write(f'    - {{accept: "Control+period", toggle: ascii_punct, when: always}}\n')
+        fout.write(f'    - {{when: composing, accept: space, send: Escape}}\n')
+        fout.write(f'    - {{when: has_menu, accept: space, send: space}}\n')
 
         fout.write(f"\n")
 
