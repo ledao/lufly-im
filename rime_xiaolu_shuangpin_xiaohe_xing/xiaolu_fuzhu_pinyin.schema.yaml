@@ -6,7 +6,7 @@
 schema:
   schema_id: xiaolu_fuzhu_pinyin
   name: 🦩小鹭音形系列·拼音辅助
-  version: "20230128.151537"
+  version: "20230206.194709"
   author: 
     - ledao <790717479@qq.com> 
   description: |
@@ -87,6 +87,8 @@ key_binder:
     - {accept: "Shift_R", send: Escape, when: composing}
     - {accept: "Shift+space", toggle: full_shape, when: always} #切换全半角
     - {accept: "Control+period", toggle: ascii_punct, when: always}
+    - {when: composing, accept: space, send: Escape}
+    - {when: has_menu, accept: space, send: space}
 
 
 menu:
