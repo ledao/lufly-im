@@ -26,6 +26,12 @@ def load_rime_export_words(path: str, sikp_words_path: str, out_path):
             if len(cols) <= 0:
                 continue
             word = cols[1]
+            if word.startswith("但"):
+                continue
+            if word.startswith("都"):
+                continue
+            if word.startswith("把"):
+                continue
             if word.startswith('的'):
                 continue
             if word.endswith('的'):

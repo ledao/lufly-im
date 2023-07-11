@@ -742,6 +742,9 @@ def generate_default_custom(config: SchemaConfig, outpath: str):
         fout.write(f'    - {{schema: {config.schema_id}}}\n')
         fout.write(f'    - {{schema: xiaolu_fuzhu_pinyin}}\n')
 
+        fout.write(f'  "switcher/hotkeys": \n')
+        fout.write(f'    - "Control+Alt+grave"\n')
+        fout.write(f'    - "F4"\n')
 
 def generate_dd(schema: InputSchema, output_dir: str):
     if schema == XHE_SP_SCHEMA:
