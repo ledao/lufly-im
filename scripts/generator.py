@@ -318,7 +318,7 @@ def generate_simpler() -> List[EncodeDecode]:
 
 def generate_schema(config: SchemaConfig, outpath: str):
     with open(outpath, 'w', encoding='utf8') as fout:
-        fout.write(f"# 小鹭音形系列方案\n")
+        fout.write(f"# 小鹭音形方案\n")
         fout.write(f"# encoding: utf-8\n")
         fout.write(f"# 机器生成，请勿修改\n")
         fout.write(f"\n")
