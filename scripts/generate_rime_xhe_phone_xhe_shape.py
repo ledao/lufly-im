@@ -14,7 +14,7 @@ def main():
 
     std_schema_config = SchemaConfig(
         schema_id="xiaolu_he_shuangpin_he_xing",
-        name="小鹭音形系列·小鹤双拼+小鹤双形",
+        name="小鹭音形·小鹤双拼+鹤形",
         version=datetime.now().strftime('%Y%m%d.%H%M%S'),
         authors=[
             "ledao <790717479@qq.com>"
@@ -28,7 +28,7 @@ def main():
 
     assistant_schema_config = SchemaConfig(
         schema_id="xiaolu_fuzhu_pinyin",
-        name="小鹭音形系列·拼音辅助",
+        name="小鹭音形·拼音辅助",
         version=datetime.now().strftime('%Y%m%d.%H%M%S'),
         authors=[
             "ledao <790717479@qq.com>"
