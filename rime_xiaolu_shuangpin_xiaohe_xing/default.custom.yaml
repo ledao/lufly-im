@@ -2,3 +2,6 @@ patch:
   schema_list: 
     - {schema: xiaolu_lu_shuangpin_he_xing}
     - {schema: xiaolu_fuzhu_pinyin}
+  "switcher/hotkeys": 
+    - "Control+Alt+grave"
+    - "F4"
