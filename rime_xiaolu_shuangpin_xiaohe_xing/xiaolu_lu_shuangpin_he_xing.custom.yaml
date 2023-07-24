@@ -1,7 +1,7 @@
 # xiaolu_lu_shuangpin_he_xing custom settings
 # encoding: utf-8
 # 
-# 小鹭音形系列·小鹭双拼+小鹤双形 custom settings
+# 小鹭音形·鹭拼+鹤形 custom settings
 # 机器生成，请勿修改
 patch:
   punctuator/half_shape:

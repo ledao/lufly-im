@@ -1,7 +1,7 @@
 # xiaolu_fuzhu_pinyin custom settings
 # encoding: utf-8
 # 
-# 小鹭音形系列·拼音辅助 custom settings
+# 小鹭音形·拼音辅助 custom settings
 # 机器生成，请勿修改
 patch:
   punctuator/half_shape:

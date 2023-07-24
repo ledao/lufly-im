@@ -11,7 +11,7 @@ import check_zrm_shuangpin
 from common import InputSchema, XHE_SP_SCHEMA, get_char_to_xhe_phones, LU_SP_SCHEMA, get_char_to_lu_phones, \
     ZRM_SP_SCHEMA, get_char_to_zrm_phones, BINGJI_SP_SCHEMA, get_char_to_bingji_phones, get_char_to_xhe_shapes, \
     is_all_alpha, SchemaConfig, PINYIN_SCHEMA
-from tables import CharPhoneTable, WordPhoneTable, EngWordTable, SimplerTable, TangshiTable
+from tables import CharPhoneTable, WordPhoneTable, EngWordTable, SimplerTable, TangshiTable, TwoStrokesWordsTable
 
 
 @dataclass
@@ -80,6 +80,11 @@ def generate_tow_hits_char(schema: InputSchema) -> List[EncodeDecode]:
 
     return items
 
+def generate_two_strokes_words() -> List[EncodeDecode]:
+    result = []
+    for item in TwoStrokesWordsTable.select().where(TwoStrokesWordsTable.is_first == True).order_by(TwoStrokesWordsTable.id.asc()):
+        result.append(EncodeDecode(encode=item.encode, decode=item.word, weight=10000000))
+    return result
 
 def get_dd_cmds():
     cmds = [
@@ -423,7 +428,7 @@ def generate_schema(config: SchemaConfig, outpath: str):
         fout.write(f'    - {{accept: "Caps_Lock", send: Escape, when: composing}}\n')
         fout.write(f'    - {{accept: "Shift_R", send: Escape, when: composing}}\n')
         fout.write(f'    - {{accept: "Shift+space", toggle: full_shape, when: always}} #切换全半角\n')
-        fout.write(f'    - {{accept: "Control+period", toggle: ascii_punct, when: always}}\n')
+        fout.write(f'    - {{accept: "Control+0", toggle: ascii_punct, when: always}}\n')
         fout.write(f'    - {{when: composing, accept: space, send: Escape}}\n')
         fout.write(f'    - {{when: has_menu, accept: space, send: space}}\n')
 
@@ -508,6 +513,12 @@ def generate_shuangpin_dict(schema_config: SchemaConfig, outpath: str):
         two_hits_chars = generate_tow_hits_char(schema_config.input_schema)
         with tqdm(total=len(two_hits_chars), desc="写入二简码") as pbar:
             for item in two_hits_chars:
+                fout.write(f"{item.decode}\t{item.encode}\n")
+                pbar.update()
+
+        two_strokes_words = generate_two_strokes_words()
+        with tqdm(total=len(two_strokes_words), desc="写入二笔词") as pbar:
+            for item in two_strokes_words:
                 fout.write(f"{item.decode}\t{item.encode}\n")
                 pbar.update()
 
