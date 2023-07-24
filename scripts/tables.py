@@ -1,7 +1,7 @@
 import os
 import datetime
 from pathlib import Path
-from peewee import SqliteDatabase, Model, CharField, IntegerField, DateTimeField
+from peewee import SqliteDatabase, Model, CharField, IntegerField, DateTimeField, BooleanField
 
 pwd = Path(__file__).parent
 
@@ -129,6 +129,17 @@ class TangshiTable(BaseModel):
         return f"<{self.id},{self.word},{self.full},{self.xhe},{self.zrm},{self.lu},{self.priority},{self.updatedt},{self.bingji}>"
 
 
+class TwoStrokesWordsTable(BaseModel):
+    id = IntegerField(primary_key=True, column_name="id")
+    word = CharField()
+    encode = CharField()
+    is_first = BooleanField()
+    updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
+
+    def __str__(self):
+        return f"<{self.id},{self.word},{self.encode},{self.is_first},{self.updatedt}>"
+
+
 def create_tables():
     if not CharPhoneTable.table_exists():
         CharPhoneTable.create_table()
@@ -152,6 +163,8 @@ def create_tables():
         SimplerTable.create_table()
     if not TangshiTable.table_exists():
         TangshiTable.create_table()
+    if not TwoStrokesWordsTable.table_exists():
+        TwoStrokesWordsTable.create_table()
 
 
 create_tables()
