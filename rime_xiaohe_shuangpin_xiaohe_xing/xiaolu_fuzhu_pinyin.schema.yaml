@@ -1,12 +1,12 @@
-# 小鹭音形系列方案
+# 小鹭音形方案
 # encoding: utf-8
 # 机器生成，请勿修改
 
 
 schema:
   schema_id: xiaolu_fuzhu_pinyin
-  name: 🦩小鹭音形系列·拼音辅助
-  version: "20230206.195341"
+  name: 🦩小鹭音形·拼音辅助
+  version: "20230724.191824"
   author: 
     - ledao <790717479@qq.com> 
   description: |
@@ -86,7 +86,7 @@ key_binder:
     - {accept: "Caps_Lock", send: Escape, when: composing}
     - {accept: "Shift_R", send: Escape, when: composing}
     - {accept: "Shift+space", toggle: full_shape, when: always} #切换全半角
-    - {accept: "Control+period", toggle: ascii_punct, when: always}
+    - {accept: "Control+0", toggle: ascii_punct, when: always}
     - {when: composing, accept: space, send: Escape}
     - {when: has_menu, accept: space, send: space}
 
