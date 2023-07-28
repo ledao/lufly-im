@@ -11,7 +11,7 @@ from pypinyin import lazy_pinyin
 from toolz.curried import curry, pipe, map, filter, groupby, valmap
 from toolz.curried import itemmap, valfilter
 
-from tables import CharPhoneTable, CharHeShapeTable, CharLuShapeTable, WordPhoneTable, TangshiTable, db
+from tables import CharPhoneTable, CharHeShapeTable, CharLuShapeTable, WordPhoneTable, TangshiTable, db, CharZrmShapeTable
 from tables import FullToTwoTable
 
 
@@ -32,6 +32,22 @@ LU_SP_SCHEMA = InputSchema("xiao lu")
 ZRM_SP_SCHEMA = InputSchema("zi ran ma")
 BINGJI_SP_SCHEMA = InputSchema("bing ji")
 PINYIN_SCHEMA = InputSchema("pinyin")
+
+
+class ShapeSchema:
+    def __init__(self, name: str):
+        super(ShapeSchema, self).__init__()
+        self.name = name
+
+    def __str__(self) -> str:
+        return f"shape schema {self.name}"
+
+    def __eq__(self, other):
+        return self.name == other.name
+
+
+XHE_SHAPE_SCHAME = ShapeSchema("xiao he")
+ZRM_SHAPE_SCHEMA = ShapeSchema("zi ran ma") 
 
 
 @curry
@@ -223,6 +239,16 @@ def get_char_to_xhe_shapes() -> Dict[str, List[str]]:
     return char_to_shape
 
 
+def get_char_to_zrm_shapes() -> Dict[str, List[str]]:
+    char_to_shape = pipe(CharZrmShapeTable.select(),
+                         map(lambda e: (e.char, e.shapes)),
+                         filter(lambda e: e[0] != '' and e[1] != ''),
+                         groupby(lambda e: e[0]),
+                         valmap(lambda e: [s[1] for s in e]), dict)
+    return char_to_shape
+
+
+
 def get_char_to_lu_shapes() -> Dict[str, List[str]]:
     char_to_shapes = defaultdict(list)
     for item in CharLuShapeTable.select().where(CharLuShapeTable.shapes != "-",
@@ -299,6 +325,7 @@ class SchemaConfig(object):
     input_schema: InputSchema
     check_db: bool = True
     reverse_dict: str = ""
+    shape_schema: ShapeSchema = XHE_SHAPE_SCHAME
 
 
 def get_exists_chars() -> Set[str]:
