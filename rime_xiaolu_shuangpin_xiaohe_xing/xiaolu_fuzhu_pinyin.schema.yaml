@@ -6,11 +6,11 @@
 schema:
   schema_id: xiaolu_fuzhu_pinyin
   name: 🦩小鹭音形·拼音辅助
-  version: "20230724.191037"
+  version: "20230728.132830"
   author: 
     - ledao <790717479@qq.com> 
   description: |
-     简单舒适音形方案·辅助方案
+     小鹭拼音辅助
 
 switches:
   - name: ascii_mode 

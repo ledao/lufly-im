@@ -8,6 +8,8 @@ from generator import generate_rime
 
 
 def main():
+    check_db = len(sys.argv) > 1 and sys.argv[1] == "check"
+
     _, output_dir = sys.argv[0], "rime_ziranma_shuangpin_xiaohe_xing"
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
@@ -23,6 +25,7 @@ def main():
         auto_select_pattern="^\w{6}$|^\w{8}$|^\w{10}$|^\w{12}$|^\w{14}$|^\w{16}$|^\w{18}$",
         input_schema=ZRM_SP_SCHEMA,
         reverse_dict="xiaolu_fuzhu_pinyin",
+        check_db=check_db,
     )
     generate_rime(std_schema_config, output_dir)
 
@@ -33,7 +36,7 @@ def main():
         authors=[
             "ledao <790717479@qq.com>"
         ],
-        description="简单舒适音形方案·辅助方案",
+        description="小鹭拼音辅助",
         auto_select_pattern="",
         input_schema=PINYIN_SCHEMA,
         check_db=False,

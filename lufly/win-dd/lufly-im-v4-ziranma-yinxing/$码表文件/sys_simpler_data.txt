@@ -1,0 +1,42 @@
+---config@码表分类=主码-9
+---config@允许编辑=是
+---config@码表别名=系统简码
+C/C++	ccp#序40000
+CMake	cmake#序40000
+CMakeLists.txt	cmakel#序40000
+Java	java#序40000
+Python	python#序40000
+Rust	rust#序40000
+Golang	gol#序40000
+Unity3D	unity#序40000
+Android	android#序40000
+APK	apk#序40000
+CUDA	cuda#序40000
+C++	cpp#序40000
+Gradle	gradle#序40000
+GPU	gpu#序40000
+GoRoutine	goroutine#序40000
+ω	oxomega#序40000
+ψ	oxpsi#序40000
+χ	oxchi#序40000
+φ	oxphi#序40000
+υ	oxupsilon#序40000
+τ	oxtau#序40000
+σ	oxsigma#序40000
+ρ	oxrho#序40000
+π	oxpi#序40000
+ο	oxo#序40000
+ξ	oxxi#序40000
+ν	oxnu#序40000
+μ	oxmu#序40000
+λ	oxlambda#序40000
+κ	oxkappa#序40000
+ι	oxiota#序40000
+θ	oxtheta#序40000
+η	oxeta#序40000
+ζ	oxzeta#序40000
+ε	oxepsilon#序40000
+δ	oxdelta#序40000
+γ	oxgamma#序40000
+β	oxbeta#序40000
+α	oxalpha#序40000
