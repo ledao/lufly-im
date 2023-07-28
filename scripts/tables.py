@@ -50,6 +50,17 @@ class CharLuShapeTable(BaseModel):
         return f"<{self.id},{self.char},{self.shapes},{self.priority},{self.updatedt}>"
 
 
+class CharZrmShapeTable(BaseModel):
+    id = IntegerField(primary_key=True)
+    char = CharField()
+    shapes = CharField()
+    priority = IntegerField()
+    updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
+
+    def __str__(self):
+        return f"<{self.id},{self.char},{self.shapes},{self.priority},{self.updatedt}>"
+
+
 class WordPhoneTable(BaseModel):
     id = IntegerField(primary_key=True)
     word = CharField()
@@ -165,6 +176,8 @@ def create_tables():
         TangshiTable.create_table()
     if not TwoStrokesWordsTable.table_exists():
         TwoStrokesWordsTable.create_table()
+    if not CharZrmShapeTable.table_exists():
+        CharZrmShapeTable.create_table()
 
 
 create_tables()
