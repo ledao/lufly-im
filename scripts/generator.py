@@ -260,7 +260,7 @@ def generate_simpler_words(char_threshold: int, word_threshold: int, schema: Inp
     return high_pri_simpler_words, low_pri_simpler_words
 
 
-def generate_full_words(schema: InputSchema, shape_schema: ShapeSchema) -> List[EncodeDecode]:
+def generate_full_words(schema: InputSchema, shape_schema: ShapeSchema, is_ff: bool) -> List[EncodeDecode]:
     if shape_schema == XHE_SHAPE_SCHAME:
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schema == ZRM_SHAPE_SCHEMA:
@@ -298,7 +298,7 @@ def generate_full_words(schema: InputSchema, shape_schema: ShapeSchema) -> List[
             for shape_first in char_to_shape[item.word[0]]:
                 for shape_last in char_to_shape[item.word[-1]]:
                     shapes = [
-                        shape_first[0] + shape_last[0],
+                        shape_first[0] + shape_last[0] if is_ff else shape_last[-1],
                     ]
                     for shape in shapes:
                         if shape in used_shapes:
@@ -572,7 +572,7 @@ def generate_shuangpin_dict(schema_config: SchemaConfig, outpath: str):
 
         fout.write(f"\n# 词语\n")
 
-        full_words = generate_full_words(schema_config.input_schema, schema_config.shape_schema)
+        full_words = generate_full_words(schema_config.input_schema, schema_config.shape_schema, schema_config.is_ff)
         with tqdm(total=len(full_words), desc="写入词") as pbar:
             for item in full_words:
                 if item.decode not in special_words:
@@ -581,7 +581,7 @@ def generate_shuangpin_dict(schema_config: SchemaConfig, outpath: str):
                 fout.write(f"{item.decode}\t{item.encode}\n")
                 pbar.update()
 
-        tangshi_words = generate_tangshi_words(schema_config.input_schema, schema_config.shape_schema)
+        tangshi_words = generate_tangshi_words(schema_config.input_schema, schema_config.shape_schema, schema_config.is_ff)
         with tqdm(total=len(tangshi_words), desc="写入诗词") as pbar:
             for item in tangshi_words:
                 fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
@@ -589,7 +589,7 @@ def generate_shuangpin_dict(schema_config: SchemaConfig, outpath: str):
                 fout.write(f"{item.decode}\t{item.encode}\n")
                 pbar.update()
 
-        len4_words = generate_4_len_word_simpler_items(schema_config.input_schema, schema_config.shape_schema)
+        len4_words = generate_4_len_word_simpler_items(schema_config.input_schema, schema_config.shape_schema, schema_config.is_ff)
         with tqdm(total=len(len4_words), desc="写入词简码") as pbar:
             for item in len4_words:
                 fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
@@ -637,7 +637,7 @@ def generate_pinyin_dict(schema_config: SchemaConfig, outpath: str):
 
         fout.write(f"\n# 词语\n")
 
-        full_words = generate_full_words(PINYIN_SCHEMA, XHE_SHAPE_SCHAME)
+        full_words = generate_full_words(PINYIN_SCHEMA, XHE_SHAPE_SCHAME, True)
         with tqdm(total=len(full_words), desc="写入词") as pbar:
             for item in full_words:
                 fout.write(f"{item.decode}\t{item.encode}\n")
@@ -780,7 +780,7 @@ def generate_default_custom(config: SchemaConfig, outpath: str):
         fout.write(f'    - "Control+Alt+grave"\n')
         fout.write(f'    - "F4"\n')
 
-def generate_dd(schema: InputSchema, output_dir: str, shape_schema: ShapeSchema, check_db: bool):
+def generate_dd(schema: InputSchema, output_dir: str, shape_schema: ShapeSchema, check_db: bool, is_ff: bool):
     if check_db:
         if schema == XHE_SP_SCHEMA:
             check_xhe_shuangpin.main()
@@ -842,7 +842,7 @@ def generate_dd(schema: InputSchema, output_dir: str, shape_schema: ShapeSchema,
         fout.write("---config@码表分类=主码-5\n")
         fout.write("---config@允许编辑=是\n")
         fout.write(f"---config@码表别名=系统词组\n")
-        for item in generate_full_words(schema, shape_schema):
+        for item in generate_full_words(schema, shape_schema, is_ff):
             fout.write(f"{item.decode}\t{item.encode}#序{60000}\n")
 
     sys_simpler_word_data = f"{output_dir}/sys_simpler_word_data.txt"
@@ -850,7 +850,7 @@ def generate_dd(schema: InputSchema, output_dir: str, shape_schema: ShapeSchema,
         fout.write("---config@码表分类=主码-6\n")
         fout.write("---config@允许编辑=是\n")
         fout.write(f"---config@码表别名=系统简词\n")
-        for item in generate_4_len_word_simpler_items(schema, shape_schema):
+        for item in generate_4_len_word_simpler_items(schema, shape_schema, is_ff):
             fout.write(f"{item.decode}\t{item.encode}#序{55000}\n")
 
     sys_tangshi_data = f"{output_dir}/sys_tangshi_word_data.txt"
@@ -858,7 +858,7 @@ def generate_dd(schema: InputSchema, output_dir: str, shape_schema: ShapeSchema,
         fout.write("---config@码表分类=主码-7\n")
         fout.write("---config@允许编辑=是\n")
         fout.write(f"---config@码表别名=系统唐诗\n")
-        for item in generate_tangshi_words(schema, shape_schema):
+        for item in generate_tangshi_words(schema, shape_schema, is_ff):
             fout.write(f"{item.decode}\t{item.encode}#序{52000}\n")
 
     with open(f'{output_dir}/sys_eng_data.txt', 'w', encoding='utf8') as fout:
@@ -891,7 +891,7 @@ def generate_dd(schema: InputSchema, output_dir: str, shape_schema: ShapeSchema,
         fout.write(f"---config@码表别名=辅助拼音\n")
         for item in generate_single_chars(PINYIN_SCHEMA, XHE_SHAPE_SCHAME):
             fout.write(f"{item.decode}\t{item.encode}#序{30000}\n")
-        for item in generate_full_words(PINYIN_SCHEMA, XHE_SHAPE_SCHAME):
+        for item in generate_full_words(PINYIN_SCHEMA, XHE_SHAPE_SCHAME, is_ff):
             fout.write(f"{item.decode}\t{item.encode}#序{30000}\n")
 
 
@@ -919,7 +919,7 @@ def generate_rime(schema_config: SchemaConfig, output_dir: str):
         generate_default_custom(schema_config, output_dir + f"/default.custom.yaml")
 
 
-def generate_4_len_wordphonetable_words(schema: InputSchema, shape_schema:ShapeSchema) -> List[EncodeDecode]:
+def generate_4_len_wordphonetable_words(schema: InputSchema, shape_schema:ShapeSchema, is_ff: bool) -> List[EncodeDecode]:
     if shape_schema == XHE_SHAPE_SCHAME:
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schema == ZRM_SHAPE_SCHEMA:
@@ -963,7 +963,7 @@ def generate_4_len_wordphonetable_words(schema: InputSchema, shape_schema:ShapeS
             for shape_first in char_to_shape[item.word[0]]:
                 for shape_last in char_to_shape[item.word[-1]]:
                     shapes = [
-                        shape_first[0] + shape_last[0],
+                        shape_first[0] + shape_last[0] if is_ff else shape_last[-1],
                     ]
                     for shape in shapes:
                         if shape in used_shapes:
@@ -980,7 +980,7 @@ def generate_4_len_wordphonetable_words(schema: InputSchema, shape_schema:ShapeS
     return result
 
 
-def generate_4_len_tangshi_words(schema: InputSchema, shape_schame:ShapeSchema) -> List[EncodeDecode]:
+def generate_4_len_tangshi_words(schema: InputSchema, shape_schame:ShapeSchema, is_ff: bool) -> List[EncodeDecode]:
     if shape_schame == XHE_SHAPE_SCHAME:
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schame == ZRM_SHAPE_SCHEMA:
@@ -1024,7 +1024,7 @@ def generate_4_len_tangshi_words(schema: InputSchema, shape_schame:ShapeSchema) 
             for shape_first in char_to_shape[item.word[0]]:
                 for shape_last in char_to_shape[item.word[-1]]:
                     shapes = [
-                        shape_first[0] + shape_last[0],
+                        shape_first[0] + shape_last[0] if is_ff else shape_last[-1],
                     ]
                     for shape in shapes:
                         if shape in used_shapes:
@@ -1041,13 +1041,13 @@ def generate_4_len_tangshi_words(schema: InputSchema, shape_schame:ShapeSchema) 
     return result
 
 
-def generate_4_len_word_simpler_items(schema: InputSchema, shape_schema:ShapeSchema) -> List[EncodeDecode]:
+def generate_4_len_word_simpler_items(schema: InputSchema, shape_schema:ShapeSchema, is_ff) -> List[EncodeDecode]:
     result = []
-    result.extend(generate_4_len_tangshi_words(schema, shape_schema))
+    result.extend(generate_4_len_tangshi_words(schema, shape_schema, is_ff))
     return result
 
 
-def generate_tangshi_words(schema: InputSchema, shape_schema:ShapeSchema) -> List[EncodeDecode]:
+def generate_tangshi_words(schema: InputSchema, shape_schema:ShapeSchema, is_ff: bool) -> List[EncodeDecode]:
     if shape_schema == XHE_SHAPE_SCHAME:
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schema == ZRM_SHAPE_SCHEMA:
@@ -1084,7 +1084,7 @@ def generate_tangshi_words(schema: InputSchema, shape_schema:ShapeSchema) -> Lis
             for shape_first in char_to_shape[item.word[0]]:
                 for shape_last in char_to_shape[item.word[-1]]:
                     shapes = [
-                        shape_first[0] + shape_last[0],
+                        shape_first[0] + shape_last[0] if is_ff else shape_last[-1],
                     ]
                     for shape in shapes:
                         if shape in used_shapes:

@@ -15,7 +15,7 @@ def main():
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
 
-    generate_dd(ZRM_SP_SCHEMA, output_dir, ZRM_SHAPE_SCHEMA, check_db)
+    generate_dd(ZRM_SP_SCHEMA, output_dir, ZRM_SHAPE_SCHEMA, check_db, True)
 
     dd_dir = 'lufly/win-dd/lufly-im-v4-ziranma-yinxing/$码表文件/'
     if os.path.exists(dd_dir):

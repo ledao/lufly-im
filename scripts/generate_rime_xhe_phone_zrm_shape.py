@@ -10,7 +10,7 @@ from generator import generate_rime
 def main():
     check_db = len(sys.argv) > 1 and sys.argv[1] == "check"
 
-    _, output_dir = sys.argv[0], "rime_xiaohe_shuangpin_zrm_xing"
+    _, output_dir = sys.argv[0], "rime_xiaohe_shuangpin_ziranma_xing"
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
 
