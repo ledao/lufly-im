@@ -15,7 +15,7 @@ def main():
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
 
-    generate_dd(BINGJI_SP_SCHEMA, output_dir, XHE_SHAPE_SCHAME, check_db)
+    generate_dd(BINGJI_SP_SCHEMA, output_dir, XHE_SHAPE_SCHAME, check_db, True)
 
     dd_dir = 'lufly/win-dd/lufly-im-v4-bingji/$码表文件/'
     if os.path.exists(dd_dir):

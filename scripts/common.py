@@ -326,6 +326,7 @@ class SchemaConfig(object):
     check_db: bool = True
     reverse_dict: str = ""
     shape_schema: ShapeSchema = XHE_SHAPE_SCHAME
+    is_ff: bool = True
 
 
 def get_exists_chars() -> Set[str]:
