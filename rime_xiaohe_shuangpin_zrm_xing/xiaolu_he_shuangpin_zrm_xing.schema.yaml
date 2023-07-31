@@ -1,0 +1,106 @@
+# 小鹭音形方案
+# encoding: utf-8
+# 机器生成，请勿修改
+
+
+schema:
+  schema_id: xiaolu_he_shuangpin_zrm_xing
+  name: 🦩小鹭音形·小鹤双拼+自然码形
+  version: "20230730.223502"
+  author: 
+    - ledao <790717479@qq.com> 
+  description: |
+     简单舒适音形方案
+
+switches:
+  - name: ascii_mode 
+    reset: 0
+  - name: full_shape
+  - name: zh_simp
+    reset: 1
+    states: [ 繁, 简 ]
+  - name: ascii_punct
+    reset: 0
+
+engine:
+  processors:
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  translators:
+    - punct_translator
+    - table_translator
+    - reverse_lookup_translator
+  filters:
+    - simplifier
+    - uniquifier
+
+speller:
+  alphabet: 'zyxwvutsrqponmlkjihgfedcba'
+  initials: 'abcdefghijklmnopqrstuvwxyz'
+  auto_select: true
+  auto_select_pattern: ^\w{6}$|^\w{8}$|^\w{10}$|^\w{12}$|^\w{14}$|^\w{16}$|^\w{18}$
+
+translator:
+  dictionary: xiaolu_he_shuangpin_zrm_xing
+  enable_charset_filter: false
+  enable_sentence: false
+  enable_completion: true
+  enable_user_dict: true
+  enable_encoder: true
+  encode_commit_history: true
+  max_phrase_length: 3
+
+
+punctuator:
+  import_preset: default
+
+reverse_lookup:
+  dictionary: xiaolu_fuzhu_pinyin
+  prefix: "`"
+  tips: [拼音]
+
+key_binder:
+  import_preset: default
+  bindings:
+    - {accept: comma, send: comma, when: paging} #注销逗号翻页
+    - {accept: period, send: period, when: has_menu} #注销句号翻页
+    - {accept: semicolon, send: 2, when: has_menu} #分号次选
+    - {accept: apostrophe, send: 3, when: has_menu} #单引号3选
+    - {accept: bracketleft, send: 4, when: has_menu} #单引号4选
+    - {accept: bracketright, send: 5, when: has_menu} #单引号5选
+    - {accept: dollar, send: 2, when: composing}
+    - {accept: Release+dollar, send: period, when: composing}
+    - {accept: Release+period, send: period, when: composing}
+    - {accept: bar, send: 2, when: composing}
+    - {accept: Release+bar, send: comma, when: composing}
+    - {accept: Release+comma, send: comma, when: composing}
+    - {accept: "Tab", send: Page_Down, when: has_menu}
+    - {accept: "Tab", send: Escape, when: composing}
+    - {accept: "Caps_Lock", send: Escape, when: composing}
+    - {accept: "Shift_R", send: Escape, when: composing}
+    - {accept: "Shift+space", toggle: full_shape, when: always} #切换全半角
+    - {accept: "Control+0", toggle: ascii_punct, when: always}
+    - {when: composing, accept: space, send: Escape}
+    - {when: has_menu, accept: space, send: space}
+
+recognizer:
+  import_preset: default
+  patterns:
+    reverse_lookup: "^`[a-z]*'?$"
+
+menu:
+  page_size: 5
+style:
+  horizontal: true

@@ -10,13 +10,13 @@ from generator import generate_dd
 def main():
     check_db = len(sys.argv) > 1 and sys.argv[1] == "check"
 
-    file_name, output_dir = sys.argv[0], "dd_xiaohe_shuangpin_zrm_xing"
+    file_name, output_dir = sys.argv[0], "dd_xiaohe_shuangpin_ziranma_xing"
 
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
 
     schema = XHE_SP_SCHEMA
-    generate_dd(XHE_SP_SCHEMA, output_dir, ZRM_SHAPE_SCHEMA, check_db)
+    generate_dd(XHE_SP_SCHEMA, output_dir, ZRM_SHAPE_SCHEMA, check_db, True)
 
     dd_dir = 'lufly/win-dd/lufly-im-v4-xiaohe-zrm/$码表文件/'
     if os.path.exists(dd_dir):
