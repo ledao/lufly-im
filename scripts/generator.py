@@ -260,7 +260,17 @@ def generate_simpler_words(char_threshold: int, word_threshold: int, schema: Inp
     return high_pri_simpler_words, low_pri_simpler_words
 
 
-def generate_full_words(schema: InputSchema, shape_schema: ShapeSchema, is_ff: bool) -> List[EncodeDecode]:
+def generate_full_words(
+        schema: InputSchema, 
+        shape_schema: ShapeSchema, 
+        is_ff: bool) -> List[EncodeDecode]:
+    """
+    生成全码词
+    :param schema: InputSchema, 输入方案
+    :param shape_schema: ShapeSchema, 形码方案
+    :param is_ff: bool, 是否首尾相同
+    :return: List[EncodeDecode]
+    """
     if shape_schema == XHE_SHAPE_SCHAME:
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schema == ZRM_SHAPE_SCHEMA:
@@ -298,8 +308,8 @@ def generate_full_words(schema: InputSchema, shape_schema: ShapeSchema, is_ff: b
             for shape_first in char_to_shape[item.word[0]]:
                 for shape_last in char_to_shape[item.word[-1]]:
                     shapes = [
-                        shape_first[0] + shape_last[0],
-                        shape_first[0] + shape_last[-1],
+                        shape_first[0] + shape_last[0] if is_ff else shape_last[-1],
+                        # shape_first[0] + shape_last[-1],
                     ]
                     for shape in shapes:
                         if shape in used_shapes:
@@ -964,8 +974,8 @@ def generate_4_len_wordphonetable_words(schema: InputSchema, shape_schema:ShapeS
             for shape_first in char_to_shape[item.word[0]]:
                 for shape_last in char_to_shape[item.word[-1]]:
                     shapes = [
-                        shape_first[0] + shape_last[0],
-                        shape_first[0] + shape_last[-1],
+                        shape_first[0] + shape_last[0] if is_ff else shape_last[-1],
+                        # shape_first[0] + shape_last[-1],
                     ]
                     for shape in shapes:
                         if shape in used_shapes:
@@ -1026,8 +1036,8 @@ def generate_4_len_tangshi_words(schema: InputSchema, shape_schame:ShapeSchema, 
             for shape_first in char_to_shape[item.word[0]]:
                 for shape_last in char_to_shape[item.word[-1]]:
                     shapes = [
-                        shape_first[0] + shape_last[0],
-                        shape_first[0] + shape_last[-1],
+                        shape_first[0] + shape_last[0] if is_ff else shape_last[-1],
+                        # shape_first[0] + shape_last[-1],
                     ]
                     for shape in shapes:
                         if shape in used_shapes:
@@ -1087,8 +1097,8 @@ def generate_tangshi_words(schema: InputSchema, shape_schema:ShapeSchema, is_ff:
             for shape_first in char_to_shape[item.word[0]]:
                 for shape_last in char_to_shape[item.word[-1]]:
                     shapes = [
-                        shape_first[0] + shape_last[0],
-                        shape_first[0] + shape_last[-1],
+                        shape_first[0] + shape_last[0] if is_ff else shape_last[-1],
+                        # shape_first[0] + shape_last[-1],
                     ]
                     for shape in shapes:
                         if shape in used_shapes:
