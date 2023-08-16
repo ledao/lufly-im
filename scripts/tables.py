@@ -50,6 +50,19 @@ class CharLuShapeTable(BaseModel):
         return f"<{self.id},{self.char},{self.shapes},{self.priority},{self.updatedt}>"
 
 
+class CharLuEditShapeTable(BaseModel):
+    id = IntegerField(primary_key=True)
+    char = CharField()
+    shapes = CharField()
+    he_shapes = CharField()
+    zrm_shapes = CharField()
+    priority = IntegerField()
+    updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
+
+    def __str__(self):
+        return f"<{self.id},{self.char},{self.shapes},{self.HeShapes},{self.ZrmShapes},{self.priority},{self.updatedt}>"
+
+
 class CharZrmShapeTable(BaseModel):
     id = IntegerField(primary_key=True)
     char = CharField()
@@ -178,6 +191,7 @@ def create_tables():
         TwoStrokesWordsTable.create_table()
     if not CharZrmShapeTable.table_exists():
         CharZrmShapeTable.create_table()
-
+    if not CharLuEditShapeTable.table_exists():
+        CharLuEditShapeTable.create_table()
 
 create_tables()
