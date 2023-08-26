@@ -60,7 +60,7 @@ class CharLuEditShapeTable(BaseModel):
     updatedt = DateTimeField("%Y-%m-%d %H:%M:%S")
 
     def __str__(self):
-        return f"<{self.id},{self.char},{self.shapes},{self.HeShapes},{self.ZrmShapes},{self.priority},{self.updatedt}>"
+        return f"<{self.id},{self.char},{self.shapes},{self.he_shapes},{self.zrm_shapes},{self.priority},{self.updatedt}>"
 
 
 class CharZrmShapeTable(BaseModel):
