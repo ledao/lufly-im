@@ -11,7 +11,7 @@ from pypinyin import lazy_pinyin
 from toolz.curried import curry, pipe, map, filter, groupby, valmap
 from toolz.curried import itemmap, valfilter
 
-from tables import CharPhoneTable, CharHeShapeTable, CharLuShapeTable, WordPhoneTable, TangshiTable, db, CharZrmShapeTable
+from tables import CharPhoneTable, CharHeShapeTable, CharLuEditShapeTable, WordPhoneTable, TangshiTable, db, CharZrmShapeTable
 from tables import FullToTwoTable
 
 
@@ -48,7 +48,7 @@ class ShapeSchema:
 
 XHE_SHAPE_SCHAME = ShapeSchema("xiao he")
 ZRM_SHAPE_SCHEMA = ShapeSchema("zi ran ma") 
-
+LU_SHAPE_SCHEMA = ShapeSchema("xiao lu")
 
 @curry
 def for_each(proc, eles):
@@ -248,11 +248,10 @@ def get_char_to_zrm_shapes() -> Dict[str, List[str]]:
     return char_to_shape
 
 
-
 def get_char_to_lu_shapes() -> Dict[str, List[str]]:
     char_to_shapes = defaultdict(list)
-    for item in CharLuShapeTable.select().where(CharLuShapeTable.shapes != "-",
-                                                CharLuShapeTable.shapes != ''):
+    for item in CharLuEditShapeTable.select().where(CharLuEditShapeTable.shapes != "-",
+                                                CharLuEditShapeTable.shapes != ''):
         char = item.char
         shapes = item.shapes
         if char == '' or shapes == '':
