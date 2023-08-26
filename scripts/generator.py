@@ -10,7 +10,8 @@ import check_xhe_shuangpin
 import check_zrm_shuangpin
 from common import InputSchema, XHE_SP_SCHEMA, get_char_to_xhe_phones, LU_SP_SCHEMA, get_char_to_lu_phones, \
     ZRM_SP_SCHEMA, get_char_to_zrm_phones, BINGJI_SP_SCHEMA, get_char_to_bingji_phones, get_char_to_xhe_shapes, \
-    is_all_alpha, SchemaConfig, PINYIN_SCHEMA, ShapeSchema, XHE_SHAPE_SCHAME, ZRM_SHAPE_SCHEMA, get_char_to_zrm_shapes
+    is_all_alpha, SchemaConfig, PINYIN_SCHEMA, ShapeSchema, XHE_SHAPE_SCHAME, ZRM_SHAPE_SCHEMA, get_char_to_zrm_shapes, \
+    LU_SHAPE_SCHEMA, get_char_to_lu_shapes
 from tables import CharPhoneTable, WordPhoneTable, EngWordTable, SimplerTable, TangshiTable, TwoStrokesWordsTable
 
 
@@ -19,6 +20,7 @@ class EncodeDecode(object):
     encode: str
     decode: str
     weight: float
+    shape_size: int = -1
 
 
 def generate_one_hit_char() -> List[EncodeDecode]:
@@ -50,7 +52,7 @@ def generate_one_hit_char() -> List[EncodeDecode]:
         "你\tn",
         "没\tm",
     ]
-    return [EncodeDecode(encode=e.split("\t")[1], decode=e.split("\t")[0], weight=100000000) for e in items]
+    return [EncodeDecode(encode=e.split("\t")[1], decode=e.split("\t")[0], weight=100000000, shape_size=0) for e in items]
 
 
 def generate_tow_hits_char(schema: InputSchema) -> List[EncodeDecode]:
@@ -76,14 +78,14 @@ def generate_tow_hits_char(schema: InputSchema) -> List[EncodeDecode]:
             print(f"A: {char} has no phones.")
             continue
         for phone in char_to_phones[char]:
-            items.append(EncodeDecode(encode=phone, decode=char, weight=10000000))
+            items.append(EncodeDecode(encode=phone, decode=char, weight=10000000, shape_size=0))
 
     return items
 
 def generate_two_strokes_words() -> List[EncodeDecode]:
     result = []
     for item in TwoStrokesWordsTable.select().where(TwoStrokesWordsTable.is_first == True).order_by(TwoStrokesWordsTable.id.asc()):
-        result.append(EncodeDecode(encode=item.encode, decode=item.word, weight=10000000))
+        result.append(EncodeDecode(encode=item.encode, decode=item.word, weight=10000000, shape_size=0))
     return result
 
 def get_dd_cmds():
@@ -154,6 +156,8 @@ def generate_single_chars(schema: InputSchema, shape_schema: ShapeSchema) -> Lis
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schema == ZRM_SHAPE_SCHEMA:
         char_to_shape = get_char_to_zrm_shapes()
+    elif shape_schema == LU_SHAPE_SCHEMA:
+        char_to_shape = get_char_to_lu_shapes()
     else:
         raise RuntimeError(f"shape_schema not found {shape_schema}")
 
@@ -182,11 +186,11 @@ def generate_single_chars(schema: InputSchema, shape_schema: ShapeSchema) -> Lis
                 if shape in used_shapes:
                     continue
                 used_shapes.add(shape)
-                result.append(EncodeDecode(decode=item.char, encode=phones + shape, weight=item.priority))
+                result.append(EncodeDecode(decode=item.char, encode=phones + shape, weight=item.priority, shape_size=len(shape)))
         else:
             if schema != PINYIN_SCHEMA:
                 print(f"没有形码的字：{item.char}")
-            result.append(EncodeDecode(decode=item.char, encode=phones, weight=item.priority))
+            result.append(EncodeDecode(decode=item.char, encode=phones, weight=item.priority, shape_size=0))
     return result
 
 
@@ -196,6 +200,8 @@ def generate_simpler_words(char_threshold: int, word_threshold: int, schema: Inp
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schema == ZRM_SHAPE_SCHEMA:
         char_to_shape = get_char_to_zrm_shapes()
+    elif shape_schema == LU_SHAPE_SCHEMA:
+        char_to_shape = get_char_to_lu_shapes()
     else:
         raise RuntimeError(f"shape_schema not found {shape_schema}")
 
@@ -254,9 +260,9 @@ def generate_simpler_words(char_threshold: int, word_threshold: int, schema: Inp
             continue
         if phones in single_chars:
             if item.priority >= word_threshold and single_chars[phones].priority < char_threshold:
-                high_pri_simpler_words.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
+                high_pri_simpler_words.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority, shape_size=0))
             else:
-                low_pri_simpler_words.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
+                low_pri_simpler_words.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority, shape_size=0))
     return high_pri_simpler_words, low_pri_simpler_words
 
 
@@ -275,6 +281,8 @@ def generate_full_words(
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schema == ZRM_SHAPE_SCHEMA:
         char_to_shape = get_char_to_zrm_shapes()
+    elif shape_schema == LU_SHAPE_SCHEMA:
+        char_to_shape = get_char_to_lu_shapes()
     else:
         raise RuntimeError(f"shape_schema not found {shape_schema}")
 
@@ -317,11 +325,11 @@ def generate_full_words(
                         used_shapes.add(shape)
                         encode = phones + shape
                         decode = item.word
-                        result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
+                        result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority, shape_size=len(shape)))
         else:
             if schema != PINYIN_SCHEMA:
                 print(f"没有形码的词：{item.word}")
-            result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
+            result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority, shape_size=0))
             continue
 
     return result
@@ -344,7 +352,7 @@ def generate_simpler() -> List[EncodeDecode]:
         encode = item.keys
         decode = item.words
         rule = f"{decode}\t{encode}"
-        result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
+        result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority, shape_size=0))
 
     return result
 
@@ -358,7 +366,7 @@ def generate_schema(config: SchemaConfig, outpath: str):
 
         fout.write(f"\nschema:\n")
         fout.write(f"  schema_id: {config.schema_id}\n")
-        fout.write(f"  name: 🦩{config.name}\n")
+        fout.write(f"  name: 🪶{config.name}\n")
         fout.write(f'  version: "{config.version}"\n')
         fout.write(f'  author: \n')
         for author in config.authors:
@@ -495,6 +503,8 @@ def generate_shuangpin_dict(schema_config: SchemaConfig, outpath: str):
         char_to_shape = get_char_to_xhe_shapes()
     elif schema_config.shape_schema == ZRM_SHAPE_SCHEMA:
         char_to_shape = get_char_to_zrm_shapes()
+    elif schema_config.shape_schema == LU_SHAPE_SCHEMA:
+        char_to_shape = get_char_to_lu_shapes()
     else:
         raise RuntimeError(f"{schema_config.shape_schema} not found")
 
@@ -559,7 +569,8 @@ def generate_shuangpin_dict(schema_config: SchemaConfig, outpath: str):
         single_chars = generate_single_chars(schema_config.input_schema, schema_config.shape_schema)
         with tqdm(total=len(single_chars), desc="写入简码单字") as pbar:
             for item in single_chars:
-                fout.write(f"{item.decode}\t{item.encode[:-1]}\n")
+                if item.shape_size == 2:
+                    fout.write(f"{item.decode}\t{item.encode[:-1]}\n")
                 pbar.update()
 
         special_words = set()
@@ -586,25 +597,32 @@ def generate_shuangpin_dict(schema_config: SchemaConfig, outpath: str):
         full_words = generate_full_words(schema_config.input_schema, schema_config.shape_schema, schema_config.is_ff)
         with tqdm(total=len(full_words), desc="写入词") as pbar:
             for item in full_words:
+
                 if item.decode not in special_words:
-                    fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
-                fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
+                    if item.shape_size >= 2:
+                        fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
+                if item.shape_size >= 1: 
+                    fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
                 fout.write(f"{item.decode}\t{item.encode}\n")
                 pbar.update()
 
         tangshi_words = generate_tangshi_words(schema_config.input_schema, schema_config.shape_schema, schema_config.is_ff)
         with tqdm(total=len(tangshi_words), desc="写入诗词") as pbar:
             for item in tangshi_words:
-                fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
-                fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
+                if item.shape_size >= 2:
+                    fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
+                if item.shape_size >= 1:
+                    fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
                 fout.write(f"{item.decode}\t{item.encode}\n")
                 pbar.update()
 
         len4_words = generate_4_len_word_simpler_items(schema_config.input_schema, schema_config.shape_schema, schema_config.is_ff)
         with tqdm(total=len(len4_words), desc="写入词简码") as pbar:
             for item in len4_words:
-                fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
-                fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
+                if item.shape_size >= 2:
+                    fout.write(f"{item.decode}\t{item.encode[0:-2]}\n")
+                if item.shape_size >= 1:
+                    fout.write(f"{item.decode}\t{item.encode[0:-1]}\n")
                 fout.write(f"{item.decode}\t{item.encode}\n")
                 pbar.update()
 
@@ -900,9 +918,9 @@ def generate_dd(schema: InputSchema, output_dir: str, shape_schema: ShapeSchema,
         fout.write("---config@码表分类=辅码码表\n")
         fout.write("---config@允许编辑=是\n")
         fout.write(f"---config@码表别名=辅助拼音\n")
-        for item in generate_single_chars(PINYIN_SCHEMA, XHE_SHAPE_SCHAME):
+        for item in generate_single_chars(PINYIN_SCHEMA, XHE_SHAPE_SCHAME): # shape_schema 随意
             fout.write(f"{item.decode}\t{item.encode}#序{30000}\n")
-        for item in generate_full_words(PINYIN_SCHEMA, XHE_SHAPE_SCHAME, is_ff):
+        for item in generate_full_words(PINYIN_SCHEMA, XHE_SHAPE_SCHAME, is_ff): # shape_schema 随意
             fout.write(f"{item.decode}\t{item.encode}#序{30000}\n")
 
 
@@ -935,6 +953,8 @@ def generate_4_len_wordphonetable_words(schema: InputSchema, shape_schema:ShapeS
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schema == ZRM_SHAPE_SCHEMA:
         char_to_shape = get_char_to_zrm_shapes()
+    elif shape_schema == LU_SHAPE_SCHEMA:
+        char_to_shape = get_char_to_lu_shapes()
     else:
         raise RuntimeError(f"shape_schema not found {shape_schema}")
 
@@ -983,10 +1003,10 @@ def generate_4_len_wordphonetable_words(schema: InputSchema, shape_schema:ShapeS
                         used_shapes.add(shape)
                         encode = phones + shape
                         decode = item.word
-                        result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
+                        result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority, shape_size=len(shape)))
         else:
             print(f"没有形码的词：{item.word}")
-            result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
+            result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority, shape_size=0))
             continue
 
     return result
@@ -997,6 +1017,8 @@ def generate_4_len_tangshi_words(schema: InputSchema, shape_schame:ShapeSchema, 
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schame == ZRM_SHAPE_SCHEMA:
         char_to_shape = get_char_to_zrm_shapes()
+    elif shape_schame == LU_SHAPE_SCHEMA:
+        char_to_shape = get_char_to_lu_shapes()
     else:
         raise RuntimeError(f"shape_schema not found {shape_schame}")
 
@@ -1045,10 +1067,10 @@ def generate_4_len_tangshi_words(schema: InputSchema, shape_schame:ShapeSchema, 
                         used_shapes.add(shape)
                         encode = phones + shape
                         decode = item.word
-                        result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
+                        result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority, shape_size=len(shape)))
         else:
             print(f"没有形码的词：{item.word}")
-            result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
+            result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority, shape_size=0))
             continue
 
     return result
@@ -1065,6 +1087,8 @@ def generate_tangshi_words(schema: InputSchema, shape_schema:ShapeSchema, is_ff:
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schema == ZRM_SHAPE_SCHEMA:
         char_to_shape = get_char_to_zrm_shapes()
+    elif shape_schema == LU_SHAPE_SCHEMA:
+        char_to_shape = get_char_to_lu_shapes()
     else:
         raise RuntimeError(f"shape_schema not found {shape_schema}")
 
@@ -1106,10 +1130,10 @@ def generate_tangshi_words(schema: InputSchema, shape_schema:ShapeSchema, is_ff:
                         used_shapes.add(shape)
                         encode = phones + shape
                         decode = item.word
-                        result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority))
+                        result.append(EncodeDecode(encode=encode, decode=decode, weight=item.priority, shape_size=len(shape)))
         else:
             print(f"没有形码的词：{item.word}")
-            result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority))
+            result.append(EncodeDecode(encode=phones, decode=item.word, weight=item.priority, shape_size=0))
             continue
 
     return result
