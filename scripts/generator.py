@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import List, Dict, Tuple
+import datetime
 
 from peewee import fn
 from tqdm import tqdm
@@ -946,6 +947,37 @@ def generate_rime(schema_config: SchemaConfig, output_dir: str):
         generate_weasel_custom(schema_config, output_dir + f"/weasel.custom.yaml")
         generate_squirrel_custom(schema_config, output_dir + f"/squirrel.custom.yaml")
         generate_default_custom(schema_config, output_dir + f"/default.custom.yaml")
+
+
+
+def generate_shouxin(schema: InputSchema, output_dir: str, shape_schema: ShapeSchema, check_db: bool, is_ff: bool):
+    if check_db:
+        if schema == XHE_SP_SCHEMA:
+            check_xhe_shuangpin.main()
+        elif schema == LU_SP_SCHEMA:
+            check_lu_shuangpin.main()
+        elif schema == ZRM_SP_SCHEMA:
+            check_zrm_shuangpin.main()
+        elif schema == BINGJI_SP_SCHEMA:
+            check_bingji_shuangpin.main()
+        else:
+            raise RuntimeError(f"{schema} not found")
+    version = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+    duanyu_txt = f"{output_dir}/xiaolu_duanyu.txt"
+    with open(duanyu_txt, 'w', encoding='utf8') as fout:
+        fout.write(f";小鹭音形系列\n")
+        fout.write(f";维护者: ledao, zhaowei153@126.com\n")
+        fout.write(f";版本：{version}\n")
+        for item in generate_full_words(schema, shape_schema, is_ff):
+            fout.write(f"{item.encode}={item.decode}\n")
+    
+    fuzhuma_txt = f"{output_dir}/xiaolu_fuzhuma.txt"
+    with open(fuzhuma_txt, "w", encoding='utf8') as fout:
+        fout.write(f";小鹭音形系列\n")
+        fout.write(f";维护者: ledao, zhaowei153@126.com\n")
+        fout.write(f";版本：{version}\n")
+        for item in generate_single_chars(schema, shape_schema):
+            fout.write(f"{item.decode}={' '.join(item.encode[-2:])} {item.encode[-2:]}\n")
 
 
 def generate_4_len_wordphonetable_words(schema: InputSchema, shape_schema:ShapeSchema, is_ff: bool) -> List[EncodeDecode]:
