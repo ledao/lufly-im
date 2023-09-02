@@ -838,6 +838,11 @@ def generate_dd(schema: InputSchema, output_dir: str, shape_schema: ShapeSchema,
                 fout.write(f"{item.decode}\t{item.encode}#序{80000}\n")
             pbar.update(len(two_hits_chars))
 
+        # 二简词放这里
+        two_strokes_words = generate_two_strokes_words()
+        for item in two_strokes_words:
+            fout.write(f"{item.decode}\t{item.encode}#序{79000}\n")
+
         single_chars = generate_single_chars(schema, shape_schema)
         for item in single_chars:
             fout.write(f"{item.decode}\t{item.encode[:-1]}#序{78000}\n")
@@ -848,6 +853,7 @@ def generate_dd(schema: InputSchema, output_dir: str, shape_schema: ShapeSchema,
         fout.write("---config@码表分类=主码-3\n")
         fout.write("---config@允许编辑=是\n")
         fout.write(f"---config@码表别名=高频简词\n")
+
         for item in high_freq_words:
             fout.write(f"{item.decode}\t{item.encode}#序{75000}\n")
 
@@ -968,6 +974,33 @@ def generate_shouxin(schema: InputSchema, output_dir: str, shape_schema: ShapeSc
         fout.write(f";小鹭音形系列\n")
         fout.write(f";维护者: ledao, zhaowei153@126.com\n")
         fout.write(f";版本：{version}\n")
+
+        one_hit_chars = generate_one_hit_char()
+        for item in one_hit_chars:
+            fout.write(f"{item.encode}={item.decode}\n")
+
+        two_hits_chars = generate_tow_hits_char(schema)
+        for item in two_hits_chars:
+            fout.write(f"{item.encode}={item.decode}\n")
+        
+        single_chars = generate_single_chars(schema, shape_schema)
+        for item in single_chars:
+            fout.write(f"{item.encode}={item.decode[:-1]}\n")
+
+        two_strokes_words = generate_two_strokes_words()
+        for item in two_strokes_words:
+            fout.write(f"{item.encode}={item.decode}\n")
+
+        high_freq_word, low_freq_words = generate_simpler_words(100, 2000, schema, shape_schema)
+        for item in high_freq_word:
+            fout.write(f"{item.encode}={item.decode}\n")
+
+        for item in single_chars:
+            fout.write(f"{item.encode}={item.decode}\n")
+
+        for item in low_freq_words:
+            fout.write(f"{item.encode}={item.decode}\n")
+
         for item in generate_full_words(schema, shape_schema, is_ff):
             fout.write(f"{item.encode}={item.decode}\n")
     
