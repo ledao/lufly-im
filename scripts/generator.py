@@ -969,10 +969,29 @@ def generate_shouxin(schema: InputSchema, output_dir: str, shape_schema: ShapeSc
         else:
             raise RuntimeError(f"{schema} not found")
     version = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
-    duanyu_txt = f"{output_dir}/xiaolu_duanyu.txt"
+    name = "xiaolu_"
+    if schema == XHE_SP_SCHEMA:
+        name += "xiaohe_shuangpin"
+    elif schema == LU_SP_SCHEMA:
+        name += "xiaolu_shuangpin"
+    elif schema == ZRM_SP_SCHEMA:
+        name += "ziranma_shuangpin"
+    else:
+        raise RuntimeError(f"{schema} not found")
+    
+    if shape_schema == XHE_SHAPE_SCHAME:
+        name += "_xiaohe_xing"
+    elif shape_schema == LU_SHAPE_SCHEMA:
+        name += "_xiaolu_xing"
+    elif shape_schema == ZRM_SHAPE_SCHEMA:
+        name += "_ziranma_xing"
+    else:
+        raise RuntimeError(f"{shape_schema} not found")
+
+    duanyu_txt = f"{output_dir}/{name}_duanyu.txt"
     with open(duanyu_txt, 'w', encoding='utf8') as fout:
         fout.write(f";小鹭音形系列\n")
-        fout.write(f";维护者: ledao, zhaowei153@126.com\n")
+        fout.write(f";维护者: ledao, 790717479@qq.com\n")
         fout.write(f";版本：{version}\n")
 
         one_hit_chars = generate_one_hit_char()
@@ -982,14 +1001,11 @@ def generate_shouxin(schema: InputSchema, output_dir: str, shape_schema: ShapeSc
         two_hits_chars = generate_tow_hits_char(schema)
         for item in two_hits_chars:
             fout.write(f"{item.encode}={item.decode}\n")
-        
+
+
         single_chars = generate_single_chars(schema, shape_schema)
         for item in single_chars:
-            fout.write(f"{item.encode}={item.decode[:-1]}\n")
-
-        two_strokes_words = generate_two_strokes_words()
-        for item in two_strokes_words:
-            fout.write(f"{item.encode}={item.decode}\n")
+            fout.write(f"{item.encode[:-1]}={item.decode}\n")
 
         high_freq_word, low_freq_words = generate_simpler_words(100, 2000, schema, shape_schema)
         for item in high_freq_word:
@@ -1003,11 +1019,15 @@ def generate_shouxin(schema: InputSchema, output_dir: str, shape_schema: ShapeSc
 
         for item in generate_full_words(schema, shape_schema, is_ff):
             fout.write(f"{item.encode}={item.decode}\n")
+
+        two_strokes_words = generate_two_strokes_words()
+        for item in two_strokes_words:
+            fout.write(f"{item.encode}={item.decode}\n")
     
-    fuzhuma_txt = f"{output_dir}/xiaolu_fuzhuma.txt"
+    fuzhuma_txt = f"{output_dir}/{name}_fuzhuma.txt"
     with open(fuzhuma_txt, "w", encoding='utf8') as fout:
         fout.write(f";小鹭音形系列\n")
-        fout.write(f";维护者: ledao, zhaowei153@126.com\n")
+        fout.write(f";维护者: ledao, 790717479@qq.com\n")
         fout.write(f";版本：{version}\n")
         for item in generate_single_chars(schema, shape_schema):
             fout.write(f"{item.decode}={' '.join(item.encode[-2:])} {item.encode[-2:]}\n")
