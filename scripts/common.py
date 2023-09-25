@@ -555,3 +555,35 @@ def contain_symbols(word: str) -> bool:
     else:
         return True
 
+
+def meanless_word(word: str) -> bool:
+    if word.startswith("但"):
+        return True
+    if word.startswith("都"):
+        return True
+    if word.startswith("把"):
+        return True
+    if word.startswith('的'):
+        return True
+    if word.endswith('的'):
+        return True
+    if word.startswith('了'):
+        return True
+    if word.endswith('了'):
+        return True
+    if word.endswith('么'):
+        return True
+    if len(word) == 3 and word.endswith('把'):
+        return True
+    if len(word) == 3 and word.endswith('比'):
+        return True
+    if len(word) < 2:
+        return True
+    if len(word) > 3:
+        return True
+    if contain_alpha(word):
+        return True
+    if contain_symbols(word):
+        return True
+
+    return False
