@@ -1,8 +1,6 @@
 import sys
-from typing import List
 
-from common import get_exists_words
-from tables import WordPhoneTable
+from common import get_exists_words, meanless_word
 
 
 def load_rime_export_words(path: str, sikp_words_path: str, out_path):
@@ -13,7 +11,7 @@ def load_rime_export_words(path: str, sikp_words_path: str, out_path):
         for line in fin:
             line = line.strip()
             if line == '': continue
-            exists_words.add(line)
+            exists_words.add(line.split(" ")[0])
 
     with open(path, 'r', encoding='utf8') as fin:
         for line in fin:
@@ -28,27 +26,7 @@ def load_rime_export_words(path: str, sikp_words_path: str, out_path):
                 continue
             word = cols[0]
 
-            if word.startswith("但"):
-                continue
-            if word.startswith("都"):
-                continue
-            if word.startswith("把"):
-                continue
-            if word.startswith('的'):
-                continue
-            if word.endswith('的'):
-                continue
-            if word.startswith('了'):
-                continue
-            if word.endswith('了'):
-                continue
-            if word.endswith('么'):
-                continue
-            if len(word) == 3 and word.endswith('把'):
-                continue
-            if len(word) == 3 and word.endswith('比'):
-                continue
-            if len(word) > 3:
+            if meanless_word(word):
                 continue
             if word in exists_words:
                 continue
