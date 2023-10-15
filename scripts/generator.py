@@ -367,7 +367,7 @@ def generate_schema(config: SchemaConfig, outpath: str):
 
         fout.write(f"\nschema:\n")
         fout.write(f"  schema_id: {config.schema_id}\n")
-        fout.write(f"  name: 🪶{config.name}\n")
+        fout.write(f"  name: 🦩{config.name}\n")
         fout.write(f'  version: "{config.version}"\n')
         fout.write(f'  author: \n')
         for author in config.authors:
