@@ -40,3 +40,5 @@ GoRoutine	goroutine#序40000
 γ	oxgamma#序40000
 β	oxbeta#序40000
 α	oxalpha#序40000
+<-	leftarrow#序40000
+->	rightarrow#序40000
