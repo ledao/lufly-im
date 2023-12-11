@@ -1,6 +1,6 @@
 ;小鹭音形系列
 ;维护者: ledao, 790717479@qq.com
-;版本：2023-09-20-09-22-48
+;版本：2023-11-02-19-50-09
 的=b u bu
 的=b u bu
 我=p d pd
@@ -8,9 +8,8 @@
 是=r n rn
 一=a a aa
 个=p a pa
-个=p u pu
+个=r l rl
 个=r a ra
-个=r u ru
 你=r e re
 妳=n e ne
 不=a d ad
@@ -21,9 +20,9 @@
 有=y u yu
 就=y j yj
 了=a a aa
-了=v u vu
+了=v l vl
 了=a a aa
-了=v u vu
+了=v l vl
 这=z w zw
 那=e l el
 那=e l el
@@ -106,9 +105,8 @@
 样=m y my
 现=w j wj
 年=p a pa
-年=p u pu
+年=p l pl
 年=r a ra
-年=r u ru
 儿=p g pg
 得=i c ic
 得=i c ic
@@ -186,9 +184,8 @@
 和=h k hk
 和=h k hk
 和=h k hk
-手=u b ub
+手=p l pl
 手=p a pa
-手=p u pu
 哦=k w kw
 哦=k w kw
 边=z l zl
@@ -246,7 +243,6 @@
 前=b d bd
 少=x p xp
 公=b s bs
-费=b f bf
 费=f b fb
 情=x q xq
 女=a a aa
@@ -397,8 +393,7 @@
 周=k j kj
 周=k k kk
 者=l r lr
-又=a d ad
-又=v d vd
+又=v n vn
 应=g a ga
 应=g h gh
 从=r r rr
@@ -532,7 +527,7 @@
 更=a n an
 款=q u qu
 空=x g xg
-资=b c bc
+资=c b cb
 宝=b y by
 数=l w lw
 数=l w lw
@@ -589,7 +584,7 @@
 爸=f b fb
 认=y r yr
 州=d a da
-州=d u du
+州=d l dl
 州=i d id
 亲=l m lm
 亲=l m lm
@@ -884,11 +879,11 @@
 希=j u ju
 介=r a ra
 介=r p rp
-介=r u ru
+介=r l rl
 刘=d w dw
 刘=w d wd
 由=l a la
-频=y b yb
+频=b b bb
 段=d u du
 段=p u pu
 段=u d ud
@@ -938,7 +933,6 @@
 婚=n h nh
 步=v x vx
 祝=u x ux
-质=b u bu
 质=p b pb
 显=r y ry
 企=r v rv
@@ -948,7 +942,7 @@
 易=r w rw
 养=y a ya
 养=y p yp
-养=y u yu
+养=y l yl
 操=f z fz
 操=t z tz
 害=b k bk
@@ -1030,12 +1024,10 @@
 充=d y dy
 充=e s es
 充=w y wy
-贵=b a ba
-贵=b h bh
 贵=v b vb
 待=i s is
-责=b f bf
 责=f b fb
+责=q b qb
 鸡=n y ny
 鸡=y n yn
 借=r x rx
@@ -1065,7 +1057,7 @@
 俩=r l rl
 升=p l pl
 牛=p a pa
-牛=p u pu
+牛=p l pl
 供=r g rg
 响=k x kx
 料=m d md
@@ -1111,7 +1103,7 @@
 志=x u xu
 累=s t st
 累=t s ts
-贷=b d bd
+贷=d b db
 闭=m c mc
 灯=h d hd
 傻=r w rw
@@ -1137,7 +1129,7 @@
 弄=w c wc
 弄=c w cw
 弄=w c wc
-货=b h bh
+货=h b hb
 际=e u eu
 增=t c tc
 巴=a g ag
@@ -1157,9 +1149,6 @@
 紧=l x lx
 环=w b wb
 县=q s qs
-杰=d m dm
-杰=h m hm
-杰=m d md
 杰=m h mh
 拜=p a pa
 拜=p u pu
@@ -1259,7 +1248,7 @@
 享=w z wz
 享=z k zk
 舞=p a pa
-舞=p u pu
+舞=p l pl
 舞=r f rf
 舞=x f xf
 急=x i xi
@@ -1348,7 +1337,6 @@
 练=s j sj
 旅=f p fp
 闻=e m em
-闻=m e me
 韩=u w uw
 韩=w u wu
 冰=d u du
@@ -1439,7 +1427,7 @@
 津=d y dy
 帅=l j lj
 获=c q cq
-警=y j yj
+警=j y jy
 虑=h x hx
 虑=x h xh
 却=q e qe
@@ -1490,14 +1478,14 @@
 季=h z hz
 怀=x b xb
 引=g a ga
-引=g u gu
+引=g l gl
 印=p e pe
 脚=y q yq
 绑=s b sb
 浪=d l dl
 争=d y dy
 川=p a pa
-川=p u pu
+川=p l pl
 波=d p dp
 胡=o g og
 胡=y g yg
@@ -1552,7 +1540,7 @@
 烧=h y hy
 束=a n an
 乎=p a pa
-乎=p u pu
+乎=p l pl
 监=l m lm
 摄=f n fn
 摄=t n tn
@@ -1737,7 +1725,6 @@
 尊=b c bc
 尊=q c qc
 舒=u y uy
-舒=y u yu
 纸=s u su
 汤=d y dy
 汤=d y dy
@@ -2007,8 +1994,7 @@
 罪=s f sf
 革=a a aa
 革=c a ca
-革=c u cu
-革=h u hu
+革=n l nl
 珍=w p wp
 顿=y t yt
 凯=j j jj
@@ -2099,7 +2085,7 @@
 潮=d i di
 谅=y j yj
 斤=p a pa
-斤=p u pu
+斤=p l pl
 链=j l jl
 爽=d y dy
 倍=r k rk
@@ -2284,7 +2270,7 @@
 伯=r b rb
 摸=f m fm
 摸=t m tm
-赞=b x bx
+赞=x b xb
 篮=v j vj
 鸭=j n jn
 鸭=n j nj
@@ -2444,8 +2430,7 @@
 债=r z rz
 恢=x h xh
 竹=p a pa
-竹=p u pu
-竹=v u vu
+竹=p l pl
 霞=y j yj
 霞=y y yy
 咬=k j kj
@@ -2460,8 +2445,7 @@
 闷=m x mx
 馈=u g ug
 榜=m p mp
-贸=b d bd
-贸=l b lb
+贸=p b pb
 献=q n qn
 旺=r w rw
 悔=x m xm
@@ -2477,7 +2461,7 @@
 描=f m fm
 描=t m tm
 乔=p p pp
-乔=p u pu
+乔=y l yl
 乔=y p yp
 艾=c i ci
 艾=c w cw
@@ -2707,9 +2691,8 @@
 缩=s s ss
 墨=h t ht
 墨=t h th
-赏=b k bk
-赏=d k dk
 赏=x y xy
+赏=d k dk
 毫=d m dm
 毫=m b mb
 毫=w m wm
@@ -2806,16 +2789,13 @@
 聘=e p ep
 予=a a aa
 予=s a sa
-予=s u su
-予=v u vu
+予=v l vl
 梯=m d md
 肌=y j yj
 箭=v q vq
 俗=r g rg
 寸=a d ad
-贾=b x bx
 贾=x b xb
-贾=b x bx
 贾=x b xb
 粗=m q mq
 俄=r w rw
@@ -2944,7 +2924,7 @@
 披=t p tp
 赤=t b tb
 赤=t y ty
-誉=y x yx
+誉=x y xy
 蹈=z j zj
 蹈=z y zy
 抬=f t ft
@@ -3131,7 +3111,6 @@
 犹=q y qy
 凑=d z dz
 绒=s r sr
-贡=b g bg
 贡=g b gb
 薪=c x cx
 械=m j mj
@@ -3287,8 +3266,7 @@
 斜=d y dy
 骄=m q mq
 袭=l y ly
-贪=b j bj
-贪=r b rb
+贪=j b jb
 蠢=i i ii
 谊=y y yy
 贞=l r lr
@@ -3338,9 +3316,8 @@
 砖=u v uv
 憾=x g xg
 臣=a a aa
-臣=h u hu
+臣=a v av
 臣=k a ka
-臣=k u ku
 庞=g l gl
 芯=c x cx
 叮=k d kd
@@ -3393,8 +3370,7 @@
 磁=u z uz
 脂=y v yv
 伪=r w rw
-贯=b m bm
-贯=m b mb
+贯=l b lb
 抑=f e fe
 抑=t e te
 蕉=c j cj
@@ -3472,7 +3448,7 @@
 粘=m v mv
 淇=d q dq
 琼=w j wj
-樊=d m dm
+樊=m d md
 践=z j zj
 拓=f u fu
 拓=t u tu
@@ -3503,7 +3479,7 @@
 晰=r x rx
 盲=m w mw
 盲=o w ow
-杠=m g mg
+杠=g h gh
 纬=s w sw
 峪=u g ug
 氛=q f qf
@@ -3523,7 +3499,7 @@
 嘟=k d kd
 弗=a a aa
 弗=g p gp
-弗=v u vu
+弗=v l vl
 泼=d f df
 枚=m w mw
 盯=m d md
@@ -3738,7 +3714,7 @@
 肇=h y hy
 肇=y w yw
 汰=d t dt
-誓=y v yv
+誓=v y vy
 牡=n t nt
 帖=j v jv
 娴=n x nx
@@ -3818,7 +3794,6 @@
 忌=j x jx
 忌=x j xj
 詹=d y dy
-詹=y b yb
 削=d x dx
 削=d x dx
 吾=k w kw
@@ -3885,7 +3860,7 @@
 梭=m w mw
 耿=e h eh
 陀=e t et
-劣=l u lu
+劣=u l ul
 扛=f g fg
 扛=t g tg
 扛=f g fg
@@ -3941,7 +3916,7 @@
 皆=b b bb
 渊=d a da
 渊=d m dm
-渊=d u du
+渊=d l dl
 芭=c b cb
 刹=d u du
 刹=d u du
@@ -4293,7 +4268,7 @@
 睫=m j mj
 鲤=y l yl
 娼=n i ni
-赁=b r br
+赁=r b rb
 辜=u x ux
 辜=x g xg
 焰=h j hj
@@ -4759,7 +4734,7 @@
 淌=d u du
 淌=d u du
 珂=w k wk
-裔=y k yk
+裔=y j yj
 炅=r h rh
 炅=r h rh
 秉=h a ha
@@ -4787,13 +4762,11 @@
 孽=z b zb
 荟=c h ch
 遣=z k zk
-梵=f l fl
-梵=m f mf
+梵=l f lf
 壹=u d ud
 呕=k q kq
 躯=u q uq
 嚣=k k kk
-嚣=y k yk
 婕=n j nj
 珀=w b wb
 蟑=i v iv
@@ -4850,7 +4823,7 @@
 稣=y h yh
 炬=h j hj
 锂=j l jl
-凿=y k yk
+凿=y y yy
 寇=b y by
 秧=h y hy
 婊=n b nb
@@ -4884,7 +4857,7 @@
 酪=y g yg
 潼=d t dt
 瀚=d h dh
-焚=h l hl
+焚=l h lh
 畴=t u tu
 粱=m b mb
 缚=s c sc
@@ -4974,8 +4947,8 @@
 瞩=m u mu
 忏=x q xq
 烯=h x hx
-譬=y b yb
-譬=y x yx
+譬=b y by
+譬=u y uy
 荫=c y cy
 镶=j x jx
 镶=j y jy
@@ -4994,7 +4967,7 @@
 楷=m j mj
 痪=b h bh
 妄=n w nw
-郴=e l el
+郴=l e le
 氮=q y qy
 猿=q y qy
 吖=k y ky
@@ -5182,8 +5155,7 @@
 钛=j t jt
 娣=n d nd
 菁=c q cq
-赘=b a ba
-赘=b w bw
+赘=a b ab
 噶=k g kg
 坍=t d td
 戛=a g ag
@@ -5969,7 +5941,7 @@
 渎=d m dm
 蜊=i l il
 酮=y t yt
-饕=u h uh
+饕=h u hu
 哝=k n kn
 孬=b h bh
 涅=d n dn
@@ -6030,7 +6002,6 @@
 熠=h b hb
 筵=v y vy
 诙=y h yh
-贰=b y by
 贰=y b yb
 醺=y x yx
 佚=r u ru
@@ -6051,8 +6022,6 @@
 褚=y v yv
 飒=l f lf
 餮=d u du
-餮=u p up
-餮=u t ut
 咫=i v iv
 弼=b g bg
 弼=g g gg
@@ -6759,7 +6728,6 @@
 褛=y l yl
 觎=j y jy
 誊=j y jy
-誊=y f yf
 赳=z l zl
 郃=e h eh
 醴=y d yd
@@ -6849,8 +6817,8 @@
 胫=y g yg
 褓=y b yb
 襁=y q yq
-贲=b h bh
-贲=b h bh
+贲=u b ub
+贲=u b ub
 骰=g u gu
 鸪=n g ng
 龅=i b ib
@@ -6867,7 +6835,7 @@
 竽=v y vy
 蓥=c j cj
 蓥=j b jb
-蹩=z b zb
+蹩=b z bz
 蹩=z w zw
 铄=j l jl
 铄=j y jy
@@ -7034,7 +7002,6 @@
 褡=y d yd
 褡=y h yh
 赉=l b lb
-赓=b g bg
 赓=g b gb
 逯=z l zl
 钿=j t jt
@@ -7062,7 +7029,6 @@
 袤=d y dy
 袤=w y wy
 袤=y m ym
-赝=b y by
 赝=i b ib
 鏖=j l jl
 鏖=l j lj
@@ -7088,7 +7054,7 @@
 舛=x f xf
 螯=i a ia
 螯=i w iw
-訾=y c yc
+訾=c y cy
 轳=i l il
 钼=j m jm
 钼=j o jo
@@ -7514,7 +7480,7 @@
 篦=v b vb
 绶=s u su
 聿=a a aa
-聿=v u vu
+聿=v l vl
 腓=y f yf
 芾=c f cf
 芾=c j cj
@@ -7621,7 +7587,6 @@
 杓=m u mu
 椟=m m mm
 楫=m e me
-楫=m q mq
 榧=m f mf
 槁=m g mg
 瀵=d g dg
@@ -8025,7 +7990,7 @@
 屦=u l ul
 岽=u d ud
 峁=u m um
-峄=u f uf
+峄=u l ul
 嶷=u y uy
 戡=u g ug
 挈=u d ud
@@ -8120,7 +8085,6 @@
 鞣=g r gr
 韪=u w uw
 颞=y n yn
-飧=u x ux
 飧=x u xu
 驽=m n mn
 骓=m v mv
@@ -8210,7 +8174,7 @@
 滹=d h dh
 漭=d m dm
 爿=a a aa
-爿=v u vu
+爿=v l vl
 爿=p j pj
 狝=q e qe
 獍=q j qj
@@ -9146,8 +9110,7 @@
 棪=m y my
 棬=m j mj
 棬=m j mj
-棼=f l fl
-棼=m f mf
+棼=l f lf
 椀=m w mw
 椆=m v mv
 椆=m v mv
@@ -9181,9 +9144,7 @@
 槜=m j mj
 槜=m n mn
 槱=m d md
-槱=m h mh
 槱=m d md
-槱=m h mh
 樗=m k mk
 樗=m y my
 樘=m t mt
@@ -10095,8 +10056,8 @@
 谮=y q yq
 谮=y r yr
 谰=y l yl
+谲=y j yj
 谲=y k yk
-谲=y y yy
 谵=y v yv
 谵=y y yy
 谼=g g gg
@@ -10104,11 +10065,10 @@
 豮=u b ub
 貆=v g vg
 貊=v b vb
-贳=b u bu
+贳=u b ub
 贶=b x bx
-贽=b v bv
+贽=v b vb
 赇=b q bq
-赍=b b bb
 赍=u b ub
 赕=b y by
 赗=b m bm
@@ -10369,12 +10329,9 @@
 飐=f v fv
 飑=f b fb
 飗=f l fl
-飨=u x ux
 飨=x u xu
 餍=i u iu
-餍=u y uy
-饔=u v uv
-饔=u y uy
+饔=w u wu
 饧=u y uy
 饩=u q uq
 饫=u y uy
@@ -10730,7 +10687,7 @@
 傪=r c rc
 躭=u y uy
 勮=l j lj
-勮=l u lu
+勮=h l hl
 纁=s x sx
 朮=m d md
 澣=d g dg
@@ -10918,7 +10875,7 @@
 欂=m b mb
 峬=u f uf
 庯=g f gf
-赀=b c bc
+赀=c b cb
 𫗦=u f uf
 䅟=m p mp
 懆=x z xz
@@ -11058,7 +11015,7 @@
 阓=m g mg
 睊=m y my
 睊=o o oo
-𫘝=m g mg
+𫘝=m n mn
 𫘨=m r mr
 䦆=j y jy
 擖=f g fg
@@ -11082,7 +11039,7 @@
 嫏=n l nl
 槺=m k mk
 𨱍=j e je
-𣗋=m e me
+𣗋=m d md
 掯=f k fk
 掯=t k tk
 儽=r l rl
@@ -11142,7 +11099,7 @@
 猸=q m qm
 曚=r m rm
 艟=v t vt
-䩄=m e me
+䩄=m j mj
 觍=j d jd
 眄=m g mg
 眄=m v mv
@@ -11201,8 +11158,8 @@
 帩=j x jx
 梫=m y my
 䞍=k o ko
-謦=y q yq
-謦=y u yu
+謦=u y uy
+謦=q y qy
 欬=q h qh
 藑=c w cw
 藑=c x cx
@@ -11215,7 +11172,7 @@
 惓=x j xj
 𣭲=s m sm
 诜=y x yx
-𬳽=m e me
+𬳽=m x mx
 甡=u u uu
 棽=l j lj
 棽=m j mj
@@ -11693,7 +11650,7 @@
 跱=z s zs
 婞=n x nx
 洢=d y dy
-駃=m d md
+駃=m n mn
 駃=m g mg
 騊=m t mt
 氽=r u ru
