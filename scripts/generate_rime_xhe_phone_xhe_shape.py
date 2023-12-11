@@ -26,6 +26,7 @@ def main():
         input_schema=XHE_SP_SCHEMA,
         reverse_dict="xiaolu_fuzhu_pinyin",
         check_db=check_db,
+        is_ff=True,
     )
     generate_rime(std_schema_config, output_dir)
 

@@ -317,7 +317,7 @@ def generate_full_words(
             for shape_first in char_to_shape[item.word[0]]:
                 for shape_last in char_to_shape[item.word[-1]]:
                     shapes = [
-                        shape_first[0] + shape_last[0] if is_ff else shape_last[-1],
+                        shape_first[0] + (shape_last[0] if is_ff else shape_last[-1]),
                         # shape_first[0] + shape_last[-1],
                     ]
                     for shape in shapes:
@@ -1143,7 +1143,7 @@ def generate_4_len_tangshi_words(schema: InputSchema, shape_schame:ShapeSchema, 
             for shape_first in char_to_shape[item.word[0]]:
                 for shape_last in char_to_shape[item.word[-1]]:
                     shapes = [
-                        shape_first[0] + shape_last[0] if is_ff else shape_last[-1],
+                        shape_first[0] + (shape_last[0] if is_ff else shape_last[-1]),
                         # shape_first[0] + shape_last[-1],
                     ]
                     for shape in shapes:
@@ -1206,7 +1206,7 @@ def generate_tangshi_words(schema: InputSchema, shape_schema:ShapeSchema, is_ff:
             for shape_first in char_to_shape[item.word[0]]:
                 for shape_last in char_to_shape[item.word[-1]]:
                     shapes = [
-                        shape_first[0] + shape_last[0] if is_ff else shape_last[-1],
+                        shape_first[0] + (shape_last[0] if is_ff else shape_last[-1]),
                         # shape_first[0] + shape_last[-1],
                     ]
                     for shape in shapes:
