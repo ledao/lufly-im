@@ -5,8 +5,8 @@
 
 schema:
   schema_id: xiaolu_fuzhu_pinyin
-  name: 🪶小鹭音形·拼音辅助
-  version: "20230920.171347"
+  name: 🦩小鹭音形·拼音辅助
+  version: "20240308.230924"
   author: 
     - ledao <790717479@qq.com> 
   description: |
