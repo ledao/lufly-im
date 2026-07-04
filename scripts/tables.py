@@ -132,7 +132,7 @@ class SimplerTable(BaseModel):
     words = CharField()
     priority = IntegerField()
     create_date = DateTimeField("%Y-%m-%d %H:%M:%S",
-                                default=datetime.datetime.now())
+                                default=datetime.datetime.now)
 
     def __str__(self):
         return f"<{self.id},{self.keys},{self.words},{self.priority},{self.create_date}>"

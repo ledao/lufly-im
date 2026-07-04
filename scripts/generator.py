@@ -11,7 +11,7 @@ import check_xhe_shuangpin
 import check_zrm_shuangpin
 from common import InputSchema, XHE_SP_SCHEMA, get_char_to_xhe_phones, LU_SP_SCHEMA, get_char_to_lu_phones, \
     ZRM_SP_SCHEMA, get_char_to_zrm_phones, BINGJI_SP_SCHEMA, get_char_to_bingji_phones, get_char_to_xhe_shapes, \
-    is_all_alpha, SchemaConfig, PINYIN_SCHEMA, ShapeSchema, XHE_SHAPE_SCHAME, ZRM_SHAPE_SCHEMA, get_char_to_zrm_shapes, \
+    is_all_alpha, SchemaConfig, PINYIN_SCHEMA, ShapeSchema, XHE_SHAPE_SCHEMA, ZRM_SHAPE_SCHEMA, get_char_to_zrm_shapes, \
     LU_SHAPE_SCHEMA, get_char_to_lu_shapes
 from tables import CharPhoneTable, WordPhoneTable, EngWordTable, SimplerTable, TangshiTable, TwoStrokesWordsTable
 
@@ -96,24 +96,24 @@ def get_dd_cmds():
         '$ddcmd(<last.1>,★)\tz',
         '$ddcmd(run(%apppath%\\),[安装目录])\toav',
         '$ddcmd(<date.yyyy>年<date.m>月<date.d>日,<date.yyyy>年<date.m>月<date.d>日)\torq',
-        '$ddcmd(<date.YYYY>年<date.M>月<date.D>日,<date.YYYY>年<date.M>月<date.D>日)\torq',
-        '$ddcmd(<date.yyyy>-<date.mm>-<date.dd>,<date.yyyy>-<date.mm>-<date.dd>)\torq',
-        '$ddcmd(<date.z> <time.h>:<time.mm>,<date.z> <time.h>:<time.mm>)\touj',
+        '$ddcmd(<date.YYYY>年<date.M>月<date.D>日,<date.YYYY>年<date.M>月<date.D>日)\toryy',
+        '$ddcmd(<date.yyyy>-<date.mm>-<date.dd>,<date.yyyy>-<date.mm>-<date.dd>)\tory',
+        '$ddcmd(<date.z> <time.h>:<time.mm>,<date.z> <time.h>:<time.mm>)\tous',
         '$ddcmd(run(https://www.baidu.com/s?wd=<last.0>),[百度]：<last.0>)\toss',
         '$ddcmd(run(https://www.zdic.net/hans/?q=<last.1>),[汉典]：<last.1>)\tohd',
-        '$ddcmd(run(http://www.xhup.club/?search_word=<last.1>),[小鹤查形]：<last.1>)\tohd',
+        '$ddcmd(run(http://www.xhup.club/?search_word=<last.1>),[小鹤查形]：<last.1>)\toxh',
         '$ddcmd(run(cmd.exe),[命令提示行])\tocm',
         '$ddcmd(run(::{20D04FE0-3AEA-1069-A2D8-08002B30309D}),[我的电脑])\todn',
         '$ddcmd(run(control.exe),[控制面板])\tokv',
         '$ddcmd(run(::{450D8FBA-AD25-11D0-98A8-0800361B1103}),[我的文档])\towd',
-        '$ddcmd(run(winword.exe),[word])\towd',
+        '$ddcmd(run(winword.exe),[word])\towr',
         '$ddcmd(run(excel.exe),[excel])\toec',
         '$ddcmd(run(mspaint.exe),[画图])\toht',
         '$ddcmd(run(notepad.exe),[记事本])\toju',
         '$ddcmd(keyboard(<32+Alt><78>),[最小化])\tozx',
         '$ddcmd(keyboard(<83+Shift+Win>),[截屏])\tojp',
         '$ddcmd(keyboard(<68+Win>),[桌面])\tovm',
-        '$ddcmd(help(keyboardmap.html,600,500),[键盘图])\tojp',
+        '$ddcmd(help(keyboardmap.html,600,500),[键盘图])\tojpt',
         '$ddcmd(config(/do anjianshezhi),[按键定义])\toaj',
         '$ddcmd(config(/do 常用),[常用项])\toiy',
         '$ddcmd(config(/do 界面),[界面项])\tojm',
@@ -122,14 +122,14 @@ def get_dd_cmds():
         '$ddcmd(config(/do gaojishezhi),[高级设置])\togj',
         '$ddcmd(config(/do about),[关于项])\togy',
         '$ddcmd(set([-IME设置-],嵌入文本内容=嵌入编码),[嵌入编码])\toiq',
-        '$ddcmd(set([-IME设置-],嵌入文本内容=嵌入首选),[嵌入首选])\toiq',
-        '$ddcmd(set([-IME设置-],嵌入文本内容=传统样式),[传统样式])\toiq',
+        '$ddcmd(set([-IME设置-],嵌入文本内容=嵌入首选),[嵌入首选])\toix',
+        '$ddcmd(set([-IME设置-],嵌入文本内容=传统样式),[传统样式])\toit',
         '$ddcmd(set([-IME设置-],隐藏候选窗口=切换),[显隐候选窗])\toic',
         '$ddcmd(set([-SKIN设置-],候选列表排列样式=横排),[横排窗口])\toih',
-        '$ddcmd(set([-SKIN设置-],候选列表排列样式=竖排),[竖排窗口])\toih',
+        '$ddcmd(set([-SKIN设置-],候选列表排列样式=竖排),[竖排窗口])\tois',
         '$ddcmd(set([-DME设置-],查询输入只查单字=切换),[万能键查字词切换])\toiz',
         '$ddcmd(config(/do 输出反查),[反查]：<last.1>)\tofi',
-        '$ddcmd(config(/do 剪贴板反查),[剪贴板反查])\tofi',
+        '$ddcmd(config(/do 剪贴板反查),[剪贴板反查])\tofj',
         '$ddcmd(config(/do 在线加词),[在线加词])\tojc',
         '$ddcmd(convert(中英文标点,切换),[中英文标点切换])\tovy',
         '$ddcmd(convert(全半角,切换),[全半角切换])\toqb',
@@ -137,13 +137,13 @@ def get_dd_cmds():
         '$ddcmd(keyboard(<35><36+Shift><46>),[删当前行])\toui',
         '$ddcmd(keyboard(<35><36+Shift><46>),[删当前行])\toiu',
         '$ddcmd(config(/dict <last.1>),[字典]：<last.1>)\tozd',
-        '$ddcmd(set([-IME设置-],禁用鼠标悬停词典=切换),[候选窗字典开关])\tozd',
+        '$ddcmd(set([-IME设置-],禁用鼠标悬停词典=切换),[候选窗字典开关])\tozk',
         '$ddcmd(set([-IME设置-],检索次显码表=是),[启用单字全码])\toqm',
-        '$ddcmd(set([-IME设置-],检索次显码表=否),[关闭])\toqm',
+        '$ddcmd(set([-IME设置-],检索次显码表=否),[关闭])\togqm',
         '$ddcmd(set([-IME设置-],输入方案=主+辅),[启用词语辅助])\tocf',
-        '$ddcmd(set([-IME设置-],输入方案=主),[关闭])\tocf',
+        '$ddcmd(set([-IME设置-],输入方案=主),[关闭])\togcf',
         '$ddcmd(set([-SKIN设置-],使用皮肤名称=切换),[换肤])\tohf',
-        '$ddcmd(set([-SKIN设置-],使用皮肤名称=fw.col),[默认])\tohf',
+        '$ddcmd(set([-SKIN设置-],使用皮肤名称=fw.col),[默认])\tomr',
         '$ddcmd(keyboard(<173>),[静音开关])\tojy',
         '$ddcmd(run(https://flypy.com),[小鹤官网])\txhgw',
         '$ddcmd(run(https://bbs.flypy.com),[小鹤论坛])\txhlt',
@@ -153,7 +153,7 @@ def get_dd_cmds():
 
 
 def generate_single_chars(schema: InputSchema, shape_schema: ShapeSchema) -> List[EncodeDecode]:
-    if shape_schema == XHE_SHAPE_SCHAME:
+    if shape_schema == XHE_SHAPE_SCHEMA:
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schema == ZRM_SHAPE_SCHEMA:
         char_to_shape = get_char_to_zrm_shapes()
@@ -197,7 +197,7 @@ def generate_single_chars(schema: InputSchema, shape_schema: ShapeSchema) -> Lis
 
 def generate_simpler_words(char_threshold: int, word_threshold: int, schema: InputSchema, shape_schema: ShapeSchema) -> Tuple[
     List[EncodeDecode], List[EncodeDecode]]:
-    if shape_schema == XHE_SHAPE_SCHAME:
+    if shape_schema == XHE_SHAPE_SCHEMA:
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schema == ZRM_SHAPE_SCHEMA:
         char_to_shape = get_char_to_zrm_shapes()
@@ -278,7 +278,7 @@ def generate_full_words(
     :param is_ff: bool, 是否首尾相同
     :return: List[EncodeDecode]
     """
-    if shape_schema == XHE_SHAPE_SCHAME:
+    if shape_schema == XHE_SHAPE_SCHEMA:
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schema == ZRM_SHAPE_SCHEMA:
         char_to_shape = get_char_to_zrm_shapes()
@@ -500,7 +500,7 @@ def generate_shuangpin_dict(schema_config: SchemaConfig, outpath: str):
 
     print(f"total {len(char_to_phones)} char phones")
 
-    if schema_config.shape_schema == XHE_SHAPE_SCHAME:
+    if schema_config.shape_schema == XHE_SHAPE_SCHEMA:
         char_to_shape = get_char_to_xhe_shapes()
     elif schema_config.shape_schema == ZRM_SHAPE_SCHEMA:
         char_to_shape = get_char_to_zrm_shapes()
@@ -656,7 +656,7 @@ def generate_pinyin_dict(schema_config: SchemaConfig, outpath: str):
 
         fout.write(f"\n# 单字\n")
 
-        single_chars = generate_single_chars(PINYIN_SCHEMA, XHE_SHAPE_SCHAME)
+        single_chars = generate_single_chars(PINYIN_SCHEMA, XHE_SHAPE_SCHEMA)
 
         special_words = set()
 
@@ -667,7 +667,7 @@ def generate_pinyin_dict(schema_config: SchemaConfig, outpath: str):
 
         fout.write(f"\n# 词语\n")
 
-        full_words = generate_full_words(PINYIN_SCHEMA, XHE_SHAPE_SCHAME, True)
+        full_words = generate_full_words(PINYIN_SCHEMA, XHE_SHAPE_SCHEMA, True)
         with tqdm(total=len(full_words), desc="写入词") as pbar:
             for item in full_words:
                 fout.write(f"{item.decode}\t{item.encode}\n")
@@ -925,9 +925,9 @@ def generate_dd(schema: InputSchema, output_dir: str, shape_schema: ShapeSchema,
         fout.write("---config@码表分类=辅码码表\n")
         fout.write("---config@允许编辑=是\n")
         fout.write(f"---config@码表别名=辅助拼音\n")
-        for item in generate_single_chars(PINYIN_SCHEMA, XHE_SHAPE_SCHAME): # shape_schema 随意
+        for item in generate_single_chars(PINYIN_SCHEMA, XHE_SHAPE_SCHEMA): # shape_schema 随意
             fout.write(f"{item.decode}\t{item.encode}#序{30000}\n")
-        for item in generate_full_words(PINYIN_SCHEMA, XHE_SHAPE_SCHAME, is_ff): # shape_schema 随意
+        for item in generate_full_words(PINYIN_SCHEMA, XHE_SHAPE_SCHEMA, is_ff): # shape_schema 随意
             fout.write(f"{item.decode}\t{item.encode}#序{30000}\n")
 
 
@@ -979,7 +979,7 @@ def generate_shouxin(schema: InputSchema, output_dir: str, shape_schema: ShapeSc
     else:
         raise RuntimeError(f"{schema} not found")
     
-    if shape_schema == XHE_SHAPE_SCHAME:
+    if shape_schema == XHE_SHAPE_SCHEMA:
         name += "_xiaohe_xing"
     elif shape_schema == LU_SHAPE_SCHEMA:
         name += "_xiaolu_xing"
@@ -1034,7 +1034,7 @@ def generate_shouxin(schema: InputSchema, output_dir: str, shape_schema: ShapeSc
 
 
 def generate_4_len_wordphonetable_words(schema: InputSchema, shape_schema:ShapeSchema, is_ff: bool) -> List[EncodeDecode]:
-    if shape_schema == XHE_SHAPE_SCHAME:
+    if shape_schema == XHE_SHAPE_SCHEMA:
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schema == ZRM_SHAPE_SCHEMA:
         char_to_shape = get_char_to_zrm_shapes()
@@ -1097,15 +1097,15 @@ def generate_4_len_wordphonetable_words(schema: InputSchema, shape_schema:ShapeS
     return result
 
 
-def generate_4_len_tangshi_words(schema: InputSchema, shape_schame:ShapeSchema, is_ff: bool) -> List[EncodeDecode]:
-    if shape_schame == XHE_SHAPE_SCHAME:
+def generate_4_len_tangshi_words(schema: InputSchema, shape_schema:ShapeSchema, is_ff: bool) -> List[EncodeDecode]:
+    if shape_schema == XHE_SHAPE_SCHEMA:
         char_to_shape = get_char_to_xhe_shapes()
-    elif shape_schame == ZRM_SHAPE_SCHEMA:
+    elif shape_schema == ZRM_SHAPE_SCHEMA:
         char_to_shape = get_char_to_zrm_shapes()
-    elif shape_schame == LU_SHAPE_SCHEMA:
+    elif shape_schema == LU_SHAPE_SCHEMA:
         char_to_shape = get_char_to_lu_shapes()
     else:
-        raise RuntimeError(f"shape_schema not found {shape_schame}")
+        raise RuntimeError(f"shape_schema not found {shape_schema}")
 
     result: List[EncodeDecode] = []
     exit_word_phones = set()
@@ -1168,7 +1168,7 @@ def generate_4_len_word_simpler_items(schema: InputSchema, shape_schema:ShapeSch
 
 
 def generate_tangshi_words(schema: InputSchema, shape_schema:ShapeSchema, is_ff: bool) -> List[EncodeDecode]:
-    if shape_schema == XHE_SHAPE_SCHAME:
+    if shape_schema == XHE_SHAPE_SCHEMA:
         char_to_shape = get_char_to_xhe_shapes()
     elif shape_schema == ZRM_SHAPE_SCHEMA:
         char_to_shape = get_char_to_zrm_shapes()
