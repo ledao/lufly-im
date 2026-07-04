@@ -3,7 +3,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from common import XHE_SP_SCHEMA, XHE_SHAPE_SCHAME
+from common import XHE_SP_SCHEMA, XHE_SHAPE_SCHEMA
 from generator import generate_dd
 
 
@@ -16,7 +16,7 @@ def main():
         os.makedirs(output_dir)
 
     schema = XHE_SP_SCHEMA
-    generate_dd(XHE_SP_SCHEMA, output_dir, XHE_SHAPE_SCHAME, check_db, True)
+    generate_dd(XHE_SP_SCHEMA, output_dir, XHE_SHAPE_SCHEMA, check_db, True)
 
     dd_dir = 'lufly/win-dd/lufly-im-v4-xiaohe/$码表文件/'
     if os.path.exists(dd_dir):
