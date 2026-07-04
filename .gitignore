@@ -112,18 +112,17 @@ to_add_words.txt
 tmp/*
 lufly/sys_data/sys_table.sqlitedb
 lufly/win-dd/生成结果/*.exe
-lufly/sys_data/sys_table.sqlite
-lufly/win-dd/*生成结果*/*.exe 
+lufly/win-dd/*生成结果*/*.exe
 
 baidu_mobile_ini/
-"lufly/sys_data/*.sqlite
+lufly/sys_data/*.sqlite
 rime_xhe_ff/
-lufly/sys_data/sys_table - 副本.sqlite
 lufly/win-dd/$码表文件/*
 lufly/win-dd/$码表文件/sys_top_chars_data.txt
 *.zip
 
 .idea
+.asai/
 lufly/win-dd/*/*/*.exe
 lufly/sys_data/sys_table.sqlite-journal
 /*.txt
