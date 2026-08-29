@@ -14,8 +14,9 @@
 //   PageUp/Down  翻页
 //   回车      编码字母原样上屏
 //   退格      删一码；Esc 清空缓冲
-//   Shift     单击: 编码中=字母原样上屏；空编码=切换中/英文模式
-//   标点      中文全角化（对齐 rime punctuator half_shape；编码中先顶字）
+//   Shift     单击: 切换中/英文模式（编码中先原样上屏字母再转英文）
+//   标点      中文全角化（对齐 rime punctuator half_shape；编码中先顶字）；
+//             前面是数字/英文时保持半角（3.14 / hello.），Ctrl+0 强制半角
 //   其余按键  不消费、不破坏缓冲（` ~ @ # 等半角键与组合键透传）
 
 #include <fcitx/addonfactory.h>
@@ -79,6 +80,11 @@ public:
     std::string pending;
     // 挂起对应的编码（退格撤销时恢复）
     std::string pendingCode;
+    // 上一个输出/透传字符的类别（0=中文/其他 1=ASCII 数字 2=ASCII 字母），
+    // 数字/英文后的标点保持半角（3.14 / hello.）
+    int lastCls = 0;
+    // Ctrl+0 切换: 标点强制半角（对齐 rime ascii_punct）
+    bool asciiPunct = false;
 };
 
 class LuflyStateFactory : public InputContextPropertyFactory {
@@ -397,6 +403,7 @@ void LuflyIm::updateUI(InputContext *ic, LuflyState *state) {
 void LuflyIm::commitCandidate(InputContext *ic, const std::string &text) {
     auto *state = this->state(ic);
     ic->commitString(text);
+    state->lastCls = 0;
     state->buffer.clear();
     state->reverse = false;
     updateUI(ic, state);
@@ -422,19 +429,24 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             const char *punct = state->pendingPunct;
             state->pendingPunct = nullptr;
             ic->commitString(punct);
+            state->lastCls = 0;
             event.accept();
             return;
         }
-        // Shift 单击（其后无其他键）: 编码中=字母原样上屏（rime commit_code）；
-        // 空编码=切换中/英文模式
+        // Shift 单击（其后无其他键）: 切换中/英文模式；
+        // 编码中先原样上屏字母再转英文（对齐常见输入法手感）
         if ((sym == FcitxKey_Shift_L || sym == FcitxKey_Shift_R) &&
             state->shiftArmed) {
             state->shiftArmed = false;
             if (!state->buffer.empty()) {
                 ic->commitString(state->buffer);
+                state->lastCls = 2;
                 state->buffer.clear();
                 state->reverse = false;
+                state->ascii = true; // 编码中必为中文态: 定向转英文
+                FCITX_LUFLY_INFO() << "lufly: 切换到英文模式";
                 updateUI(ic, state);
+                ic->updateUserInterface(UserInterfaceComponent::StatusArea);
             } else {
                 if (!state->pending.empty()) {
                     // 挂起字随模式切换落地
@@ -443,6 +455,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
                     state->pendingCode.clear();
                 }
                 state->reverse = false;
+                state->lastCls = 0;
                 state->ascii = !state->ascii;
                 FCITX_LUFLY_INFO() << "lufly: 切换到"
                                    << (state->ascii ? "英文" : "中文") << "模式";
@@ -466,9 +479,18 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
         return;
     }
 
-    // 带组合修饰键的按键一律透传（Ctrl+C / Alt+Tab 等）。
-    if (key.states().test(KeyState::Ctrl) || key.states().test(KeyState::Alt) ||
-        key.states().test(KeyState::Super) ||
+    // 带组合修饰键的按键一律透传（Ctrl+C / Alt+Tab 等）；Ctrl+0 例外，
+    // 切换标点强制半角（对齐 rime ascii_punct）。
+    if (key.states().test(KeyState::Ctrl)) {
+        if (sym == FcitxKey_0) {
+            state->asciiPunct = !state->asciiPunct;
+            FCITX_LUFLY_INFO() << "lufly: 标点"
+                               << (state->asciiPunct ? "强制半角" : "跟随中文");
+            event.accept();
+        }
+        return;
+    }
+    if (key.states().test(KeyState::Alt) || key.states().test(KeyState::Super) ||
         key.states().test(KeyState::Hyper) ||
         key.states().test(KeyState::Meta)) {
         return;
@@ -572,6 +594,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             const int idx = sel + common->currentPage() * common->pageSize();
             if (const char *text = lufly_candidate_text(eng, idx)) {
                 ic->commitString(text);
+                state->lastCls = 0;
                 state->buffer.clear();
                 state->reverse = false;
                 updateUI(ic, state);
@@ -593,6 +616,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             const int idx = 1 + common->currentPage() * common->pageSize();
             if (const char *text = lufly_candidate_text(eng, idx)) {
                 ic->commitString(text);
+                state->lastCls = 0;
                 state->buffer.clear();
                 state->reverse = false;
                 state->pendingPunct =
@@ -612,6 +636,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
                 ic->commitString(state->pending);
                 state->pending.clear();
                 state->pendingCode.clear();
+                state->lastCls = 0;
                 updateUI(ic, state);
                 event.accept();
                 return;
@@ -628,6 +653,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
         }
         state->buffer.clear();
         state->reverse = false;
+        state->lastCls = 0;
         updateUI(ic, state);
         event.accept();
         return;
@@ -645,6 +671,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             return;
         }
         ic->commitString(state->buffer); // 编码字母原样上屏
+        state->lastCls = 2;
         state->buffer.clear();
         state->reverse = false;
         updateUI(ic, state);
@@ -701,6 +728,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             ic->commitString(state->pending);
             state->pending.clear();
             state->pendingCode.clear();
+            state->lastCls = 0;
         }
         const std::string prev = state->buffer;
         if (const char *text = lufly_key(eng, ch)) {
@@ -715,11 +743,14 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
     }
 
     // ---- 标点: 中文全角化（对齐 rime punctuator half_shape）----
+    // 上下文半角: 前一字符是数字/英文、miss 携带英文、或 Ctrl+0 强制时，
+    // 标点不映射、原样透传（编码中仍先顶字）—— 3.14 / hello. / english,
     // 编码中先顶出首选再上屏标点并消费；空缓冲直接上屏标点。
-    // miss（编码 miss，输英文中）: 累积的英文原样上屏后接标点。
-    // rime 同为半角的键（` ~ @ # % & * - + = 等）不映射、保持透传。
     const bool composing = !state->buffer.empty();
-    if (const char *punct = chinesePunct(sym, state)) {
+    const bool halfPunct =
+        state->asciiPunct || state->lastCls != 0 || miss;
+    const char *punct = halfPunct ? nullptr : chinesePunct(sym, state);
+    if (punct) {
         if (!state->pending.empty()) {
             // 挂起字随标点顶出
             ic->commitString(state->pending);
@@ -736,14 +767,21 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
         state->buffer.clear();
         state->reverse = false;
         ic->commitString(punct);
+        state->lastCls = 0;
         updateUI(ic, state);
         event.accept();
         return;
     }
-    // 未映射的简单键（如 `）: miss 时透传不清屏（英文继续）；
-    // 编码中顶出首选后放行原字符。
+    // 未映射的简单键（含按上下文放行的半角标点）:
+    // miss 时透传不清屏（英文继续）；编码中顶出首选后放行原字符。
     if (composing && key.isSimple()) {
         if (miss) {
+            // 英文原样上屏，标点等符号不消费、半角自然插入
+            ic->commitString(state->buffer);
+            state->buffer.clear();
+            state->reverse = false;
+            state->lastCls = 2;
+            updateUI(ic, state);
             return;
         }
         if (const char *text = lufly_key(eng, ' ')) {
@@ -751,8 +789,13 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
         }
         state->buffer.clear();
         state->reverse = false;
+        state->lastCls = 0;
         updateUI(ic, state);
         // 不消费，让原字符自然插入
+    }
+    // 空缓冲透传的数字: 记录上下文（3.14 / 1,000 后续标点保持半角）
+    if (!composing && sym >= FcitxKey_0 && sym <= FcitxKey_9) {
+        state->lastCls = 1;
     }
 }
 
@@ -773,6 +816,7 @@ void LuflyIm::reset(const InputMethodEntry &, InputContextEvent &event) {
     state->reverse = false;
     state->shiftArmed = false;
     state->pendingPunct = nullptr;
+    state->lastCls = 0;
     state->dqOpen = false;
     state->sqOpen = false;
     updateUI(ic, state);
