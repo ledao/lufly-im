@@ -19,9 +19,6 @@ for h in /home/*; do
     fi
 done
 
-# 旧版贴图主题残留清理（现为纯色+彩色边框方案，无贴图）
-rm -f /usr/share/fcitx5/themes/lufly/*.png /usr/share/fcitx5/themes/lufly-dark/*.png 2>/dev/null || true
-
 # 用户目录的主题是早期调试残留，XDG 用户目录优先级高于系统目录，
 # 不清掉会一直覆盖 deb 安装的新版主题
 rm -rf /home/*/.local/share/fcitx5/themes/lufly \
@@ -127,31 +124,53 @@ import re, sys
 
 path = sys.argv[1]
 text = open(path, encoding="utf-8").read()
-if re.search(r"(?m)^Name=lufly$", text):
-    sys.exit(0)
+changed = False
 
 # 每个分组的最大 Items 序号
 maxitem = {}
 for m in re.finditer(r"(?m)^\[Groups/(\d+)/Items/(\d+)\]", text):
     g, i = int(m.group(1)), int(m.group(2))
     maxitem[g] = max(maxitem.get(g, -1), i)
-if not maxitem:
-    sys.exit(0)
 
-# profile 以空行分节；在该分组最后一个 item 节后追加 lufly
-sections = text.split("\n\n")
-for idx, sec in enumerate(sections):
-    m = re.search(r"(?m)^\[Groups/(\d+)/Items/(\d+)\]", sec)
-    if m and int(m.group(2)) == maxitem[int(m.group(1))]:
-        g = int(m.group(1))
-        sections[idx] = (
-            sec
-            + f"\n\n[Groups/{g}/Items/{maxitem[g] + 1}]"
-            + "\n# Name\nName=lufly\n# Layout\nLayout="
-        )
+# 1) 尚未注册时: 在每个分组最后一个 item 节后追加 lufly
+if maxitem and not re.search(r"(?m)^Name=lufly$", text):
+    sections = text.split("\n\n")
+    for idx, sec in enumerate(sections):
+        m = re.search(r"(?m)^\[Groups/(\d+)/Items/(\d+)\]", sec)
+        if m and int(m.group(2)) == maxitem[int(m.group(1))]:
+            g = int(m.group(1))
+            sections[idx] = (
+                sec
+                + f"\n\n[Groups/{g}/Items/{maxitem[g] + 1}]"
+                + "\n# Name\nName=lufly\n# Layout\nLayout="
+            )
+    text = "\n\n".join(sections)
+    changed = True
 
-open(path, "w", encoding="utf-8").write("\n\n".join(sections))
-print("fcitx5-lufly: 已把「小鹭音形」加入输入法列表")
+# 2) 含 lufly 的分组 DefaultIM 指向小鹭（新窗口默认小鹭，而非 rime）
+#    两遍扫描: 先收集含 lufly 的分组号（DefaultIM 行在其 Items 节之前出现）
+if maxitem:
+    lufly_groups = {
+        int(m.group(1))
+        for m in re.finditer(r"(?m)^\[Groups/(\d+)/Items/\d+\]\n# Name\nName=lufly\b", text)
+    }
+    out = []
+    cur_group = None
+    for ln in text.splitlines():
+        s = ln.strip()
+        gm = re.match(r"^\[Groups/(\d+)\]$", s)
+        if gm:
+            cur_group = int(gm.group(1))
+        if s.startswith("DefaultIM=") and cur_group in lufly_groups:
+            if s != "DefaultIM=lufly":
+                ln = "DefaultIM=lufly"
+                changed = True
+        out.append(ln)
+    text = "\n".join(out)
+
+if changed:
+    open(path, "w", encoding="utf-8").write(text + "\n")
+    print("fcitx5-lufly: 已把「小鹭音形」加入输入法列表并设为默认")
 PYEOF
 
     chown "$OWNER" "$P"

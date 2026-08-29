@@ -253,6 +253,11 @@ void LuflyIm::updateUI(InputContext *ic, LuflyState *state) {
         list->insert(i, std::make_unique<LuflyCandidateWord>(std::move(text),
                                                              this));
     }
+    // 空候选列表上调 setGlobalCursorIndex 会抛异常（fcitx5 直接 abort），
+    // 必须有候选时才置高亮游标。
+    if (count > 0) {
+        list->setGlobalCursorIndex(0);
+    }
     panel.setCandidateList(std::move(list));
 
     ic->updatePreedit();

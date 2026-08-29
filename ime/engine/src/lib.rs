@@ -163,7 +163,11 @@ impl Engine {
         exact.reserve(rest.len());
         exact.append(&mut rest);
         exact.truncate(MAX_CANDIDATES);
-        exact.into_iter().map(|i| {
+        // 同文本去重（同一词常有多个编码变体），保留 rank 最小的首个
+        let mut seen = std::collections::HashSet::with_capacity(64);
+        exact.into_iter()
+            .filter(|&i| seen.insert(self.entries[i as usize].text.as_str()))
+            .map(|i| {
                 let e = &self.entries[i as usize];
                 Candidate {
                     text: e.text.clone(),

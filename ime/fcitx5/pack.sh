@@ -31,9 +31,13 @@ install -m 644 data/lufly.png           "$STAGE/usr/share/icons/hicolor/48x48/ap
 # 16x16 供托盘菜单等小尺寸场景: 无底板灰色天鹅剪影, 与系统图标视觉一致
 install -m 644 data/lufly-16.png        "$STAGE/usr/share/icons/hicolor/16x16/apps/lufly.png"
 install -m 644 ../data/xiaolu_he_he.bin "$STAGE/usr/share/fcitx5/lufly/dict.bin"
-# 主题（亮/暗，纯色+彩色边框方案，无贴图；postinst 负责选中并跟随系统深浅色）
+# 主题（亮/暗，圆角卡片 9-patch 贴图 + 药丸高亮；postinst 负责选中并跟随系统深浅色）
 install -m 644 data/theme/lufly/theme.conf      "$STAGE/usr/share/fcitx5/themes/lufly/theme.conf"
-install -m 644 data/theme/lufly-dark/theme.conf "$STAGE/usr/share/fcitx5/themes/lufly-dark/theme.conf"
+install -m 644 data/theme/lufly/panel.png       "$STAGE/usr/share/fcitx5/themes/lufly/panel.png"
+install -m 644 data/theme/lufly/highlight.png   "$STAGE/usr/share/fcitx5/themes/lufly/highlight.png"
+install -m 644 data/theme/lufly-dark/theme.conf      "$STAGE/usr/share/fcitx5/themes/lufly-dark/theme.conf"
+install -m 644 data/theme/lufly-dark/panel.png       "$STAGE/usr/share/fcitx5/themes/lufly-dark/panel.png"
+install -m 644 data/theme/lufly-dark/highlight.png   "$STAGE/usr/share/fcitx5/themes/lufly-dark/highlight.png"
 
 INSTALLED_SIZE=$(du -sk "$STAGE" | cut -f1)
 
