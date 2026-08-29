@@ -4,8 +4,8 @@
 用法:
     python build_dict.py [dict.yaml] [-o output.bin]
 
-默认输入: ../rime_xiaolu_shuangpin_xiaolu_xing/xiaolu_lu_shuangpin_lu_xing.dict.yaml
-默认输出: ../data/xiaolu_lu_lu.bin
+默认输入: ../rime_xiaohe_shuangpin_xiaohe_xing/xiaolu_he_shuangpin_he_xing.dict.yaml
+默认输出: ../data/xiaolu_he_he.bin
 
 二进制格式 (小端):
     magic     8 bytes  "LUFLYD01"
@@ -71,8 +71,8 @@ def build(entries):
 
 def main():
     repo = Path(__file__).resolve().parent.parent.parent
-    default_in = repo / "rime_xiaolu_shuangpin_xiaolu_xing" / "xiaolu_lu_shuangpin_lu_xing.dict.yaml"
-    default_out = Path(__file__).resolve().parent.parent / "data" / "xiaolu_lu_lu.bin"
+    default_in = repo / "rime_xiaohe_shuangpin_xiaohe_xing" / "xiaolu_he_shuangpin_he_xing.dict.yaml"
+    default_out = Path(__file__).resolve().parent.parent / "data" / "xiaolu_he_he.bin"
 
     ap = argparse.ArgumentParser()
     ap.add_argument("input", nargs="?", default=str(default_in))

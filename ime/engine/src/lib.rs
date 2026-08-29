@@ -37,6 +37,9 @@ struct Entry {
 pub struct Engine {
     entries: Vec<Entry>, // 按 code 字典序排列
     input: String,
+    /// 候选缓存：与 input 同步（input 一变即失效）。
+    cache: Vec<Candidate>,
+    cache_valid: bool,
 }
 
 impl Engine {
@@ -76,6 +79,8 @@ impl Engine {
         Ok(Engine {
             entries,
             input: String::new(),
+            cache: Vec::new(),
+            cache_valid: false,
         })
     }
 
@@ -89,6 +94,8 @@ impl Engine {
                 .map(|(code, text, rank)| Entry { code, text, rank })
                 .collect(),
             input: String::new(),
+            cache: Vec::new(),
+            cache_valid: false,
         }
     }
 
@@ -105,34 +112,71 @@ impl Engine {
     /// 清空缓冲（composition 被外部终止等场景）
     pub fn reset(&mut self) {
         self.input.clear();
+        self.invalidate();
+    }
+
+    fn invalidate(&mut self) {
+        self.cache_valid = false;
+        self.cache.clear();
     }
 
     /// 当前候选列表：完全命中在前，其余按码表行序。
-    pub fn candidates(&self) -> Vec<Candidate> {
+    ///
+    /// 结果按 input 缓存；input 未变时重复调用零开销（前端每键会取多次）。
+    pub fn candidates(&mut self) -> &[Candidate] {
+        if !self.cache_valid {
+            self.cache = self.compute_candidates();
+            self.cache_valid = true;
+        }
+        &self.cache
+    }
+
+    fn compute_candidates(&self) -> Vec<Candidate> {
         if self.input.is_empty() {
             return Vec::new();
         }
         let start = self.prefix_start(&self.input);
-        let mut out = Vec::new();
-        for e in &self.entries[start..] {
+        // 只收集索引并按组排序，截断后再物化字符串，避免全量克隆
+        let mut exact: Vec<u32> = Vec::new();
+        let mut rest: Vec<u32> = Vec::new();
+        for (i, e) in self.entries[start..].iter().enumerate() {
             if !e.code.starts_with(&self.input) {
                 break;
             }
-            let exact = e.code == self.input;
-            out.push(Candidate {
-                text: e.text.clone(),
-                rank: e.rank,
-                exact,
-            });
+            if e.code.len() == self.input.len() {
+                &mut exact
+            } else {
+                &mut rest
+            }
+            .push((start + i) as u32);
         }
-        out.sort_by(|a, b| b.exact.cmp(&a.exact).then(a.rank.cmp(&b.rank)));
-        out.truncate(MAX_CANDIDATES);
-        out
+        // 短前缀可能命中几十万条；select_nth 选出前 100 再排序，O(n) 而非 O(n log n)
+        for group in [&mut exact, &mut rest] {
+            if group.len() > MAX_CANDIDATES {
+                group.select_nth_unstable_by_key(MAX_CANDIDATES - 1, |&i| {
+                    self.entries[i as usize].rank
+                });
+                group.truncate(MAX_CANDIDATES);
+            }
+            group.sort_unstable_by_key(|&i| self.entries[i as usize].rank);
+        }
+        exact.reserve(rest.len());
+        exact.append(&mut rest);
+        exact.truncate(MAX_CANDIDATES);
+        exact.into_iter().map(|i| {
+                let e = &self.entries[i as usize];
+                Candidate {
+                    text: e.text.clone(),
+                    rank: e.rank,
+                    exact: e.code.len() == self.input.len(),
+                }
+            })
+            .collect()
     }
 
     /// 首选文本（exact 优先，否则前缀第一个）
-    pub fn top_text(&self) -> Option<String> {
-        self.candidates().into_iter().next().map(|c| c.text)
+    pub fn top_text(&mut self) -> Option<String> {
+        self.candidates().first().map(|c| c.text.clone())
     }
 
     /// 喂入一个按键，返回需要上屏的文本（顶字/选词/自动上屏）。
@@ -150,20 +194,24 @@ impl Engine {
             ' ' => {
                 let text = self.top_text()?;
                 self.input.clear();
+                self.invalidate();
                 Some(text)
             }
             '1'..='9' => {
                 let idx = c as usize - '1' as usize;
                 let text = self.candidates().get(idx)?.text.clone();
                 self.input.clear();
+                self.invalidate();
                 Some(text)
             }
             '\u{8}' => {
                 self.input.pop();
+                self.invalidate();
                 None
             }
             '\u{1b}' => {
                 self.input.clear();
+                self.invalidate();
                 None
             }
             _ => None,
@@ -174,6 +222,7 @@ impl Engine {
         let mut next = String::with_capacity(self.input.len() + 1);
         next.push_str(&self.input);
         next.push(c);
+        self.invalidate();
 
         if self.has_prefix(&next) {
             self.input = next;

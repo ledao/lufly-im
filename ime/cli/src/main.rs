@@ -14,7 +14,7 @@ fn default_dict() -> PathBuf {
         .parent()
         .unwrap()
         .join("data")
-        .join("xiaolu_lu_lu.bin")
+        .join("xiaolu_he_he.bin")
 }
 
 fn main() {

@@ -32,7 +32,7 @@ pub struct LuflyTsf {
 
 impl LuflyTsf {
     pub fn new() -> Self {
-        static DICT: &[u8] = include_bytes!("../../data/xiaolu_lu_lu.bin");
+        static DICT: &[u8] = include_bytes!("../../data/xiaolu_he_he.bin");
         let engine = Engine::load(DICT).expect("embedded dict must be valid");
         Self {
             shared: Arc::new(Mutex::new(Shared {
