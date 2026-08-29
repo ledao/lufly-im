@@ -8,13 +8,14 @@
 // 缓冲 ≤ 10 字符，重放开销可忽略），避免给每个焦点切换克隆 43MB 码表。
 //
 // 按键语义:
-//   a-z       进编码缓冲（死码/全码自动顶字上屏由引擎决定）
-//   空格      上屏首选
-//   1-6       选当前页候选（每页 6 个）
+//   a-z       进编码缓冲（6/8/10…偶数全码唯一 → 顶功挂起，下一键顶出）
+//   空格      上屏首选 / 确认挂起字；编码 miss 时清屏（回车上屏英文）
+//   1-6       选当前页候选
 //   PageUp/Down  翻页
 //   回车      编码字母原样上屏
 //   退格      删一码；Esc 清空缓冲
-//   其余按键  不消费、不破坏缓冲（标点透传；空键组合键一律透传）
+//   标点      中文全角化（对齐 rime punctuator half_shape；编码中先顶字）
+//   其余按键  不消费、不破坏缓冲（` ~ @ # 等半角键与组合键透传）
 
 #include <fcitx/addonfactory.h>
 #include <fcitx/addoninstance.h>
@@ -55,17 +56,26 @@ namespace fcitx {
 
 namespace {
 
-// 候选页大小: 数字 1-6 对应本页 6 个候选。
-constexpr int kPageSize = 6;
-
-// true: 候选窗钉在首个字母处不随输入右移（预编辑光标固定在起点）；
-// false: 候选窗跟随最新字母（预编辑光标在末尾）。
-constexpr bool kPinCandidateWindow = true;
+// 候选页大小: 对齐 rime menu/page_size，数字 1-5 对应本页 5 个候选。
+constexpr int kPageSize = 5;
 
 // 每个 InputContext 的编码缓冲。
 class LuflyState : public InputContextProperty {
 public:
     std::string buffer;
+    // 反查模式: ` 已按下，buffer 为拼音字母（不含 ` 本身）
+    bool reverse = false;
+    // Shift 已按下且其后无其他按键（单击 commit_code：字母原样上屏）
+    bool shiftArmed = false;
+    // $/| 已选次选候选，抬键时补发该标点（"。" / "，"）
+    const char *pendingPunct = nullptr;
+    // 引号配对状态（“‘ 已开待闭）
+    bool dqOpen = false;
+    bool sqOpen = false;
+    // 顶功挂起: 全码唯一已自动选字、但未发送，等下一键顶出/空格确认
+    std::string pending;
+    // 挂起对应的编码（退格撤销时恢复）
+    std::string pendingCode;
 };
 
 class LuflyStateFactory : public InputContextPropertyFactory {
@@ -74,6 +84,41 @@ public:
         return new LuflyState;
     }
 };
+
+// 中文标点映射，对齐 rime punctuator half_shape（import_preset: default，
+// /usr/share/rime-data/punctuation.yaml）。列表项取第一个；引号按对交替。
+// 返回 nullptr 表示 rime 里也是半角的键（` ~ @ # % & * - + = 与字母数字）。
+const char *chinesePunct(KeySym sym, LuflyState *st) {
+    switch (sym) {
+    case FcitxKey_comma: return "，";
+    case FcitxKey_period: return "。";
+    case FcitxKey_less: return "《";
+    case FcitxKey_greater: return "》";
+    case FcitxKey_slash: return "、";
+    case FcitxKey_question: return "？";
+    case FcitxKey_semicolon: return "；";
+    case FcitxKey_colon: return "：";
+    case FcitxKey_apostrophe:
+        st->sqOpen = !st->sqOpen;
+        return st->sqOpen ? "‘" : "’";
+    case FcitxKey_quotedbl:
+        st->dqOpen = !st->dqOpen;
+        return st->dqOpen ? "“" : "”";
+    case FcitxKey_backslash: return "、";
+    case FcitxKey_bar: return "·";
+    case FcitxKey_exclam: return "！";
+    case FcitxKey_dollar: return "￥";
+    case FcitxKey_asciicircum: return "……";
+    case FcitxKey_parenleft: return "（";
+    case FcitxKey_parenright: return "）";
+    case FcitxKey_underscore: return "——";
+    case FcitxKey_bracketleft: return "「";
+    case FcitxKey_bracketright: return "」";
+    case FcitxKey_braceleft: return "『";
+    case FcitxKey_braceright: return "』";
+    default: return nullptr;
+    }
+}
 
 // 候选词: 点击/回车选中后提交并清缓冲。
 class LuflyCandidateWord : public CandidateWord {
@@ -110,17 +155,20 @@ private:
     }
 
     bool ensureDict();
+    bool ensureRev();
     // 码表热更新: 文件变化时重载（升级码表免重启 fcitx5），有 1s 节流。
     void checkDictReload(bool force = false);
-    // 把 IC 缓冲重放到工作引擎（引擎即恢复到该 IC 的当前状态）。
-    void replay(const std::string &buffer);
+    // 把 IC 缓冲重放到指定引擎（normal=scratch_ / 反查=rev_）。
+    void replay(LuflyEngine *eng, const std::string &buffer);
     // 按当前引擎状态刷新预编辑 + 候选窗（空缓冲时清空面板）。
     void updateUI(InputContext *ic, LuflyState *state);
 
     Instance *instance_;
     LuflyStateFactory factory_;
     LuflyEngine *scratch_ = nullptr;
+    LuflyEngine *rev_ = nullptr; // 拼音反查码表（懒加载，无热更新）
     bool triedLoad_ = false;
+    bool triedRev_ = false;
     KeyList selectionKeys_;
     std::string dictPath_;
     time_t dictMtime_ = 0;
@@ -140,6 +188,9 @@ LuflyIm::LuflyIm(Instance *instance) : instance_(instance) {
 LuflyIm::~LuflyIm() {
     if (scratch_) {
         lufly_free(scratch_);
+    }
+    if (rev_) {
+        lufly_free(rev_);
     }
 }
 
@@ -189,6 +240,46 @@ bool LuflyIm::ensureDict() {
     return true;
 }
 
+// 反查码表（拼音→单字，fuzhu.bin）: 懒加载，首次按 ` 时才读。
+bool LuflyIm::ensureRev() {
+    if (rev_) {
+        return true;
+    }
+    if (triedRev_) {
+        return false;
+    }
+    triedRev_ = true;
+
+    std::string path;
+    if (const char *env = getenv("LUFLY_FUZHU")) {
+        path = env;
+    }
+    if (path.empty()) {
+        path = StandardPath::global().locate(StandardPath::Type::PkgData,
+                                             "lufly/fuzhu.bin");
+    }
+    if (path.empty()) {
+        FCITX_LUFLY_ERROR() << "lufly: 未找到反查码表（lufly/fuzhu.bin 或 $LUFLY_FUZHU）";
+        return false;
+    }
+
+    std::ifstream in(path, std::ios::binary);
+    if (!in) {
+        FCITX_LUFLY_ERROR() << "lufly: 反查码表读取失败 " << path;
+        return false;
+    }
+    std::vector<char> bytes((std::istreambuf_iterator<char>(in)),
+                            std::istreambuf_iterator<char>());
+    rev_ = lufly_new(reinterpret_cast<const uint8_t *>(bytes.data()),
+                     bytes.size());
+    if (!rev_) {
+        FCITX_LUFLY_ERROR() << "lufly: 反查码表解析失败 " << path;
+        return false;
+    }
+    FCITX_LUFLY_INFO() << "lufly: 反查码表加载成功 " << path;
+    return true;
+}
+
 void LuflyIm::checkDictReload(bool force) {
     if (!scratch_ || dictPath_.empty()) {
         return;
@@ -214,18 +305,35 @@ void LuflyIm::checkDictReload(bool force) {
     }
 }
 
-void LuflyIm::replay(const std::string &buffer) {
-    lufly_reset(scratch_);
+void LuflyIm::replay(LuflyEngine *eng, const std::string &buffer) {
+    lufly_reset(eng);
     for (unsigned char c : buffer) {
-        lufly_key(scratch_, c);
+        lufly_key(eng, c);
     }
 }
 
 void LuflyIm::updateUI(InputContext *ic, LuflyState *state) {
+    auto *eng = state->reverse ? rev_ : scratch_;
     auto &panel = ic->inputPanel();
     if (state->buffer.empty()) {
         panel.reset();
+        if (state->reverse) {
+            // 裸 ` 已按下、还没输入拼音: 只显示模式提示
+            panel.setAuxUp(Text("拼音"));
+        }
+        if (!state->pending.empty()) {
+            // 顶功挂起: 已选字显示在光标处（预编辑），但还没发给应用
+            Text preedit;
+            preedit.append(state->pending, TextFormatFlag::Underline);
+            preedit.setCursor(static_cast<int>(preedit.textLength()));
+            if (ic->capabilityFlags().test(CapabilityFlag::Preedit)) {
+                panel.setClientPreedit(preedit);
+            } else {
+                panel.setPreedit(preedit);
+            }
+        }
         ic->updatePreedit();
+        // 必须显式通知 UI 面板已变化，否则上屏后候选窗不消失
         ic->updateUserInterface(UserInterfaceComponent::InputPanel);
         return;
     }
@@ -233,10 +341,17 @@ void LuflyIm::updateUI(InputContext *ic, LuflyState *state) {
     // 编码字母跟随光标内联显示（客户端支持预编辑时）；
     // 否则退回候选窗顶部一行，保证字母始终可见。
     Text preedit;
-    preedit.append(lufly_input(scratch_), TextFormatFlag::Underline);
-    // 候选窗按预编辑光标位置定位: 光标在起点=钉在首字母处，在末尾=跟随右移
-    preedit.setCursor(kPinCandidateWindow ? 0
-                                          : static_cast<int>(preedit.textLength()));
+    if (state->reverse) {
+        preedit.append("`", TextFormatFlag::Underline);
+        panel.setAuxUp(Text("拼音"));
+    }
+    if (!state->pending.empty()) {
+        // 顶功挂起字在前，正在打的编码跟在后面
+        preedit.append(state->pending, TextFormatFlag::Underline);
+    }
+    preedit.append(lufly_input(eng), TextFormatFlag::Underline);
+    // 候选窗与文本光标都定位在预编辑末尾（跟随输入位置，标准 IME 行为）
+    preedit.setCursor(static_cast<int>(preedit.textLength()));
     if (ic->capabilityFlags().test(CapabilityFlag::Preedit)) {
         panel.setClientPreedit(preedit);
     } else {
@@ -247,9 +362,9 @@ void LuflyIm::updateUI(InputContext *ic, LuflyState *state) {
     list->setSelectionKey(selectionKeys_);
     list->setPageSize(kPageSize);
     list->setLayoutHint(CandidateLayoutHint::Horizontal);
-    const int count = lufly_candidate_count(scratch_);
+    const int count = lufly_candidate_count(eng);
     for (int i = 0; i < count; i++) {
-        Text text(lufly_candidate_text(scratch_, i));
+        Text text(lufly_candidate_text(eng, i));
         list->insert(i, std::make_unique<LuflyCandidateWord>(std::move(text),
                                                              this));
     }
@@ -268,6 +383,7 @@ void LuflyIm::commitCandidate(InputContext *ic, const std::string &text) {
     auto *state = this->state(ic);
     ic->commitString(text);
     state->buffer.clear();
+    state->reverse = false;
     updateUI(ic, state);
 }
 
@@ -278,9 +394,49 @@ void LuflyCandidateWord::select(InputContext *ic) const {
 void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
     auto *ic = event.inputContext();
     const auto &key = event.key();
-    if (event.isRelease() || key.isModifier()) {
+    const KeySym sym = key.sym();
+    auto *state = this->state(ic);
+
+    // ---- 抬键（release）----
+    if (event.isRelease()) {
+        // $/|: 按下时已选次选候选，抬键补标点（对齐 rime Release+dollar/bar）。
+        // 兼容先松 Shift 的情况（此时 keysym 变回 4 / backslash）。
+        if (state->pendingPunct &&
+            (sym == FcitxKey_dollar || sym == FcitxKey_bar ||
+             sym == FcitxKey_4 || sym == FcitxKey_backslash)) {
+            const char *punct = state->pendingPunct;
+            state->pendingPunct = nullptr;
+            ic->commitString(punct);
+            event.accept();
+            return;
+        }
+        // Shift 单击（其后无其他键）: 编码字母原样上屏（rime commit_code）
+        if ((sym == FcitxKey_Shift_L || sym == FcitxKey_Shift_R) &&
+            state->shiftArmed) {
+            state->shiftArmed = false;
+            if (!state->buffer.empty()) {
+                ic->commitString(state->buffer);
+                state->buffer.clear();
+                state->reverse = false;
+                updateUI(ic, state);
+            }
+        }
         return;
     }
+
+    // 任何其他按下键解除 Shift 单击武装、作废待补标点
+    state->shiftArmed = false;
+    state->pendingPunct = nullptr;
+
+    // ---- 修饰键: Shift 记录单击，其余透传 ----
+    if (key.isModifier()) {
+        if ((sym == FcitxKey_Shift_L || sym == FcitxKey_Shift_R) &&
+            !state->buffer.empty()) {
+            state->shiftArmed = true;
+        }
+        return;
+    }
+
     // 带组合修饰键的按键一律透传（Ctrl+C / Alt+Tab 等）。
     if (key.states().test(KeyState::Ctrl) || key.states().test(KeyState::Alt) ||
         key.states().test(KeyState::Super) ||
@@ -292,14 +448,33 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
         return;
     }
     checkDictReload();
-    auto *state = this->state(ic);
-    replay(state->buffer);
 
-    const KeySym sym = key.sym();
+    // ---- ` 进入拼音反查（对齐 rime reverse_lookup prefix）----
+    if (!state->reverse && sym == FcitxKey_grave && state->buffer.empty()) {
+        if (ensureRev()) {
+            state->reverse = true;
+            updateUI(ic, state);
+            event.accept();
+        }
+        return; // 已在反查模式或码表缺失: ` 透传
+    }
 
-    // 翻页（有候选时）。
+    // 反查用 rev_ 引擎，普通输入用 scratch_；重放恢复到该 IC 的状态。
+    LuflyEngine *eng = state->reverse ? rev_ : scratch_;
+    if (!eng) {
+        state->reverse = false;
+        eng = scratch_;
+    }
+    replay(eng, state->buffer);
+
+    // 是否有候选（rime has_menu）/ 是否编码 miss，以刚重放的引擎为准。
+    // miss = 缓冲非空但无任何前缀命中（用户可能在输英文）。
+    const auto candList = ic->inputPanel().candidateList();
+    const bool hasMenu = lufly_candidate_count(eng) > 0;
+    const bool miss = !hasMenu && !state->buffer.empty();
+
+    // ---- 翻页: PageUp / PageDown / Tab ----
     if (!state->buffer.empty()) {
-        auto candList = ic->inputPanel().candidateList();
         if (auto *pageable = candList ? candList->toPageable() : nullptr) {
             if (key.check(FcitxKey_Page_Down) && pageable->hasNext()) {
                 pageable->next();
@@ -314,35 +489,112 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
                 return;
             }
         }
+        // Tab: 有菜单翻页；miss 时透传（英文输入中，不清屏）；否则清空（rime send Escape）
+        if (key.check(FcitxKey_Tab)) {
+            if (miss) {
+                return;
+            }
+            if (hasMenu) {
+                if (auto *pageable = candList->toPageable();
+                    pageable && pageable->hasNext()) {
+                    pageable->next();
+                }
+                ic->updateUserInterface(UserInterfaceComponent::InputPanel);
+            } else {
+                state->buffer.clear();
+                state->reverse = false;
+                updateUI(ic, state);
+            }
+            event.accept();
+            return;
+        }
+        // Caps_Lock: 清空缓冲（rime send Escape）
+        if (key.check(FcitxKey_Caps_Lock)) {
+            state->buffer.clear();
+            state->reverse = false;
+            updateUI(ic, state);
+            event.accept();
+            return;
+        }
     }
 
-    // 数字选词（当前页内，越界则透传）。
-    if (sym >= FcitxKey_1 && sym < FcitxKey_1 + kPageSize &&
-        !state->buffer.empty()) {
-        auto candList = ic->inputPanel().candidateList();
+    // ---- 选词: 数字 1-5 与 ; ' [ ] = 第2/3/4/5（对齐 rime key_binder）----
+    int sel = -1;
+    bool digitSel = false;
+    if (sym >= FcitxKey_1 && sym < FcitxKey_1 + kPageSize) {
+        sel = static_cast<int>(sym - FcitxKey_1);
+        digitSel = true;
+    } else if (key.check(FcitxKey_semicolon)) {
+        sel = 1;
+    } else if (key.check(FcitxKey_apostrophe)) {
+        sel = 2;
+    } else if (key.check(FcitxKey_bracketleft)) {
+        sel = 3;
+    } else if (key.check(FcitxKey_bracketright)) {
+        sel = 4;
+    }
+    if (sel >= 0 && !state->buffer.empty() && hasMenu) {
         auto *common = dynamic_cast<CommonCandidateList *>(candList.get());
         if (common) {
-            const int idx =
-                static_cast<int>(sym - FcitxKey_1) +
-                common->currentPage() * common->pageSize();
-            if (const char *text = lufly_candidate_text(scratch_, idx)) {
+            const int idx = sel + common->currentPage() * common->pageSize();
+            if (const char *text = lufly_candidate_text(eng, idx)) {
                 ic->commitString(text);
                 state->buffer.clear();
+                state->reverse = false;
                 updateUI(ic, state);
                 event.accept();
+                return;
             }
-            return;
+            if (digitSel) {
+                return; // 数字越界: 消费不动作（原行为）
+            }
+            // ;'[] 越界: 落到标点顶字
+        }
+    }
+
+    // ---- $ / |: 选次选候选，抬键补 。 / ，（对齐 rime dollar/bar 绑定）----
+    if ((key.check(FcitxKey_dollar) || key.check(FcitxKey_bar)) &&
+        !state->buffer.empty() && hasMenu) {
+        auto *common = dynamic_cast<CommonCandidateList *>(candList.get());
+        if (common) {
+            const int idx = 1 + common->currentPage() * common->pageSize();
+            if (const char *text = lufly_candidate_text(eng, idx)) {
+                ic->commitString(text);
+                state->buffer.clear();
+                state->reverse = false;
+                state->pendingPunct =
+                    key.check(FcitxKey_dollar) ? "。" : "，";
+                updateUI(ic, state);
+                event.accept();
+                return;
+            }
         }
     }
 
     if (key.check(FcitxKey_space)) {
         if (state->buffer.empty()) {
+            if (!state->pending.empty()) {
+                // 空格确认挂起字（空格被消费，不会漏成真空格）
+                state->reverse = false;
+                ic->commitString(state->pending);
+                state->pending.clear();
+                state->pendingCode.clear();
+                updateUI(ic, state);
+                event.accept();
+                return;
+            }
+            if (state->reverse) {
+                state->reverse = false; // 反查空缓冲: 空格退出反查
+                updateUI(ic, state);
+                event.accept();
+            }
             return; // 空缓冲透传
         }
-        if (const char *text = lufly_key(scratch_, ' ')) {
+        if (const char *text = lufly_key(eng, ' ')) {
             ic->commitString(text);
         }
         state->buffer.clear();
+        state->reverse = false;
         updateUI(ic, state);
         event.accept();
         return;
@@ -350,10 +602,18 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
 
     if (key.check(FcitxKey_Return)) {
         if (state->buffer.empty()) {
+            if (!state->pending.empty()) {
+                // 挂起字先送出，Enter 本身不消费（换行照常，顺序正确）
+                ic->commitString(state->pending);
+                state->pending.clear();
+                state->pendingCode.clear();
+                updateUI(ic, state);
+            }
             return;
         }
         ic->commitString(state->buffer); // 编码字母原样上屏
         state->buffer.clear();
+        state->reverse = false;
         updateUI(ic, state);
         event.accept();
         return;
@@ -361,10 +621,25 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
 
     if (key.check(FcitxKey_BackSpace)) {
         if (state->buffer.empty()) {
+            if (!state->pending.empty()) {
+                // 撤销顶功挂起: 恢复原编码供继续编辑（加形码/换候选/删码）
+                state->buffer = state->pendingCode;
+                state->pending.clear();
+                state->pendingCode.clear();
+                replay(eng, state->buffer);
+                updateUI(ic, state);
+                event.accept();
+                return;
+            }
+            if (state->reverse) {
+                state->reverse = false; // 退过 ` 本身: 退出反查
+                updateUI(ic, state);
+                event.accept();
+            }
             return;
         }
-        lufly_key(scratch_, '\b');
-        state->buffer = lufly_input(scratch_);
+        lufly_key(eng, '\b');
+        state->buffer = lufly_input(eng);
         updateUI(ic, state);
         event.accept();
         return;
@@ -372,9 +647,15 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
 
     if (key.check(FcitxKey_Escape)) {
         if (state->buffer.empty()) {
+            if (state->reverse) {
+                state->reverse = false;
+                updateUI(ic, state);
+                event.accept();
+            }
             return;
         }
         state->buffer.clear();
+        state->reverse = false;
         updateUI(ic, state);
         event.accept();
         return;
@@ -382,24 +663,63 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
 
     if (sym >= FcitxKey_a && sym <= FcitxKey_z) {
         const uint32_t ch = static_cast<uint32_t>('a' + (sym - FcitxKey_a));
-        if (const char *text = lufly_key(scratch_, ch)) {
-            ic->commitString(text);
+        if (!state->pending.empty()) {
+            // 顶功: 下一字词的首键把挂起字顶出上屏（快打全程不用空格）
+            ic->commitString(state->pending);
+            state->pending.clear();
+            state->pendingCode.clear();
         }
-        state->buffer = lufly_input(scratch_);
+        const std::string prev = state->buffer;
+        if (const char *text = lufly_key(eng, ch)) {
+            // 全码唯一: 不立即发送，挂起等顶出/空格确认（顶功）
+            state->pending = text;
+            state->pendingCode = prev + static_cast<char>(ch);
+        }
+        state->buffer = lufly_input(eng);
         updateUI(ic, state);
         event.accept();
         return;
     }
 
-    // 其余可打印键（标点等）: 顶出首选后放行 —— "标点顶屏"。
-    // 不带修饰键的 ASCII 键才算（方向键/F 键/组合键不顶字）。
-    if (key.isSimple() && !state->buffer.empty()) {
-        if (const char *text = lufly_key(scratch_, ' ')) {
+    // ---- 标点: 中文全角化（对齐 rime punctuator half_shape）----
+    // 编码中先顶出首选再上屏标点并消费；空缓冲直接上屏标点。
+    // miss（编码 miss，输英文中）: 累积的英文原样上屏后接标点。
+    // rime 同为半角的键（` ~ @ # % & * - + = 等）不映射、保持透传。
+    const bool composing = !state->buffer.empty();
+    if (const char *punct = chinesePunct(sym, state)) {
+        if (!state->pending.empty()) {
+            // 挂起字随标点顶出
+            ic->commitString(state->pending);
+            state->pending.clear();
+            state->pendingCode.clear();
+        }
+        if (miss) {
+            ic->commitString(state->buffer); // 英文原样上屏
+        } else if (composing) {
+            if (const char *text = lufly_key(eng, ' ')) {
+                ic->commitString(text);
+            }
+        }
+        state->buffer.clear();
+        state->reverse = false;
+        ic->commitString(punct);
+        updateUI(ic, state);
+        event.accept();
+        return;
+    }
+    // 未映射的简单键（如 `）: miss 时透传不清屏（英文继续）；
+    // 编码中顶出首选后放行原字符。
+    if (composing && key.isSimple()) {
+        if (miss) {
+            return;
+        }
+        if (const char *text = lufly_key(eng, ' ')) {
             ic->commitString(text);
         }
         state->buffer.clear();
+        state->reverse = false;
         updateUI(ic, state);
-        // 不消费，让标点自然插入
+        // 不消费，让原字符自然插入
     }
 }
 
@@ -410,7 +730,18 @@ void LuflyIm::activate(const InputMethodEntry &, InputContextEvent &) {
 void LuflyIm::reset(const InputMethodEntry &, InputContextEvent &event) {
     auto *ic = event.inputContext();
     auto *state = this->state(ic);
+    if (!state->pending.empty()) {
+        // 焦点切走: 挂起字落地防丢
+        ic->commitString(state->pending);
+        state->pending.clear();
+        state->pendingCode.clear();
+    }
     state->buffer.clear();
+    state->reverse = false;
+    state->shiftArmed = false;
+    state->pendingPunct = nullptr;
+    state->dqOpen = false;
+    state->sqOpen = false;
     updateUI(ic, state);
 }
 

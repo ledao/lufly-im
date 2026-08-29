@@ -71,20 +71,37 @@ def build(entries):
 
 def main():
     repo = Path(__file__).resolve().parent.parent.parent
-    default_in = repo / "rime_xiaohe_shuangpin_xiaohe_xing" / "xiaolu_he_shuangpin_he_xing.dict.yaml"
-    default_out = Path(__file__).resolve().parent.parent / "data" / "xiaolu_he_he.bin"
+    rime = repo / "rime_xiaohe_shuangpin_xiaohe_xing"
+    data = Path(__file__).resolve().parent.parent / "data"
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("input", nargs="?", default=str(default_in))
-    ap.add_argument("-o", "--output", default=str(default_out))
+    ap.add_argument("input", nargs="?", default=None,
+                    help="单文件模式: 指定 dict.yaml（配合 -o）")
+    ap.add_argument("-o", "--output", default=None)
     args = ap.parse_args()
 
-    entries = parse_dict_yaml(Path(args.input))
-    data = build(entries)
-    out = Path(args.output)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_bytes(data)
-    print(f"entries: {len(entries)}, output: {out} ({len(data)} bytes)")
+    if args.input or args.output:
+        entries = parse_dict_yaml(Path(args.input))
+        out = Path(args.output) if args.output else data / "xiaolu_he_he.bin"
+        blob = build(entries)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(blob)
+        print(f"entries: {len(entries)}, output: {out} ({len(blob)} bytes)")
+        return
+
+    # 默认: 一次编译主码表 + 拼音辅助码表（反查用）
+    targets = [
+        (rime / "xiaolu_he_shuangpin_he_xing.dict.yaml",
+         data / "xiaolu_he_he.bin"),
+        (rime / "xiaolu_fuzhu_pinyin.dict.yaml",
+         data / "xiaolu_fuzhu.bin"),
+    ]
+    for src, out in targets:
+        entries = parse_dict_yaml(src)
+        blob = build(entries)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(blob)
+        print(f"entries: {len(entries)}, output: {out} ({len(blob)} bytes)")
 
 
 if __name__ == "__main__":

@@ -183,23 +183,24 @@ impl Engine {
         self.candidates().first().map(|c| c.text.clone())
     }
 
-    /// 喂入一个按键，返回需要上屏的文本（顶字/选词/自动上屏）。
+    /// 喂入一个按键，返回需要上屏的文本（选词/自动上屏）。
     ///
     /// 按键语义:
-    /// - `a..z`  进编码缓冲（死码时先顶出当前首选）
-    /// - 空格    上屏首选
+    /// - `a..z`  进编码缓冲；编码 miss 时不顶字，字母原样累积（输英文）
+    /// - 空格    上屏首选；无候选（miss/空缓冲）时清屏
     /// - `1..9`  选候选
-    /// - `\u{8}` 退格
+    /// - `\u{8}` 退格（回到有效编码后恢复候选）
     /// - `\u{1b}`清空缓冲
     /// - 其他    忽略（标点/符号处理属于前端职责）
     pub fn key(&mut self, c: char) -> Option<String> {
         match c {
             'a'..='z' => self.push_letter(c),
             ' ' => {
-                let text = self.top_text()?;
+                // miss 时 top_text 为 None → 清屏不上屏
+                let text = self.top_text();
                 self.input.clear();
                 self.invalidate();
-                Some(text)
+                text
             }
             '1'..='9' => {
                 let idx = c as usize - '1' as usize;
@@ -230,10 +231,11 @@ impl Engine {
 
         if self.has_prefix(&next) {
             self.input = next;
-            // 6 码及以上偶数长度命中全码 → 自动上屏（词组/多字词）
+            // 6/8/10… 偶数全码唯一 → 自动上屏（对齐 rime auto_select_pattern；
+            // auto_select 只在唯一候选时生效）。4/5 码只显示候选。
             let n = self.input.len();
             if n >= 6 && n % 2 == 0 {
-                if let Some(text) = self.exact_top_text() {
+                if let Some(text) = self.unique_exact_text() {
                     self.input.clear();
                     return Some(text);
                 }
@@ -241,20 +243,22 @@ impl Engine {
             return None;
         }
 
-        // 死码：顶出当前首选，新键重新开始
-        let commit = self.top_text();
-        self.input.clear();
-        self.input.push(c);
-        commit
+        // 编码 miss: 不顶字 —— 用户可能在输入英文。字母原样累积:
+        // 空格清屏 / 回车(前端)上屏英文 / 退格回到有效编码后恢复候选
+        self.input = next;
+        None
     }
 
-    fn exact_top_text(&self) -> Option<String> {
+    /// 全码唯一命中: 编码恰为某词条全码、且无其他词条共用该编码。
+    fn unique_exact_text(&self) -> Option<String> {
         let start = self.prefix_start(&self.input);
-        let e = &self.entries[start];
-        if e.code == self.input {
-            Some(e.text.clone())
-        } else {
-            None
+        let e = self.entries.get(start)?;
+        if e.code != self.input {
+            return None;
+        }
+        match self.entries.get(start + 1) {
+            Some(n) if n.code == self.input => None, // 编码撞车，等用户手选
+            _ => Some(e.text.clone()),
         }
     }
 
@@ -285,6 +289,7 @@ mod tests {
             ("vegezr".into(), "这个".into(), 7),
             ("yige".into(), "一个".into(), 8),
             ("yigeap".into(), "一个".into(), 9),
+            ("yiger".into(), "一个".into(), 12), // 5 码唯一: 全码自动上屏
             ("veui".into(), "这是".into(), 10),
         ])
     }
@@ -341,15 +346,16 @@ mod tests {
     }
 
     #[test]
-    fn dead_key_bumps_previous() {
+    fn dead_key_keeps_input() {
         let mut e = demo_engine();
         for c in "debu".chars() {
             e.key(c);
         }
         assert_eq!(e.input(), "debu");
-        // 后续按键 "qq" 无前缀 → 顶出 4 码单字"的"
-        assert_eq!(e.key('q'), Some("的".into()));
-        assert_eq!(e.input(), "q");
+        // 后续按键无前缀 → 不顶字，原样累积（用户可能在输英文）
+        assert_eq!(e.key('q'), None);
+        assert_eq!(e.input(), "debuq");
+        assert!(e.candidates().is_empty());
     }
 
     #[test]
@@ -381,12 +387,39 @@ mod tests {
     }
 
     #[test]
-    fn no_prefix_after_single_falls_back() {
+    fn miss_keeps_input_for_english() {
         let mut e = demo_engine();
-        e.key('n'); // "ni" 有二简
-        // nz 无前缀 → 顶出一简/二简首选
-        let commit = e.key('z');
-        assert_eq!(commit.as_deref(), Some("你"));
-        assert_eq!(e.input(), "z");
+        for c in "debu".chars() {
+            e.key(c); // "的" 4 码全码: 唯一但不自动上屏
+        }
+        assert_eq!(e.input(), "debu");
+        // debux miss: 不顶字，字母原样累积（可能正在输英文）
+        assert_eq!(e.key('x'), None);
+        assert_eq!(e.input(), "debux");
+        assert!(e.candidates().is_empty());
+        e.key('k');
+        assert_eq!(e.input(), "debuxk");
+        // 退格回到有效编码后候选恢复
+        e.key('\u{8}');
+        e.key('\u{8}');
+        assert_eq!(e.input(), "debu");
+        assert!(!e.candidates().is_empty());
+        // miss 状态下空格 = 清屏，不上屏任何文本
+        assert_eq!(e.key('x'), None);
+        assert_eq!(e.key(' '), None);
+        assert!(e.is_empty());
+    }
+
+    #[test]
+    fn five_code_needs_space() {
+        let mut e = demo_engine();
+        for c in "yige".chars() {
+            assert_eq!(e.key(c), None, "4 码不自动上屏");
+        }
+        // 5 码唯一也不自动上屏（对齐 rime: 只有 6/8/10… 偶数全码才自动）
+        assert_eq!(e.key('r'), None);
+        assert_eq!(e.input(), "yiger");
+        assert_eq!(e.key(' '), Some("一个".into()));
+        assert!(e.is_empty());
     }
 }
