@@ -30,6 +30,9 @@ install -m 644 data/lufly-im.conf       "$STAGE/usr/share/fcitx5/inputmethod/luf
 install -m 644 data/lufly.png           "$STAGE/usr/share/icons/hicolor/48x48/apps/lufly.png"
 # 16x16 供托盘菜单等小尺寸场景: 无底板灰色天鹅剪影, 与系统图标视觉一致
 install -m 644 data/lufly-16.png        "$STAGE/usr/share/icons/hicolor/16x16/apps/lufly.png"
+# 英文模式子模式图标 (subModeIcon): 白底圆角板 + "en"
+install -m 644 data/lufly-en.png        "$STAGE/usr/share/icons/hicolor/48x48/apps/lufly-en.png"
+install -m 644 data/lufly-en-16.png     "$STAGE/usr/share/icons/hicolor/16x16/apps/lufly-en.png"
 install -m 644 ../data/xiaolu_he_he.bin "$STAGE/usr/share/fcitx5/lufly/dict.bin"
 install -m 644 ../data/xiaolu_fuzhu.bin "$STAGE/usr/share/fcitx5/lufly/fuzhu.bin"
 # 主题（亮/暗，圆角卡片 9-patch 贴图 + 药丸高亮；postinst 负责选中并跟随系统深浅色）

@@ -14,6 +14,7 @@
 //   PageUp/Down  翻页
 //   回车      编码字母原样上屏
 //   退格      删一码；Esc 清空缓冲
+//   Shift     单击: 编码中=字母原样上屏；空编码=切换中/英文模式
 //   标点      中文全角化（对齐 rime punctuator half_shape；编码中先顶字）
 //   其余按键  不消费、不破坏缓冲（` ~ @ # 等半角键与组合键透传）
 
@@ -65,6 +66,8 @@ public:
     std::string buffer;
     // 反查模式: ` 已按下，buffer 为拼音字母（不含 ` 本身）
     bool reverse = false;
+    // 英文直通模式（空编码 Shift 单击切换）: 所有按键透传
+    bool ascii = false;
     // Shift 已按下且其后无其他按键（单击 commit_code：字母原样上屏）
     bool shiftArmed = false;
     // $/| 已选次选候选，抬键时补发该标点（"。" / "，"）
@@ -132,7 +135,7 @@ private:
     LuflyIm *im_;
 };
 
-class LuflyIm final : public InputMethodEngine {
+class LuflyIm final : public InputMethodEngineV2 {
 public:
     explicit LuflyIm(Instance *instance);
     ~LuflyIm() override;
@@ -146,6 +149,18 @@ public:
 
     // 供 LuflyCandidateWord::select 回调。
     void commitCandidate(InputContext *ic, const std::string &text);
+
+    // 子模式图标/标签: 随中英文模式切换，托盘 SNI 图标据此刷新
+    std::string subModeIconImpl(const InputMethodEntry &,
+                                InputContext &ic) override {
+        auto *st = this->state(&ic);
+        return st && st->ascii ? "lufly-en" : "lufly";
+    }
+    std::string subModeLabelImpl(const InputMethodEntry &,
+                                 InputContext &ic) override {
+        auto *st = this->state(&ic);
+        return st && st->ascii ? "EN" : "中";
+    }
 
 private:
     friend class LuflyCandidateWord;
@@ -410,7 +425,8 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             event.accept();
             return;
         }
-        // Shift 单击（其后无其他键）: 编码字母原样上屏（rime commit_code）
+        // Shift 单击（其后无其他键）: 编码中=字母原样上屏（rime commit_code）；
+        // 空编码=切换中/英文模式
         if ((sym == FcitxKey_Shift_L || sym == FcitxKey_Shift_R) &&
             state->shiftArmed) {
             state->shiftArmed = false;
@@ -419,6 +435,20 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
                 state->buffer.clear();
                 state->reverse = false;
                 updateUI(ic, state);
+            } else {
+                if (!state->pending.empty()) {
+                    // 挂起字随模式切换落地
+                    ic->commitString(state->pending);
+                    state->pending.clear();
+                    state->pendingCode.clear();
+                }
+                state->reverse = false;
+                state->ascii = !state->ascii;
+                FCITX_LUFLY_INFO() << "lufly: 切换到"
+                                   << (state->ascii ? "英文" : "中文") << "模式";
+                updateUI(ic, state);
+                // 通知托盘 SNI 刷新子模式图标（天鹅/en）
+                ic->updateUserInterface(UserInterfaceComponent::StatusArea);
             }
         }
         return;
@@ -428,10 +458,9 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
     state->shiftArmed = false;
     state->pendingPunct = nullptr;
 
-    // ---- 修饰键: Shift 记录单击，其余透传 ----
+    // ---- 修饰键: Shift 记录单击（空编码时用于切换中英），其余透传 ----
     if (key.isModifier()) {
-        if ((sym == FcitxKey_Shift_L || sym == FcitxKey_Shift_R) &&
-            !state->buffer.empty()) {
+        if (sym == FcitxKey_Shift_L || sym == FcitxKey_Shift_R) {
             state->shiftArmed = true;
         }
         return;
@@ -442,6 +471,10 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
         key.states().test(KeyState::Super) ||
         key.states().test(KeyState::Hyper) ||
         key.states().test(KeyState::Meta)) {
+        return;
+    }
+    // 英文模式: 一律透传，Shift 单击切回中文
+    if (state->ascii) {
         return;
     }
     if (!ensureDict()) {
