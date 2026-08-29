@@ -1,0 +1,8 @@
+[package]
+name = "lufly-engine"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "小鹭音形输入法核心引擎（平台无关）"
+
+[dependencies]
