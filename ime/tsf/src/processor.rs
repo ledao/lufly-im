@@ -1003,7 +1003,7 @@ impl ITfTextInputProcessor_Impl for LuflyTsf_Impl {
                 .into();
                 let mode_btn: ITfLangBarItemButton = crate::langbar::LangItem::new(
                     crate::langbar::Kind::Mode,
-                    crate::langbar::GUID_LBI_MODE,
+                    GUID_LBI_INPUTMODE, // 系统保留：任务栏「输入模式」图标位
                     self.shared.clone(),
                 )
                 .into();
@@ -1012,10 +1012,17 @@ impl ITfTextInputProcessor_Impl for LuflyTsf_Impl {
                 let mut items = Vec::new();
                 if let (Ok(logo), Ok(mode)) = (logo, mode) {
                     unsafe {
-                        if mgr.AddItem(&logo).is_ok() {
+                        let r1 = mgr.AddItem(&logo);
+                        let r2 = mgr.AddItem(&mode);
+                        crate::log(&format!(
+                            "langbar add: logo={} mode={}",
+                            r1.is_ok(),
+                            r2.is_ok()
+                        ));
+                        if r1.is_ok() {
                             items.push(logo);
                         }
-                        if mgr.AddItem(&mode).is_ok() {
+                        if r2.is_ok() {
                             items.push(mode);
                         }
                     }

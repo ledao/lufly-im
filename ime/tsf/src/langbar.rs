@@ -17,7 +17,9 @@ use windows::Win32::UI::WindowsAndMessaging::*;
 
 /// 托盘项 GUID（仅需与 TIP 内唯一）
 pub const GUID_LBI_LOGO: GUID = GUID::from_u128(0x6F4A9B2E_3C8D_4E71_A5F6_1D2B3C4D5E6F);
-pub const GUID_LBI_MODE: GUID = GUID::from_u128(0x8C7D6E5F_4A3B_4F29_B1A0_9F8E7D6C5B4A);
+// 模式项不用自定义 GUID —— 任务栏「输入模式」图标位只收系统保留的
+// GUID_LBI_INPUTMODE（微软拼音/weasel 均如此）；自定义 GUID 只会进
+// 经典浮动语言栏（Win10/11 默认隐藏，等于看不见）
 
 const ICON_LOGO: &str = "lufly.ico";
 const ICON_ZH: &str = "lufly-zh.ico";
