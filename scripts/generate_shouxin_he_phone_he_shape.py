@@ -3,7 +3,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from common import XHE_SP_SCHEMA, XHE_SHAPE_SCHAME
+from common import XHE_SP_SCHEMA, XHE_SHAPE_SCHEMA
 from generator import generate_shouxin
 
 
@@ -14,7 +14,7 @@ def main():
     if not Path(output_dir).exists():
         os.makedirs(output_dir)
 
-    generate_shouxin(XHE_SP_SCHEMA, output_dir, XHE_SHAPE_SCHAME, check_db, True)
+    generate_shouxin(XHE_SP_SCHEMA, output_dir, XHE_SHAPE_SCHEMA, check_db, True)
 
 if __name__ == "__main__":
     main()

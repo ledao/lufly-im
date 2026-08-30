@@ -1,10 +1,9 @@
-import imp
 import re
 from tqdm import tqdm
 
 import tables
 from collections import defaultdict, OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Tuple, List, Dict, Set
 
 from pypinyin import lazy_pinyin
@@ -46,7 +45,7 @@ class ShapeSchema:
         return self.name == other.name
 
 
-XHE_SHAPE_SCHAME = ShapeSchema("xiao he")
+XHE_SHAPE_SCHEMA = ShapeSchema("xiao he")
 ZRM_SHAPE_SCHEMA = ShapeSchema("zi ran ma") 
 LU_SHAPE_SCHEMA = ShapeSchema("xiao lu")
 
@@ -163,7 +162,7 @@ def get_full(word: str) -> List[str]:
     for full in lazy_pinyin(word):
         for e in full:
             if e not in "abcdefghijklmnopqrstuvwxyz":
-                raise RuntimeError(f"{e} not alphe, word is: {word}, pinyin is: {full}")
+                raise RuntimeError(f"{e} not alpha, word is: {word}, pinyin is: {full}")
         fulls.append(full)
     return fulls
 
@@ -324,7 +323,7 @@ class SchemaConfig(object):
     input_schema: InputSchema
     check_db: bool = True
     reverse_dict: str = ""
-    shape_schema: ShapeSchema = XHE_SHAPE_SCHAME
+    shape_schema: ShapeSchema = field(default_factory=lambda: XHE_SHAPE_SCHEMA)
     is_ff: bool = True
 
 
@@ -345,7 +344,7 @@ def get_exists_charyinpins() -> Set[str]:
 def get_exists_words() -> Set[str]:
     exist_words = set()
 
-    exist_words.union(get_exists_chars())
+    exist_words.update(get_exists_chars())
 
     for e in WordPhoneTable.select():
         exist_words.add(e.word)
@@ -357,7 +356,7 @@ def get_exists_words() -> Set[str]:
 
 def check_wordphonetable_pinyin(transformer: Dict[str, str], schema: InputSchema):
     to_update_items = []
-    with tqdm(total=len(WordPhoneTable), desc="检查词的拼音") as pbar:
+    with tqdm(total=WordPhoneTable.select().count(), desc="检查词的拼音") as pbar:
         for item in WordPhoneTable.select():
             fulls = item.full
             if schema == XHE_SP_SCHEMA:
@@ -418,7 +417,7 @@ def check_wordphonetable_pinyin(transformer: Dict[str, str], schema: InputSchema
 
 def check_tangshitable_pinyin(transformer: Dict[str, str], schema: InputSchema):
     to_update_items = []
-    with tqdm(total=len(TangshiTable), desc="检查诗词的拼音") as pbar:
+    with tqdm(total=TangshiTable.select().count(), desc="检查诗词的拼音") as pbar:
         for item in TangshiTable.select():
             fulls = item.full
             if schema == XHE_SP_SCHEMA:
@@ -484,7 +483,7 @@ def check_words_pinyin(transformer: Dict[str, str], schema: InputSchema):
 
 def check_chars_pinyin(transformer: Dict[str, str], schema: InputSchema):
     to_update_items = []
-    with tqdm(total=len(CharPhoneTable), desc="检查字的拼音") as pbar:
+    with tqdm(total=CharPhoneTable.select().count(), desc="检查字的拼音") as pbar:
         for item in CharPhoneTable.select():
             full = item.full
             if schema == XHE_SP_SCHEMA:
@@ -496,7 +495,7 @@ def check_chars_pinyin(transformer: Dict[str, str], schema: InputSchema):
             elif schema == BINGJI_SP_SCHEMA:
                 shuangpin = item.bingji
             else:
-                raise RuntimeError(f"unkonwn schame {schema}")
+                raise RuntimeError(f"unknown schema {schema}")
             s, y = split_sy(full)
             sp = transformer[s] + transformer[y]
             if shuangpin != sp:
@@ -509,7 +508,7 @@ def check_chars_pinyin(transformer: Dict[str, str], schema: InputSchema):
                 elif schema == BINGJI_SP_SCHEMA:
                     item.bingji = sp
                 else:
-                    raise RuntimeError(f"unkonwn schame {schema}")
+                    raise RuntimeError(f"unknown schema {schema}")
                 to_update_items.append(item)
                 pbar.set_postfix(to_update=item.char)
                 pbar.set_postfix(OrderedDict(char=item.char, before=shuangpin, after=sp))
@@ -533,7 +532,7 @@ def check_chars_pinyin(transformer: Dict[str, str], schema: InputSchema):
                                        fields=['bingji'],
                                        batch_size=100)
         else:
-            raise RuntimeError(f"unkonwn schame {schema}")
+            raise RuntimeError(f"unknown schema {schema}")
 
     print(to_update_items)
     print(f'update {len(to_update_items)} char items')

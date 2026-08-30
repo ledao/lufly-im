@@ -1,0 +1,183 @@
+#!/bin/sh
+# deb postinst: 安装后零配置可用
+# 把「小鹭音形」追加进所有 fcitx5 用户的输入法分组。
+# fcitx5 监听 profile 文件变化，运行中即生效，无需重启。
+set -e
+
+# 找到目标用户: 优先本次安装的调用者，其次所有有 fcitx5 profile 的用户
+USERS=""
+if [ -n "${SUDO_USER:-}" ]; then
+    USERS="$SUDO_USER"
+fi
+for h in /home/*; do
+    u=$(basename "$h")
+    case " $USERS " in
+        *" $u "*) continue ;;
+    esac
+    if [ -f "$h/.config/fcitx5/profile" ]; then
+        USERS="$USERS $u"
+    fi
+done
+
+# 用户目录的主题是早期调试残留，XDG 用户目录优先级高于系统目录，
+# 不清掉会一直覆盖 deb 安装的新版主题
+rm -rf /home/*/.local/share/fcitx5/themes/lufly \
+       /home/*/.local/share/fcitx5/themes/lufly-dark \
+       /home/*/.local/share/fcitx5/themes/lufly-flat 2>/dev/null || true
+
+for u in $USERS; do
+    HOME_DIR=$(getent passwd "$u" | cut -d: -f6)
+    OWNER=$(stat -c '%U:%G' "$HOME_DIR" 2>/dev/null || echo "$u")
+
+    # 1) 选中「小鹭」主题并跟随系统深浅色（classicui.conf 无节头，平铺键值）
+    C_DIR="$HOME_DIR/.config/fcitx5/conf"
+    C="$C_DIR/classicui.conf"
+    MADE_DIR=0
+    if [ ! -d "$C_DIR" ]; then
+        mkdir -p "$C_DIR"
+        MADE_DIR=1
+    fi
+    python3 - "$C" <<'PYEOF' || true
+import os, sys
+
+path = sys.argv[1]
+want = {
+    "Theme": "lufly",
+    "DarkTheme": "lufly-dark",
+    "UseDarkTheme": "True",
+    "Font": "Noto Sans CJK SC 11",
+}
+lines = open(path, encoding="utf-8").read().splitlines() if os.path.exists(path) else []
+seen = set()
+out = []
+for ln in lines:
+    key = ln.split("=", 1)[0].strip() if "=" in ln else None
+    if key in want:
+        if key not in seen:
+            out.append(f"{key}={want[key]}")
+            seen.add(key)
+        continue
+    out.append(ln)
+for key, val in want.items():
+    if key not in seen:
+        out.append(f"{key}={val}")
+open(path, "w", encoding="utf-8").write("\n".join(out) + "\n")
+print("fcitx5-lufly: 主题已设为「小鹭」（跟随系统深浅色）")
+PYEOF
+    chown "$OWNER" "$C"
+    if [ "$MADE_DIR" = 1 ]; then
+        chown "$OWNER" "$C_DIR"
+        if [ "$(stat -c '%U' "$HOME_DIR/.config/fcitx5")" = "root" ]; then
+            chown "$OWNER" "$HOME_DIR/.config/fcitx5"
+        fi
+    fi
+
+    # 2) 打开「在程序中显示预编辑文本」，编码字母内联显示在光标后
+    G_DIR="$HOME_DIR/.config/fcitx5"
+    G="$G_DIR/config"
+    python3 - "$G_DIR" "$G" <<'PYEOF' || true
+import os, sys
+
+cfg_dir, path = sys.argv[1], sys.argv[2]
+os.makedirs(cfg_dir, exist_ok=True)
+lines = open(path, encoding="utf-8").read().splitlines() if os.path.exists(path) else []
+out, in_behavior, done = [], False, False
+for ln in lines:
+    if ln.strip() == "[Behavior]":
+        in_behavior = True
+        out.append(ln)
+        continue
+    if ln.strip().startswith("[") and in_behavior:
+        if not done:
+            out.append("PreeditEnabledByDefault=True")
+            done = True
+        in_behavior = False
+    if in_behavior and ln.strip().startswith("PreeditEnabledByDefault"):
+        if not done:
+            out.append("PreeditEnabledByDefault=True")
+            done = True
+        continue
+    out.append(ln)
+if in_behavior and not done:
+    out.append("PreeditEnabledByDefault=True")
+    done = True
+elif not done:
+    out.append("")
+    out.append("[Behavior]")
+    out.append("PreeditEnabledByDefault=True")
+open(path, "w", encoding="utf-8").write("\n".join(out) + "\n")
+PYEOF
+    chown "$OWNER" "$G"
+    if [ "$(stat -c '%U' "$G_DIR")" = "root" ]; then
+        chown "$OWNER" "$G_DIR"
+    fi
+    if [ "$(stat -c '%U' "$HOME_DIR/.config/fcitx5")" = "root" ]; then
+        chown "$OWNER" "$HOME_DIR/.config/fcitx5"
+    fi
+
+    P="$HOME_DIR/.config/fcitx5/profile"
+    [ -f "$P" ] || continue
+
+    OWNER=$(stat -c '%U:%G' "$P")
+    python3 - "$P" <<'PYEOF' || true
+import re, sys
+
+path = sys.argv[1]
+text = open(path, encoding="utf-8").read()
+changed = False
+
+# 每个分组的最大 Items 序号
+maxitem = {}
+for m in re.finditer(r"(?m)^\[Groups/(\d+)/Items/(\d+)\]", text):
+    g, i = int(m.group(1)), int(m.group(2))
+    maxitem[g] = max(maxitem.get(g, -1), i)
+
+# 1) 尚未注册时: 在每个分组最后一个 item 节后追加 lufly
+if maxitem and not re.search(r"(?m)^Name=lufly$", text):
+    sections = text.split("\n\n")
+    for idx, sec in enumerate(sections):
+        m = re.search(r"(?m)^\[Groups/(\d+)/Items/(\d+)\]", sec)
+        if m and int(m.group(2)) == maxitem[int(m.group(1))]:
+            g = int(m.group(1))
+            sections[idx] = (
+                sec
+                + f"\n\n[Groups/{g}/Items/{maxitem[g] + 1}]"
+                + "\n# Name\nName=lufly\n# Layout\nLayout="
+            )
+    text = "\n\n".join(sections)
+    changed = True
+
+# 2) 含 lufly 的分组 DefaultIM 指向小鹭（新窗口默认小鹭，而非 rime）
+#    两遍扫描: 先收集含 lufly 的分组号（DefaultIM 行在其 Items 节之前出现）
+if maxitem:
+    lufly_groups = {
+        int(m.group(1))
+        for m in re.finditer(r"(?m)^\[Groups/(\d+)/Items/\d+\]\n# Name\nName=lufly\b", text)
+    }
+    out = []
+    cur_group = None
+    for ln in text.splitlines():
+        s = ln.strip()
+        gm = re.match(r"^\[Groups/(\d+)\]$", s)
+        if gm:
+            cur_group = int(gm.group(1))
+        if s.startswith("DefaultIM=") and cur_group in lufly_groups:
+            if s != "DefaultIM=lufly":
+                ln = "DefaultIM=lufly"
+                changed = True
+        out.append(ln)
+    text = "\n".join(out)
+
+if changed:
+    open(path, "w", encoding="utf-8").write(text + "\n")
+    print("fcitx5-lufly: 已把「小鹭音形」加入输入法列表并设为默认")
+PYEOF
+
+    chown "$OWNER" "$P"
+done
+
+# 刷新图标缓存（失败不阻塞安装）
+update-icon-caches /usr/share/icons/hicolor 2>/dev/null || true
+
+echo "fcitx5-lufly: 安装完成。Ctrl+Space 切换输入法即可选到「小鹭音形」。"
+exit 0
