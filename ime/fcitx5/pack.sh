@@ -11,10 +11,13 @@ ARCH=amd64
 MULTIARCH=$(dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || gcc -dumpmachine)
 
 ./build.sh
+# lufly-cli 供 ojc 加词弹窗管线使用（usr/bin/lufly-cli）
+cargo build --release -p lufly-cli --manifest-path ../Cargo.toml
 
 STAGE="pack/${PKG}_${VER}_${ARCH}"
 rm -rf "$STAGE"
 mkdir -p "$STAGE/DEBIAN" \
+    "$STAGE/usr/bin" \
     "$STAGE/usr/lib/$MULTIARCH/fcitx5" \
     "$STAGE/usr/share/fcitx5/addon" \
     "$STAGE/usr/share/fcitx5/inputmethod" \
@@ -25,6 +28,8 @@ mkdir -p "$STAGE/DEBIAN" \
     "$STAGE/usr/share/icons/hicolor/16x16/apps"
 
 install -m 644 build/liblufly.so        "$STAGE/usr/lib/$MULTIARCH/fcitx5/liblufly.so"
+# ojc 加词命令管线: zenity 表单 → lufly-cli addword（查码表自动算码）
+install -m 755 ../target/release/lufly-cli "$STAGE/usr/bin/lufly-cli"
 install -m 644 data/lufly-addon.conf    "$STAGE/usr/share/fcitx5/addon/lufly.conf"
 install -m 644 data/lufly-im.conf       "$STAGE/usr/share/fcitx5/inputmethod/lufly.conf"
 install -m 644 data/lufly.png           "$STAGE/usr/share/icons/hicolor/48x48/apps/lufly.png"
@@ -56,7 +61,7 @@ Depends: fcitx5, libc6, libstdc++6, libgcc-s1
 Installed-Size: $INSTALLED_SIZE
 Description: 小鹭音形输入法（fcitx5 前端）
  定长音形输入法：双拼两键 + 形码两键，词组简语与全码。
- Rust 引擎经 C ABI 静态链接进 fcitx5 addon。
+ 词频自学习与 ojc 候选窗内造词；Rust 引擎经 C ABI 静态链接进 fcitx5 addon。
 EOF
 
 install -m 755 data/postinst "$STAGE/DEBIAN/postinst"

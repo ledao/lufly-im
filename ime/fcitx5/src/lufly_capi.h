@@ -38,6 +38,26 @@ const char *lufly_candidate_text(LuflyEngine *handle, int idx);
 /// 第 idx 个候选是否编码完全命中。
 int lufly_candidate_exact(LuflyEngine *handle, int idx);
 
+/// 打开用户词典文件（存在则加载；之后每累计 64 次学习自动原子落盘）。
+void lufly_user_open(LuflyEngine *handle, const char *path);
+
+/// 强制落盘用户词典（无变更则不写）。返回 1 表示写了文件。
+int lufly_user_flush(LuflyEngine *handle);
+
+/// 热重载用户词典: 合并磁盘最新内容（外部进程追加的自定义词），
+/// 随即全量原子落盘。返回 1 表示磁盘有变化。
+int lufly_user_reload(LuflyEngine *handle);
+
+/// 推导一个词的默认全码（ojc 加词: 单字=4码全码；多字=双拼+首末形码各1）。
+/// 失败返回 NULL。返回指针在下次调用前有效。
+const char *lufly_derive_word(LuflyEngine *handle, const char *word);
+
+/// 添加自定义词（ojc 加词）: 词条立即生效并强制落盘。成功返回 1。
+int lufly_user_add_word(LuflyEngine *handle, const char *code, const char *text);
+
+/// 记录一次真实上屏 (code, text)，用于词频自学习（同码撞车时常用词排前）。
+void lufly_learn(LuflyEngine *handle, const char *code, const char *text);
+
 #ifdef __cplusplus
 }
 #endif

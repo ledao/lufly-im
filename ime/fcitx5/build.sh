@@ -23,3 +23,4 @@ g++ -std=c++17 -shared -fPIC -fvisibility=hidden \
     -lpthread -ldl -lm
 
 echo "OK: $(pwd)/build/liblufly.so"
+
