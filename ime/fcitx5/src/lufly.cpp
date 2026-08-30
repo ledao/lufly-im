@@ -572,15 +572,21 @@ void LuflyIm::updateUI(InputContext *ic, LuflyState *state) {
     list->setPageSize(kPageSize);
     list->setLayoutHint(CandidateLayoutHint::Horizontal);
     const int count = lufly_candidate_count(eng);
+    const std::string &typed = state->buffer;
     for (int i = 0; i < count; i++) {
-        // 显示「词 编码」: 编码后缀仅供学习参考，上屏用纯词文本
+        // 显示「词 剩余编码」: 已敲的前缀在预编辑里不重复，exact 命中无后缀；
+        // 编码仅供学习参考，上屏用纯词文本（commitText 分离防漏进文档）
         const char *raw = lufly_candidate_text(eng, i);
         const char *code = lufly_candidate_code(eng, i);
         std::string commitText = raw ? raw : "";
         Text text(commitText);
         if (code && *code) {
-            text.append(" ");
-            text.append(code);
+            const std::string_view full(code);
+            if (full.size() > typed.size() &&
+                full.compare(0, typed.size(), typed) == 0) {
+                text.append(" ");
+                text.append(std::string(full.substr(typed.size())));
+            }
         }
         list->insert(i, std::make_unique<LuflyCandidateWord>(
                             std::move(text), std::move(commitText), this));
