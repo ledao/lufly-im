@@ -148,15 +148,18 @@ int utf8Chars(const char *s) {
     return n;
 }
 
-// 候选词: 点击/回车选中后提交并清缓冲。
+// 候选词: 点击/回车选中后提交并清缓冲。显示文本可带编码后缀，
+// 上屏固定用纯词文本（commitText），两者分离防编码漏进文档。
 class LuflyCandidateWord : public CandidateWord {
 public:
-    LuflyCandidateWord(Text text, class LuflyIm *im)
-        : CandidateWord(std::move(text)), im_(im) {}
+    LuflyCandidateWord(Text text, std::string commitText, class LuflyIm *im)
+        : CandidateWord(std::move(text)), commitText_(std::move(commitText)),
+          im_(im) {}
 
     void select(InputContext *ic) const override;
 
 private:
+    std::string commitText_;
     LuflyIm *im_;
 };
 
@@ -570,9 +573,17 @@ void LuflyIm::updateUI(InputContext *ic, LuflyState *state) {
     list->setLayoutHint(CandidateLayoutHint::Horizontal);
     const int count = lufly_candidate_count(eng);
     for (int i = 0; i < count; i++) {
-        Text text(lufly_candidate_text(eng, i));
-        list->insert(i, std::make_unique<LuflyCandidateWord>(std::move(text),
-                                                             this));
+        // 显示「词 编码」: 编码后缀仅供学习参考，上屏用纯词文本
+        const char *raw = lufly_candidate_text(eng, i);
+        const char *code = lufly_candidate_code(eng, i);
+        std::string commitText = raw ? raw : "";
+        Text text(commitText);
+        if (code && *code) {
+            text.append(" ");
+            text.append(code);
+        }
+        list->insert(i, std::make_unique<LuflyCandidateWord>(
+                            std::move(text), std::move(commitText), this));
     }
     // 空候选列表上调 setGlobalCursorIndex 会抛异常（fcitx5 直接 abort），
     // 必须有候选时才置高亮游标。
@@ -605,7 +616,7 @@ void LuflyIm::commitCandidate(InputContext *ic, const std::string &text) {
 }
 
 void LuflyCandidateWord::select(InputContext *ic) const {
-    im_->commitCandidate(ic, text().toString());
+    im_->commitCandidate(ic, commitText_);
 }
 
 void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
@@ -778,20 +789,35 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
     const bool hasMenu = lufly_candidate_count(eng) > 0;
     const bool miss = !hasMenu && !state->buffer.empty();
 
-    // ---- 翻页: PageUp / PageDown / Tab ----
+    // ---- 翻页: PageUp/PageDown、- 前翻 = 后翻、Tab 后翻 Shift+Tab 前翻 ----
     if (!state->buffer.empty()) {
         if (auto *pageable = candList ? candList->toPageable() : nullptr) {
-            if (key.check(FcitxKey_Page_Down) && pageable->hasNext()) {
-                pageable->next();
-                ic->updateUserInterface(UserInterfaceComponent::InputPanel);
-                event.accept();
-                return;
-            }
-            if (key.check(FcitxKey_Page_Up) && pageable->hasPrev()) {
-                pageable->prev();
-                ic->updateUserInterface(UserInterfaceComponent::InputPanel);
-                event.accept();
-                return;
+            const bool shiftHeld = key.states().test(KeyState::Shift);
+            const bool pagePrev = key.check(FcitxKey_Page_Up) ||
+                                  key.check(FcitxKey_minus) ||
+                                  (key.check(FcitxKey_Tab) && shiftHeld);
+            const bool pageNext = key.check(FcitxKey_Page_Down) ||
+                                  key.check(FcitxKey_equal) ||
+                                  (key.check(FcitxKey_Tab) && !shiftHeld);
+            if (pagePrev || pageNext) {
+                if ((pageNext && pageable->hasNext()) ||
+                    (pagePrev && pageable->hasPrev())) {
+                    if (pageNext) {
+                        pageable->next();
+                    } else {
+                        pageable->prev();
+                    }
+                    ic->updateUserInterface(UserInterfaceComponent::InputPanel);
+                    event.accept();
+                    return;
+                }
+                // - = Tab 到头/单页: 消费不动作（防半角 - = 漏进文档）；
+                // PageUp/PageDown 保持透传（非简单键，应用自处理）
+                if (hasMenu && !key.check(FcitxKey_Page_Up) &&
+                    !key.check(FcitxKey_Page_Down)) {
+                    event.accept();
+                    return;
+                }
             }
         }
         // Tab: 有菜单翻页；miss 时透传（英文输入中，不清屏）；否则清空（rime send Escape）

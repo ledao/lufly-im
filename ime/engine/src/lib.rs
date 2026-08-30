@@ -15,6 +15,8 @@ const MAX_CANDIDATES: usize = 100;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Candidate {
     pub text: String,
+    /// 该候选对应词条的全码（前端显示在候选后供参考学习）
+    pub code: String,
     /// 码表行序，越小越优先
     pub rank: u32,
     /// 编码完全命中（区别于前缀扩展）
@@ -410,6 +412,7 @@ impl Engine {
                 let e = &self.entries[i as usize];
                 Candidate {
                     text: e.text.clone(),
+                    code: e.code.clone(),
                     rank: e.rank,
                     exact: e.code.len() == self.input.len(),
                 }

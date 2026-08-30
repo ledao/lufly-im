@@ -26,8 +26,8 @@ pub struct LuflyEngine {
     commit: Option<CString>,
     /// 预编辑串缓存
     input: CString,
-    /// 候选缓存: (文本, 是否完全命中)
-    cands: Vec<(CString, bool)>,
+    /// 候选缓存: (文本, 全码, 是否完全命中)
+    cands: Vec<(CString, CString, bool)>,
     /// 用户词典路径（`lufly_user_open` 设置；未设置则学习不落盘）
     user_path: Option<PathBuf>,
     /// 上次落盘时的 user_ops 基线
@@ -47,6 +47,7 @@ impl LuflyEngine {
             .map(|c| {
                 (
                     CString::new(c.text.as_bytes()).unwrap_or_default(),
+                    CString::new(c.code.as_bytes()).unwrap_or_default(),
                     c.exact,
                 )
             })
@@ -179,7 +180,20 @@ pub unsafe extern "C" fn lufly_candidate_text(handle: *mut LuflyEngine, idx: c_i
     let e = &mut *handle;
     e.cands
         .get(idx as usize)
-        .map(|(s, _)| s.as_ptr())
+        .map(|(s, _, _)| s.as_ptr())
+        .unwrap_or(std::ptr::null())
+}
+
+/// 第 `idx` 个候选的全码（0 起，越界返回 NULL）。
+///
+/// # Safety
+/// `handle` 须有效。返回指针在下次调用前有效。
+#[no_mangle]
+pub unsafe extern "C" fn lufly_candidate_code(handle: *mut LuflyEngine, idx: c_int) -> *const c_char {
+    let e = &mut *handle;
+    e.cands
+        .get(idx as usize)
+        .map(|(_, c, _)| c.as_ptr())
         .unwrap_or(std::ptr::null())
 }
 
@@ -191,7 +205,7 @@ pub unsafe extern "C" fn lufly_candidate_text(handle: *mut LuflyEngine, idx: c_i
 pub unsafe extern "C" fn lufly_candidate_exact(handle: *mut LuflyEngine, idx: c_int) -> c_int {
     let e = &mut *handle;
     match e.cands.get(idx as usize) {
-        Some((_, exact)) => *exact as c_int,
+        Some((_, _, exact)) => *exact as c_int,
         None => 0,
     }
 }

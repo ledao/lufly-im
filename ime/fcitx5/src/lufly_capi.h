@@ -35,6 +35,9 @@ int lufly_candidate_count(LuflyEngine *handle);
 /// 第 idx 个候选文本（0 起，越界返回 NULL）。
 const char *lufly_candidate_text(LuflyEngine *handle, int idx);
 
+/// 第 idx 个候选的全码（0 起，越界返回 NULL）。
+const char *lufly_candidate_code(LuflyEngine *handle, int idx);
+
 /// 第 idx 个候选是否编码完全命中。
 int lufly_candidate_exact(LuflyEngine *handle, int idx);
 
