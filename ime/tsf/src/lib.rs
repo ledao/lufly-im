@@ -1,22 +1,68 @@
 //! DLL 导出：COM 类工厂入口 + regsvr32 注册/反注册
+mod cand;
 mod class_factory;
 mod edit_session;
 mod guids;
+mod langbar;
 mod processor;
+mod state;
+mod status;
 
 use std::ffi::c_void;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicPtr, Ordering};
 
 use windows::core::*;
 use windows::Win32::Foundation::*;
+use windows::Win32::System::Com::*;
 use windows::Win32::System::LibraryLoader::GetModuleFileNameW;
 use windows::Win32::System::Registry::*;
 use windows::Win32::System::SystemServices::DLL_PROCESS_ATTACH;
+use windows::Win32::UI::TextServices::{
+    CLSID_TF_CategoryMgr, CLSID_TF_InputProcessorProfiles, GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,
+    GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT, GUID_TFCAT_TIPCAP_INPUTMODECOMPARTMENT,
+    GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT, GUID_TFCAT_TIPCAP_UIELEMENTENABLED, GUID_TFCAT_TIP_KEYBOARD,
+    ITfCategoryMgr, ITfInputProcessorProfiles,
+};
 
 use class_factory::ClassFactory;
 use guids::{CLSID_LUFLY_TIP, GUID_LUFLY_PROFILE, IME_NAME};
 
 static DLL_INSTANCE: AtomicPtr<c_void> = AtomicPtr::new(std::ptr::null_mut());
+
+/// 后台预载的主码表槽（Engine 是纯数据可跨线程；Shared 含 COM 指针不可）
+static PRELOAD: Mutex<Option<lufly_engine::Engine>> = Mutex::new(None);
+
+pub fn take_preload() -> Option<lufly_engine::Engine> {
+    PRELOAD.lock().unwrap().take()
+}
+
+pub fn store_preload(e: Option<lufly_engine::Engine>) {
+    *PRELOAD.lock().unwrap() = e;
+}
+
+/// 诊断日志（%APPDATA%\lufly\tsf.log）：定位激活/按键链路问题用
+pub fn log(msg: &str) {
+    let Ok(appdata) = std::env::var("APPDATA") else {
+        return;
+    };
+    let dir = std::path::Path::new(&appdata).join("lufly");
+    if std::fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("tsf.log"))
+    {
+        use std::io::Write;
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        let _ = writeln!(f, "[{ts}] {msg}");
+    }
+}
 
 #[no_mangle]
 extern "system" fn DllMain(hinst: HINSTANCE, reason: u32, _reserved: *mut c_void) -> BOOL {
@@ -39,6 +85,7 @@ extern "system" fn DllGetClassObject(
         if *rclsid != CLSID_LUFLY_TIP {
             return CLASS_E_CLASSNOTAVAILABLE;
         }
+        log("DllGetClassObject");
         let factory: IUnknown = ClassFactory.into();
         factory.query(riid, ppv)
     }
@@ -55,6 +102,16 @@ fn dll_path() -> Vec<u16> {
     let len = unsafe { GetModuleFileNameW(Some(hinst.into()), &mut buf) } as usize;
     buf.truncate(len);
     buf
+}
+
+/// DLL 所在目录（模式图标文件 lufly-zh.ico / lufly-en.ico 与 DLL 同目录）
+pub fn dll_dir() -> Option<std::path::PathBuf> {
+    let path = dll_path();
+    if path.is_empty() {
+        return None;
+    }
+    let p = std::path::PathBuf::from(String::from_utf16_lossy(&path));
+    p.parent().map(|d| d.to_path_buf())
 }
 
 fn guid_str(g: &GUID) -> String {
@@ -109,31 +166,9 @@ fn reg_set_str(hkey: &HKEY, name: Option<&str>, value: &str) -> Result<()> {
     Ok(())
 }
 
-fn reg_set_u32(hkey: &HKEY, name: Option<&str>, value: u32) -> Result<()> {
-    let name = name.map(HSTRING::from);
-    let res = unsafe {
-        RegSetValueExW(
-            *hkey,
-            name.as_ref().map_or(PCWSTR::null(), |n| PCWSTR(n.as_ptr())),
-            Some(0),
-            REG_DWORD,
-            Some(&value.to_le_bytes()),
-        )
-    };
-    if res.is_err() {
-        return Err(Error::from_hresult(HRESULT::from_win32(res.0)));
-    }
-    Ok(())
-}
-
 fn tip_key_path() -> String {
     format!(r"SOFTWARE\Microsoft\CTF\TIP\{}", guid_str(&CLSID_LUFLY_TIP))
 }
-
-/// TIP 类别（系统通用 GUID）
-const CAT_TIP_KEYBOARD: &str = "{34745CFF-B564-4C63-BC4F-5FE7EB2946A8}";
-const CAT_IMMERSIVE_SUPPORT: &str = "{13A016DF-6C8F-4C47-99EA-9EB1B1C4A9B3}";
-const CAT_SYSTRAY_SUPPORT: &str = "{25517FB3-3F9F-4BF5-8C54-51F02C1F9971}";
 
 #[no_mangle]
 extern "system" fn DllRegisterServer() -> HRESULT {
@@ -150,7 +185,7 @@ fn register_server() -> Result<()> {
     let path = dll_path();
     let path_str = String::from_utf16_lossy(&path);
 
-    // 1. COM 类注册
+    // 1. COM 类注册（标准 COM，regsvr32 必需）
     let clsid_key = format!(r"SOFTWARE\Classes\CLSID\{}", guid_str(&CLSID_LUFLY_TIP));
     let hk = reg_create(&clsid_key)?;
     reg_set_str(&hk, None, IME_NAME)?;
@@ -159,31 +194,51 @@ fn register_server() -> Result<()> {
     reg_set_str(&inproc, Some("ThreadingModel"), "Apartment")?;
     unsafe { let _ = RegCloseKey(hk); let _ = RegCloseKey(inproc); }
 
-    // 2. CTF TIP 注册
-    let tip = reg_create(&tip_key_path())?;
-    reg_set_str(&tip, None, IME_NAME)?;
+    // 2. 语言档与类别: 必须走 TSF COM API（对齐 PIME/libIME2）。
+    //    设置界面读 CTF 内部数据，手写 CTF 注册表键不够 —— 名字显示空白、
+    //    缺 INPUTMODECOMPARTMENT 类别时输入法会被应用禁用（收不到按键）。
+    unsafe {
+        CoInitializeEx(None, COINIT_APARTMENTTHREADED).ok()?;
 
-    // 2.1 类别
-    for cat in [CAT_TIP_KEYBOARD, CAT_IMMERSIVE_SUPPORT, CAT_SYSTRAY_SUPPORT] {
-        let ck = reg_create(&format!(r"{}\Category\Category\{cat}", tip_key_path()))?;
-        unsafe { let _ = RegCloseKey(ck); }
-        let ik = reg_create(&format!(r"{}\Category\Instance\{cat}", tip_key_path()))?;
-        reg_set_str(&ik, None, &path_str)?;
-        unsafe { let _ = RegCloseKey(ik); }
+        let profiles: ITfInputProcessorProfiles = CoCreateInstance(
+            &CLSID_TF_InputProcessorProfiles, None, CLSCTX_INPROC_SERVER,
+        )?;
+        profiles.Register(&CLSID_LUFLY_TIP)?;
+
+        // 名字与图标经 AddLanguageProfile 注册（UTF-16）。
+        // 实测（0.4.x 注册表取证）：CTF 存 Description 时不按 cch 截断，
+        // 而是按 NUL 结尾读 —— 未补 NUL 时名字后混进堆垃圾显示乱码，
+        // 所以两个字符串都必须补 NUL 再传（图标路径恰好踩在归零缓冲上才幸免）
+        let mut name: Vec<u16> = IME_NAME.encode_utf16().collect();
+        name.push(0);
+        let mut icon = path.clone();
+        icon.push(0);
+        profiles.AddLanguageProfile(
+            &CLSID_LUFLY_TIP,
+            0x0804,
+            &GUID_LUFLY_PROFILE,
+            &name,
+            &icon,
+            0,
+        )?;
+
+        let categories: ITfCategoryMgr = CoCreateInstance(
+            &CLSID_TF_CategoryMgr, None, CLSCTX_INPROC_SERVER,
+        )?;
+        for cat in [
+            GUID_TFCAT_TIP_KEYBOARD,
+            GUID_TFCAT_TIPCAP_INPUTMODECOMPARTMENT,
+            GUID_TFCAT_TIPCAP_UIELEMENTENABLED,
+            GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,
+            GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT,
+            GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,
+        ] {
+            categories.RegisterCategory(&CLSID_LUFLY_TIP, &cat, &CLSID_LUFLY_TIP)?;
+        }
     }
 
-    // 2.2 简体中文(0x0804)语言档
-    let lp = reg_create(&format!(
-        r"{}\LanguageProfile\0x0804\{}",
-        tip_key_path(),
-        guid_str(&GUID_LUFLY_PROFILE)
-    ))?;
-    reg_set_str(&lp, Some("Description"), IME_NAME)?;
-    reg_set_u32(&lp, Some("Enable"), 1)?;
-    reg_set_str(&lp, Some("IconFile"), &path_str)?;
-    reg_set_u32(&lp, Some("IconIndex"), 0)?;
-    unsafe { let _ = RegCloseKey(lp); let _ = RegCloseKey(tip); }
-
+    // 注意：不要再手写 LanguageProfile\0x0804\Enable —— AddLanguageProfile 已建
+    // 0x00000804 键，再手写一份 0x0804 会产生重复 profile，语言栏渲染错乱
     Ok(())
 }
 
@@ -201,10 +256,30 @@ extern "system" fn DllUnregisterServer() -> HRESULT {
 }
 
 fn unregister_server() -> Result<()> {
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+        if let Ok(categories) = CoCreateInstance::<_, ITfCategoryMgr>(
+            &CLSID_TF_CategoryMgr, None, CLSCTX_INPROC_SERVER,
+        ) {
+            for cat in [
+                GUID_TFCAT_TIP_KEYBOARD,
+                GUID_TFCAT_TIPCAP_INPUTMODECOMPARTMENT,
+                GUID_TFCAT_TIPCAP_UIELEMENTENABLED,
+                GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT,
+                GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT,
+                GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,
+            ] {
+                let _ = categories.UnregisterCategory(&CLSID_LUFLY_TIP, &cat, &CLSID_LUFLY_TIP);
+            }
+        }
+        if let Ok(profiles) = CoCreateInstance::<_, ITfInputProcessorProfiles>(
+            &CLSID_TF_InputProcessorProfiles, None, CLSCTX_INPROC_SERVER,
+        ) {
+            let _ = profiles.Unregister(&CLSID_LUFLY_TIP);
+        }
+    }
     let r1 = reg_delete_tree(&tip_key_path());
     let r2 = reg_delete_tree(&format!(r"SOFTWARE\Classes\CLSID\{}", guid_str(&CLSID_LUFLY_TIP)));
-    if r1 != 0 || r2 != 0 {
-        // 键不存在等情形容忍; 只在明确失败时返回错误
-    }
+    let _ = (r1, r2);
     Ok(())
 }

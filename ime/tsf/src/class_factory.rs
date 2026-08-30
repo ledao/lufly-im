@@ -19,6 +19,7 @@ impl IClassFactory_Impl for ClassFactory_Impl {
             return Err(Error::from_hresult(CLASS_E_NOAGGREGATION));
         }
         let tip: IUnknown = LuflyTsf::new().into();
+        crate::log("ClassFactory::CreateInstance ok");
         unsafe { tip.query(riid, ppvobject).ok() }
     }
 
