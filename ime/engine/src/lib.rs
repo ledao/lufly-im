@@ -280,8 +280,11 @@ impl Engine {
         if text.contains('|') || text.contains('\n') {
             return Err("词不能含 | 或换行".into());
         }
+        // or_insert: 词已存在（重复 ojc/自动造词再触发）时保留已学习的
+        // 词频，不归零
         self.user
-            .insert((code.to_owned(), text.to_owned()), 1);
+            .entry((code.to_owned(), text.to_owned()))
+            .or_insert(1);
         self.insert_user_word(code, text);
         self.user_ops = self.user_ops.wrapping_add(1);
         self.invalidate();

@@ -91,6 +91,9 @@ public:
     int addStage = 0;
     std::string addWord; // 已选定的词（stage2）
     std::string addCode; // 编码，初始为自动推导（stage2）
+    // 自动造词: 连续全码(4键)上屏的单字链（UTF-8 拼接），≥2 字即成词。
+    // 任何非「单字+4码」的上屏（简码/选词/标点/英文/回车原样）都断链。
+    std::string autoBuf;
 };
 
 class LuflyStateFactory : public InputContextPropertyFactory {
@@ -133,6 +136,16 @@ const char *chinesePunct(KeySym sym, LuflyState *st) {
     case FcitxKey_braceright: return "』";
     default: return nullptr;
     }
+}
+
+// 字符串里的 UTF-8 码点数（判断单字/词长用）
+int utf8Chars(const char *s) {
+    int n = 0;
+    for (const unsigned char *p = reinterpret_cast<const unsigned char *>(s);
+         *p; ++p) {
+        n += (*p & 0xC0) != 0x80;
+    }
+    return n;
 }
 
 // 候选词: 点击/回车选中后提交并清缓冲。
@@ -200,6 +213,11 @@ private:
     void finishAddWord(LuflyState *state);
     // 退出/取消加词模式
     static void cancelAddWord(LuflyState *state);
+    // 自动造词: 上屏钩子。单字+全码(4键) → 拼进 autoBuf，≥2 字成词
+    // （走 ojc 同一条 add_user_word: rank0/计数1/常规落盘）；
+    // 其余任何上屏断链。词长上限 4 字。
+    void noteAutoCommit(LuflyState *state, const std::string &code,
+                        const char *text);
 
     Instance *instance_;
     LuflyStateFactory factory_;
@@ -360,6 +378,34 @@ void LuflyIm::cancelAddWord(LuflyState *state) {
     state->addStage = 0;
     state->addWord.clear();
     state->addCode.clear();
+    state->autoBuf.clear();
+}
+
+// 自动造词: 用户连续以 4 键全码打字上屏时，把这些字拼成自动词。
+// 例: 连续全码打「乐」「乐」→ 造出 lelemb（双拼+首末形码）→ 乐乐，
+// 之后打该码即可出词；learn 随使用自然提频。断链 = 任何非「单字+4码」
+// 的上屏（简码选字/词上屏/标点/英文/回车原样都到不了这里或被显式清）。
+void LuflyIm::noteAutoCommit(LuflyState *state, const std::string &code,
+                             const char *text) {
+    if (code.size() != 4 || utf8Chars(text) != 1) {
+        state->autoBuf.clear();
+        return;
+    }
+    state->autoBuf += text;
+    const int n = utf8Chars(state->autoBuf.c_str());
+    if (n < 2) {
+        return;
+    }
+    if (n > 4) { // 词长上限 4 字，超长断链防串词
+        state->autoBuf.clear();
+        return;
+    }
+    if (scratch_) {
+        if (const char *d =
+                lufly_derive_word(scratch_, state->autoBuf.c_str())) {
+            lufly_user_add_word(scratch_, d, state->autoBuf.c_str());
+        }
+    }
 }
 
 // 反查码表（拼音→单字，fuzhu.bin）: 懒加载，首次按 ` 时才读。
@@ -578,6 +624,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             const char *punct = state->pendingPunct;
             state->pendingPunct = nullptr;
             ic->commitString(punct);
+            state->autoBuf.clear(); // 标点 = 断链
             state->lastCls = 0;
             event.accept();
             return;
@@ -604,6 +651,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
                     state->pending.clear();
                     state->pendingCode.clear();
                 }
+                state->autoBuf.clear(); // 切英文模式 = 断链
                 state->reverse = false;
                 state->lastCls = 0;
                 state->ascii = !state->ascii;
@@ -805,6 +853,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
                     return;
                 }
                 lufly_learn(eng, state->buffer.c_str(), text);
+                noteAutoCommit(state, state->buffer, text);
                 ic->commitString(text);
                 state->lastCls = 0;
                 state->buffer.clear();
@@ -834,6 +883,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
                     return;
                 }
                 lufly_learn(eng, state->buffer.c_str(), text);
+                noteAutoCommit(state, state->buffer, text);
                 ic->commitString(text);
                 state->lastCls = 0;
                 state->buffer.clear();
@@ -860,6 +910,8 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
                         lufly_learn(scratch_, state->pendingCode.c_str(),
                                     state->pending.c_str());
                     }
+                    noteAutoCommit(state, state->pendingCode,
+                                   state->pending.c_str());
                     ic->commitString(state->pending);
                 }
                 state->pending.clear();
@@ -886,6 +938,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
                 return;
             }
             lufly_learn(eng, code.c_str(), text);
+            noteAutoCommit(state, code, text);
             ic->commitString(text);
         }
         state->buffer.clear();
@@ -931,6 +984,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
                 ic->commitString(state->pending);
                 state->pending.clear();
                 state->pendingCode.clear();
+                state->autoBuf.clear(); // 回车换行 = 断链
                 updateUI(ic, state);
             }
             return;
@@ -1021,6 +1075,8 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             if (state->addStage == 1) {
                 state->addWord += state->pending;
             } else {
+                noteAutoCommit(state, state->pendingCode,
+                               state->pending.c_str());
                 ic->commitString(state->pending);
             }
             state->pending.clear();
@@ -1061,6 +1117,8 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
     if (punct) {
         if (!state->pending.empty()) {
             // 挂起字随标点顶出
+            noteAutoCommit(state, state->pendingCode,
+                           state->pending.c_str());
             ic->commitString(state->pending);
             state->pending.clear();
             state->pendingCode.clear();
@@ -1071,12 +1129,14 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             const std::string code = state->buffer;
             if (const char *text = lufly_key(eng, ' ')) {
                 lufly_learn(eng, code.c_str(), text);
+                noteAutoCommit(state, code, text);
                 ic->commitString(text);
             }
         }
         state->buffer.clear();
         state->reverse = false;
         ic->commitString(punct);
+        state->autoBuf.clear(); // 标点 = 断链
         state->lastCls = 0;
         updateUI(ic, state);
         event.accept();
@@ -1095,17 +1155,20 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             state->buffer.clear();
             state->reverse = false;
             state->lastCls = 2;
+            state->autoBuf.clear(); // 英文 = 断链
             updateUI(ic, state);
             return;
         }
         const std::string code = state->buffer;
         if (const char *text = lufly_key(eng, ' ')) {
             lufly_learn(eng, code.c_str(), text);
+            noteAutoCommit(state, code, text);
             ic->commitString(text);
         }
         state->buffer.clear();
         state->reverse = false;
         state->lastCls = 0;
+        state->autoBuf.clear(); // 透传的原字符插在字间 = 断链
         updateUI(ic, state);
         // 不消费，让原字符自然插入
     }
