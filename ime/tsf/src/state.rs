@@ -61,6 +61,9 @@ pub struct State {
     /// 上一个输出/透传字符的类别（0=中文/其他 1=ASCII 数字 2=ASCII 字母），
     /// 数字/英文后的标点保持半角（3.14 / hello.）
     pub last_cls: i32,
+    /// 退格删过已上屏字符（空缓冲透传退格）: 下一个标点无视 last_cls 恢复全角
+    /// —— 删掉半角标点重打应得中文（一次性，打字母/数字/标点后清除）
+    pub punct_erased: bool,
     /// Ctrl+0 切换: 标点强制半角（对齐 rime ascii_punct）
     pub ascii_punct: bool,
     /// ojc 加词模式: 1=选词阶段 2=编码编辑阶段（0=非加词）
@@ -83,6 +86,7 @@ impl State {
         self.pending.clear();
         self.pending_code.clear();
         self.last_cls = 0;
+        self.punct_erased = false;
         self.dq_open = false;
         self.sq_open = false;
         self.cancel_add_word();

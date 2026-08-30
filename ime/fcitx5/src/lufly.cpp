@@ -84,6 +84,9 @@ public:
     // 上一个输出/透传字符的类别（0=中文/其他 1=ASCII 数字 2=ASCII 字母），
     // 数字/英文后的标点保持半角（3.14 / hello.）
     int lastCls = 0;
+    // 退格删过已上屏字符（空缓冲透传退格）: 下一个标点无视 lastCls 恢复全角
+    // —— 删掉半角标点重打应得中文（一次性，打字母/数字/标点后清除）
+    bool punctErased = false;
     // Ctrl+0 切换: 标点强制半角（对齐 rime ascii_punct）
     bool asciiPunct = false;
     // ojc 加词模式: 1=选词阶段 2=编码编辑阶段（0=非加词）。
@@ -1067,6 +1070,9 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
                 event.accept();
                 return;
             }
+            // 空缓冲透传退格 = 应用删掉一个已上屏字符:
+            // 下一个标点无视 lastCls 恢复全角（删掉半角标点重打应得中文）
+            state->punctErased = true;
             return;
         }
         lufly_key(eng, '\b');
@@ -1100,6 +1106,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
     }
 
     if (sym >= FcitxKey_a && sym <= FcitxKey_z) {
+        state->punctErased = false; // 继续打字: 退格翻转作废
         const uint32_t ch = static_cast<uint32_t>('a' + (sym - FcitxKey_a));
         if (!state->pending.empty()) {
             // 顶功: 下一字词的首键把挂起字顶出（快打全程不用空格）；
@@ -1144,7 +1151,9 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
     }
     const bool composing = !state->buffer.empty();
     const bool halfPunct =
-        state->asciiPunct || state->lastCls != 0 || miss;
+        state->asciiPunct ||
+        (state->lastCls != 0 && !state->punctErased) || miss;
+    state->punctErased = false; // 标点键一次性（半角透传同样清除）
     const char *punct = halfPunct ? nullptr : chinesePunct(sym, state);
     if (punct) {
         if (!state->pending.empty()) {
@@ -1206,6 +1215,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
     }
     // 空缓冲透传的数字: 记录上下文（3.14 / 1,000 后续标点保持半角）
     if (!composing && sym >= FcitxKey_0 && sym <= FcitxKey_9) {
+        state->punctErased = false; // 继续打字: 退格翻转作废
         state->lastCls = 1;
     }
 }
@@ -1228,6 +1238,7 @@ void LuflyIm::reset(const InputMethodEntry &, InputContextEvent &event) {
     state->shiftArmed = false;
     state->pendingPunct = nullptr;
     state->lastCls = 0;
+    state->punctErased = false;
     state->dqOpen = false;
     state->sqOpen = false;
     cancelAddWord(state);

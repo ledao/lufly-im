@@ -737,6 +737,9 @@ fn compute_action(
                 }
                 return Act::Compose;
             }
+            // 空缓冲透传退格 = 应用删掉一个已上屏字符:
+            // 下一个标点无视 last_cls 恢复全角（删掉半角标点重打应得中文）
+            s.st.punct_erased = true;
             return Act::Pass;
         }
         s.st.buffer.pop();
@@ -766,6 +769,7 @@ fn compute_action(
 
     // ---- 字母: 进编码缓冲（含顶功挂起逻辑）----
     if is_letter {
+        s.st.punct_erased = false; // 继续打字: 退格翻转作废
         let mut pushed_out = String::new();
         if !s.st.pending.is_empty() {
             // 顶功: 下一字词的首键把挂起字顶出（快打全程不用空格）。
@@ -812,7 +816,10 @@ fn compute_action(
         s.st.add_stage = 0; // 标点退出加词（视为反悔），照常处理标点
     }
     let composing = !s.st.buffer.is_empty();
-    let half_punct = s.st.ascii_punct || s.st.last_cls != 0 || miss;
+    let half_punct = s.st.ascii_punct
+        || (s.st.last_cls != 0 && !s.st.punct_erased)
+        || miss;
+    s.st.punct_erased = false; // 标点键一次性（半角透传同样清除）
     let punct = if half_punct {
         None
     } else {
@@ -889,6 +896,7 @@ fn compute_action(
     }
     // 空缓冲透传的数字: 记录上下文（3.14 / 1,000 后续标点保持半角）
     if ch.is_ascii_digit() && !shift {
+        s.st.punct_erased = false; // 继续打字: 退格翻转作废
         s.st.last_cls = 1;
     }
     Act::Pass
