@@ -50,16 +50,12 @@ final class LuflyEngine {
         triedRev = true
         lock.unlock()
 
-        guard let url = Bundle.main.url(forResource: "fuzhu", withExtension: "bin"),
-              let data = try? Data(contentsOf: url) else {
+        guard let url = Bundle.main.url(forResource: "fuzhu", withExtension: "bin") else {
             LuflyLog.shared.error("未找到反查码表（bundle Resources/fuzhu.bin）")
             return false
         }
-        let bytes = [UInt8](data)
-        let h = bytes.withUnsafeBufferPointer { buf -> OpaquePointer? in
-            guard let base = buf.baseAddress else { return nil }
-            return lufly_new(base, buf.count)
-        }
+        // mmap 加载: 码表页保持文件后备，干净页可被系统随时回收（零拷贝借用）
+        let h = url.path.withCString { p in lufly_new_file(p) }
         lock.lock()
         revHandle = h
         lock.unlock()
@@ -67,7 +63,7 @@ final class LuflyEngine {
             LuflyLog.shared.error("反查码表解析失败 fuzhu.bin")
             return false
         }
-        LuflyLog.shared.info("反查码表加载成功 \(data.count) 字节")
+        LuflyLog.shared.info("反查码表加载成功（mmap \(url.path)）")
         return true
     }
 
@@ -78,16 +74,12 @@ final class LuflyEngine {
         loadAttempted = true
         lock.unlock()
 
-        guard let url = Bundle.main.url(forResource: "dict", withExtension: "bin"),
-              let data = try? Data(contentsOf: url) else {
+        guard let url = Bundle.main.url(forResource: "dict", withExtension: "bin") else {
             LuflyLog.shared.error("码表读取失败（bundle Resources/dict.bin）")
             return false
         }
-        let bytes = [UInt8](data)
-        let h = bytes.withUnsafeBufferPointer { buf -> OpaquePointer? in
-            guard let base = buf.baseAddress else { return nil }
-            return lufly_new(base, buf.count)
-        }
+        // mmap 加载: 码表页保持文件后备，干净页可被系统随时回收、不进 swap
+        let h = url.path.withCString { p in lufly_new_file(p) }
         lock.lock()
         handle = h
         lock.unlock()
@@ -95,7 +87,7 @@ final class LuflyEngine {
             LuflyLog.shared.error("码表解析失败 dict.bin")
             return false
         }
-        LuflyLog.shared.info("码表加载成功 \(data.count) 字节")
+        LuflyLog.shared.info("码表加载成功（mmap \(url.path)）")
         openUserDict()
         return true
     }

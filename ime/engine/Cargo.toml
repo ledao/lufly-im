@@ -6,3 +6,4 @@ license.workspace = true
 description = "小鹭音形输入法核心引擎（平台无关）"
 
 [dependencies]
+memmap2 = "0.9"

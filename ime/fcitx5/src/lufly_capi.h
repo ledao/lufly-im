@@ -14,6 +14,10 @@ typedef struct LuflyEngine LuflyEngine;
 
 /// 加载二进制码表，失败返回 NULL。
 LuflyEngine *lufly_new(const uint8_t *dict, size_t len);
+
+/// 从文件路径加载码表（mmap 映射: 码表页保持文件后备，干净页可被系统
+/// 随时回收）。失败返回 NULL。
+LuflyEngine *lufly_new_file(const char *path);
 void lufly_free(LuflyEngine *handle);
 
 /// 喂入一个按键（Unicode 码位），返回需上屏的文本（可能为 NULL）。

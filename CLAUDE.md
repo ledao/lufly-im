@@ -7,6 +7,7 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 
 - 引擎（`ime/engine`）是纯数据、平台无关的（可跨线程）；按键状态机、标点、造词等前端逻辑**逐功能对齐 fcitx5 版**（`ime/fcitx5/src/lufly.cpp` 是参照真源）。新平台前端只做薄壳：按键协议适配 + UI。
 - 移植或对齐功能时，逐行比对 fcitx5 实现，不要凭记忆重写。
+- 引擎码表 **v2 格式**（`LUFLYD02`，`ime/tools/build_dict.py` 产物）：文件内嵌「(数据偏移, rank) × N」索引区，引擎把整个文件 mmap/托管拷贝后按索引借用（`meta_of`/`ranges_of`），**堆上零索引**；加载时逐条校验索引指向、记录边界与 UTF-8（损坏文件加载期拒绝，查询期免判空）。实测（1.37M 条目、`cargo run -p lufly-engine --example mem` + vmmap）：mmap 路径（`lufly_new_file`，macOS 在用）进程物理占用 **~1.5MB**——码表 32.5MB 全是干净文件页，内存压力下系统直接丢弃；堆拷贝路径（`lufly_new`）≈ 文件自身大小、无引擎额外开销。历史教训：v0 每条目两个 String 曾把码表放大成 ~140MB 常驻。**MAGIC 升级 = 旧 bin 全平台不兼容**：改格式须重跑 build_dict.py 并重编各端（fcitx5 `install.sh`/`pack.sh`、TSF `include_bytes!`、macOS `build.sh` 都直接取 `ime/data/`）。
 
 ## Windows TSF（ime/tsf）非显而易见的坑
 
@@ -45,6 +46,15 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 - macOS：已实现并实测（含 punctErased：空缓冲退格删掉已上屏字符后，下一标点无视 lastCls 恢复全角）。
 - fcitx5（Linux）：`src/lufly.cpp` 标点分支已同步（punctErased 原有，作用范围收窄到数字），未重新构建——下次构建即生效。
 - TSF（Windows）：`src/processor.rs` 已同步（已过 x86_64-pc-windows-msvc cargo check，未出 DLL）——发版时注意更新说明。
+
+## 码表 v2 升级（fcitx5/TSF 待重编上线）
+
+引擎码表格式已升级 v2（MAGIC `LUFLYD01`→`LUFLYD02`）：文件内嵌「(数据偏移, rank) × N」索引，引擎整体 mmap/托管后按索引借用、**堆上零索引**；`ime/data/xiaolu_he_he.bin`（32.5MiB/137.3万条）与 `xiaolu_fuzhu.bin` 已重新生成。实测（vmmap）：mmap 路径进程物理占用 **~1.5MB**（码表全为可回收干净文件页），旧 v0 约 140MB；同方案本机对比 Rime/Squirrel 常驻 27.9MB。**C ABI 除新增 `lufly_new_file`（mmap 加载）外不变**，前端逻辑零改动，重编即接入：
+
+- fcitx5（Linux）：重跑 `build.sh` → `install.sh` 即可（build.sh 本就全路径链 `liblufly_capi.a`，不受 capi 改动影响）。**已部署机器必须升级 `/usr/share/fcitx5/lufly/*.bin`**——旧 bin 加载直接报 "bad dict: invalid magic"，不会静默出错词。快速回归：`cargo run -p lufly-cli` REPL 跑几组键序。
+- TSF（Windows）：`processor.rs` 的 `include_bytes!` 已指向新 bin，重编 DLL + NSIS 即可；升级安装注意覆盖旧码表。
+- capi crate-type 收窄为仅 staticlib（cdylib 移除）：cdylib 与 .a 并存时 `-llufly_capi` 会被链接器挑中 dylib，留下指向 `target/` 的绝对路径 install_name，跨机器分发 dyld 起不来（macOS 踩过，已修）。新端接入一律全路径链 `.a`（fcitx5/macOS 的 build.sh 均已如此）。
+- 引擎自测工具：`cargo test -p lufly-engine`（23 例）；`cargo run -p lufly-engine --example mem` + vmmap（内存）；`ime/macos/tools/engtest.c`（C API 打字流）。
 
 ## 工作方式
 

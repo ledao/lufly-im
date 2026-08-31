@@ -75,7 +75,23 @@ impl LuflyEngine {
     }
 }
 
-/// 加载二进制码表。失败返回 NULL。
+/// 统一收尾: 包成句柄并刷新缓存。
+fn into_handle(engine: Engine) -> *mut LuflyEngine {
+    let mut e = Box::new(LuflyEngine {
+        engine,
+        commit: None,
+        input: CString::new("").unwrap(),
+        cands: Vec::new(),
+        user_path: None,
+        saved_ops: 0,
+        derive: None,
+    });
+    e.refresh();
+    Box::into_raw(e)
+}
+
+/// 加载二进制码表（缓冲构造: 内部接管一份堆拷贝，条目零字符串化）。
+/// 失败返回 NULL。
 ///
 /// # Safety
 /// `dict` 须指向至少 `len` 字节可读内存。
@@ -85,20 +101,27 @@ pub unsafe extern "C" fn lufly_new(dict: *const u8, len: usize) -> *mut LuflyEng
         return std::ptr::null_mut();
     }
     let bytes = std::slice::from_raw_parts(dict, len);
-    match Engine::load(bytes) {
-        Ok(engine) => {
-            let mut e = Box::new(LuflyEngine {
-                engine,
-                commit: None,
-                input: CString::new("").unwrap(),
-                cands: Vec::new(),
-                user_path: None,
-                saved_ops: 0,
-                derive: None,
-            });
-            e.refresh();
-            Box::into_raw(e)
-        }
+    match Engine::load_owned(bytes.to_vec().into_boxed_slice()) {
+        Ok(engine) => into_handle(engine),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// 从文件路径加载码表（mmap: 码表页保持文件后备——干净页内存压力下
+/// 被系统直接丢弃、不进 swap；加载近乎零拷贝）。失败返回 NULL。
+///
+/// # Safety
+/// `path` 须为合法 C 字符串。
+#[no_mangle]
+pub unsafe extern "C" fn lufly_new_file(path: *const c_char) -> *mut LuflyEngine {
+    if path.is_null() {
+        return std::ptr::null_mut();
+    }
+    let Ok(p) = CStr::from_ptr(path).to_str() else {
+        return std::ptr::null_mut();
+    };
+    match Engine::open_mmap(p) {
+        Ok(engine) => into_handle(engine),
         Err(_) => std::ptr::null_mut(),
     }
 }

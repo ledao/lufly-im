@@ -1,6 +1,7 @@
 //! 小鹭音形输入法核心引擎（平台无关）
 //!
-//! 码表: `ime/tools/build_dict.py` 从 Rime dict.yaml 编译出的二进制
+//! 码表: `ime/tools/build_dict.py` 从 Rime dict.yaml 编译出的 v2 二进制
+//!       （文件内嵌「数据偏移+行序」索引，引擎整体 mmap 借用，堆上零索引）
 //! 行为: 定长音形 —— 双拼 2 键 + 形码 2 键; 一简(1键)、二简(2键)、
 //!       词组 4 码(简语) / 6 码(全码: 双拼4 + 首末形码)、多字词 8 码以上。
 //!       6 码及以上偶数长度命中全码时自动上屏; 4 码靠空格/顶字上屏。
@@ -8,9 +9,13 @@
 use std::collections::HashMap;
 use std::fmt;
 
-const MAGIC: &[u8; 8] = b"LUFLYD01";
+const MAGIC: &[u8; 8] = b"LUFLYD02";
 
 const MAX_CANDIDATES: usize = 100;
+
+/// 候选收集的合并索引空间: 该位之上为用户自定义词（rank 恒 0），
+/// 之下为静态码表条目下标（码表条目数远小于 2^30）。
+const USER_INDEX_FLAG: u32 = 1 << 30;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Candidate {
@@ -29,16 +34,61 @@ impl fmt::Display for Candidate {
     }
 }
 
-#[derive(Debug)]
-struct Entry {
+/// 用户自定义词条（ojc 加词 / user_dict 的 w 行）: 拥有字符串，rank 恒 0。
+#[derive(Debug, Clone)]
+struct UserEntry {
     code: String,
     text: String,
-    rank: u32,
+}
+
+/// 码表字节源。Mapped = 文件 mmap（干净文件页，内存压力下系统直接丢弃、
+/// 不进 swap）；Owned = 堆拷贝（缓冲构造时复制一份保证生命周期）。
+#[derive(Debug)]
+pub enum DictBytes {
+    Mapped(memmap2::Mmap),
+    Owned(Box<[u8]>),
+}
+
+impl DictBytes {
+    fn bytes(&self) -> &[u8] {
+        match self {
+            DictBytes::Mapped(m) => m,
+            DictBytes::Owned(b) => b,
+        }
+    }
+}
+
+/// v2 索引区第 i 项: (记录数据偏移, rank)。调用方保证 i 在条目数内
+/// （load 期已校验索引区完整）。
+fn meta_of(d: &[u8], i: usize) -> (usize, u32) {
+    let o = 12 + i * 8;
+    (
+        u32::from_le_bytes(d[o..o + 4].try_into().unwrap()) as usize,
+        u32::from_le_bytes(d[o + 4..o + 8].try_into().unwrap()),
+    )
+}
+
+/// 条目 i 的 (code, text) 字节区间。记录布局: code_len u8 + code +
+/// text_len u8 + text（边界由 load 逐条校验，这里直接下标）。
+fn ranges_of(d: &[u8], i: usize) -> (std::ops::Range<usize>, std::ops::Range<usize>) {
+    let (off, _) = meta_of(d, i);
+    let code_len = d[off] as usize;
+    let text_len = d[off + 1 + code_len] as usize;
+    (
+        off + 1..off + 1 + code_len,
+        off + 2 + code_len..off + 2 + code_len + text_len,
+    )
 }
 
 /// 输入法引擎。持有一个按键缓冲（编码串），通过 [`Engine::key`] 逐键喂入。
 pub struct Engine {
-    entries: Vec<Entry>, // 按 code 字典序排列
+    dict: DictBytes,
+    /// 静态码表条目数。条目的 (数据偏移, rank) 存于文件内嵌索引区
+    /// （mmap 借用，堆上零索引），第 i 项在 12 + i*8。
+    entry_count: u32,
+    /// 用户自定义词，按 code 字典序；同码后插者在前（对齐旧「插入 entries
+    /// 同码块开头」的相对次序）。候选收集时排在同码静态词之前（rank 0）。
+    user_entries: Vec<UserEntry>,
     input: String,
     /// 候选缓存：与 input 同步（input 一变即失效）。
     cache: Vec<Candidate>,
@@ -48,7 +98,7 @@ pub struct Engine {
     /// （全码唯一判定/自动上屏仍按码表词条数，学得再多也不改变顶功）。
     user: HashMap<(String, String), u32>,
     /// 用户自定义词（ojc 加词）: (编码, 词) 清单，按 code 序。
-    /// 加载时作为新词条插入 entries（rank 0，同码组内最前），
+    /// 加载时进入候选视图（rank 0，同码组内最前），
     /// 这里只留清单供 save_user 输出与 reload 幂等去重。
     user_words: Vec<(String, String)>,
     /// learn 累计次数（自上次 load_user 起）。前端/capi 据此决定落盘时机。
@@ -56,41 +106,68 @@ pub struct Engine {
 }
 
 impl Engine {
-    /// 从二进制码表加载（`build_dict.py` 产物）。
+    /// 从二进制码表加载（`build_dict.py` 产物）。数据拷贝一份堆内托管。
     pub fn load(dict: &[u8]) -> Result<Self, String> {
-        if dict.len() < 12 || &dict[..8] != MAGIC {
+        Self::load_owned(dict.to_vec().into_boxed_slice())
+    }
+
+    /// 同 [`Engine::load`]，但接管调用方提供的码表存储（零拷贝，条目
+    /// 以偏移借用其中的字节）。
+    pub fn load_owned(dict: Box<[u8]>) -> Result<Self, String> {
+        Self::parse(DictBytes::Owned(dict))
+    }
+
+    /// mmap 文件加载: 打开 `path` 并映射整个文件。码表页保持文件后备
+    /// （干净页，内存压力下系统直接丢弃、不进 swap），加载近乎零拷贝。
+    pub fn open_mmap(path: &str) -> Result<Self, String> {
+        let file = std::fs::File::open(path).map_err(|e| format!("open dict: {e}"))?;
+        let mmap =
+            unsafe { memmap2::Mmap::map(&file) }.map_err(|e| format!("mmap dict: {e}"))?;
+        Self::parse(DictBytes::Mapped(mmap))
+    }
+
+    /// 同 [`Engine::open_mmap`]，但接受调用方已建好的映射。
+    pub fn load_mapped(mmap: memmap2::Mmap) -> Result<Self, String> {
+        Self::parse(DictBytes::Mapped(mmap))
+    }
+
+    fn parse(dict: DictBytes) -> Result<Self, String> {
+        let d = dict.bytes();
+        if d.len() < 12 || &d[..8] != MAGIC {
             return Err("bad dict: invalid magic".into());
         }
-        let count = u32::from_le_bytes(dict[8..12].try_into().unwrap()) as usize;
-        let mut pos = 12usize;
-        let mut entries = Vec::with_capacity(count);
-        for _ in 0..count {
-            if pos + 1 > dict.len() {
-                return Err("bad dict: truncated".into());
+        let count = u32::from_le_bytes(d[8..12].try_into().unwrap()) as usize;
+        let index_end = 12usize
+            .checked_add(count.checked_mul(8).ok_or("bad dict: too many entries")?)
+            .ok_or("bad dict: too many entries")?;
+        if index_end > d.len() {
+            return Err("bad dict: truncated index".into());
+        }
+        // 逐条校验索引指向、记录边界与 UTF-8: 损坏文件在加载期拒绝而非
+        // 查询期炸；顺带把码表页读热进 page cache（干净页，可随时回收）
+        for i in 0..count {
+            let (off, _) = meta_of(d, i);
+            if off >= d.len() {
+                return Err("bad dict: truncated record".into());
             }
-            let code_len = dict[pos] as usize;
-            pos += 1;
-            if pos + code_len > dict.len() {
-                return Err("bad dict: truncated".into());
+            let code_len = d[off] as usize;
+            let text_len_pos = off + 1 + code_len;
+            if text_len_pos >= d.len() {
+                return Err("bad dict: truncated record".into());
             }
-            let code = String::from_utf8_lossy(&dict[pos..pos + code_len]).into_owned();
-            pos += code_len;
-            if pos + 1 > dict.len() {
-                return Err("bad dict: truncated".into());
+            let text_len = d[text_len_pos] as usize;
+            if text_len_pos + 1 + text_len > d.len() {
+                return Err("bad dict: truncated record".into());
             }
-            let text_len = dict[pos] as usize;
-            pos += 1;
-            if pos + text_len + 4 > dict.len() {
-                return Err("bad dict: truncated".into());
+            let (c, t) = ranges_of(d, i);
+            if std::str::from_utf8(&d[c]).is_err() || std::str::from_utf8(&d[t]).is_err() {
+                return Err("bad dict: invalid utf-8".into());
             }
-            let text = String::from_utf8_lossy(&dict[pos..pos + text_len]).into_owned();
-            pos += text_len;
-            let rank = u32::from_le_bytes(dict[pos..pos + 4].try_into().unwrap());
-            pos += 4;
-            entries.push(Entry { code, text, rank });
         }
         Ok(Engine {
-            entries,
+            dict,
+            entry_count: count as u32,
+            user_entries: Vec::new(),
             input: String::new(),
             cache: Vec::new(),
             cache_valid: false,
@@ -100,22 +177,80 @@ impl Engine {
         })
     }
 
-    /// 便于测试/嵌入方构造
+    /// 静态条目数
+    fn entry_count(&self) -> usize {
+        self.entry_count as usize
+    }
+
+    fn code_at(&self, i: usize) -> &str {
+        let (c, _) = ranges_of(self.dict.bytes(), i);
+        std::str::from_utf8(&self.dict.bytes()[c]).unwrap_or("")
+    }
+
+    fn text_at(&self, i: usize) -> &str {
+        let (_, t) = ranges_of(self.dict.bytes(), i);
+        std::str::from_utf8(&self.dict.bytes()[t]).unwrap_or("")
+    }
+
+    fn rank_at(&self, i: usize) -> u32 {
+        meta_of(self.dict.bytes(), i).1
+    }
+
+    /// 虚拟序列 [0, n) 的分区点（code_at 按字典序单调，二分安全）
+    fn partition_point(&self, n: usize, pred: impl Fn(usize) -> bool) -> usize {
+        let (mut lo, mut hi) = (0usize, n);
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            if pred(mid) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        lo
+    }
+
+    /// 合并索引空间取词条 (code, text, rank):
+    /// `USER_INDEX_FLAG` 位之上为用户词（rank 0），之下为静态码表下标。
+    /// 枚举序 = 用户词块在前、静态码表在后，与旧「用户词插入 entries
+    /// 同码块开头」的文件序一致。
+    fn entry_ref(&self, k: u32) -> (&str, &str, u32) {
+        if k >= USER_INDEX_FLAG {
+            let e = &self.user_entries[(k - USER_INDEX_FLAG) as usize];
+            (e.code.as_str(), e.text.as_str(), 0)
+        } else {
+            (
+                self.code_at(k as usize),
+                self.text_at(k as usize),
+                self.rank_at(k as usize),
+            )
+        }
+    }
+
+    /// 便于测试/嵌入方构造: 序列化为 v2 码表格式后走真实 load 路径
+    /// （索引从字节源借用），测试与生产同一条解析代码。
     #[cfg(test)]
     pub fn from_entries(mut entries: Vec<(String, String, u32)>) -> Self {
         entries.sort_by(|a, b| a.0.cmp(&b.0));
-        Engine {
-            entries: entries
-                .into_iter()
-                .map(|(code, text, rank)| Entry { code, text, rank })
-                .collect(),
-            input: String::new(),
-            cache: Vec::new(),
-            cache_valid: false,
-            user: HashMap::new(),
-            user_words: Vec::new(),
-            user_ops: 0,
+        let n = entries.len();
+        let mut index = Vec::with_capacity(n * 8);
+        let mut body = Vec::new();
+        for (code, text, rank) in &entries {
+            assert!(code.len() <= 255 && text.len() <= 255);
+            let data_off = (12 + n * 8 + body.len()) as u32;
+            index.extend_from_slice(&data_off.to_le_bytes());
+            index.extend_from_slice(&rank.to_le_bytes());
+            body.push(code.len() as u8);
+            body.extend_from_slice(code.as_bytes());
+            body.push(text.len() as u8);
+            body.extend_from_slice(text.as_bytes());
         }
+        let mut buf = Vec::with_capacity(12 + index.len() + body.len());
+        buf.extend_from_slice(MAGIC);
+        buf.extend_from_slice(&(n as u32).to_le_bytes());
+        buf.extend_from_slice(&index);
+        buf.extend_from_slice(&body);
+        Engine::load_owned(buf.into_boxed_slice()).expect("demo dict")
     }
 
     /// 当前编码缓冲（预编辑串）
@@ -206,7 +341,7 @@ impl Engine {
     /// 加载 [`Engine::save_user`] 产物。坏行（手工编辑损坏）跳过不报错；
     /// **合并语义**: 覆盖磁盘已有 (code,text) 的计数，内存里磁盘没有的
     /// 学习记录保留（热重载时磁盘新行与内存增量互不丢失）。
-    /// 自定义词（w 列）作为新词条插入 entries——rank 0 使其在同码组内
+    /// 自定义词（w 列）进入候选视图——rank 0 使其在同码组内
     /// 最前，候选/miss/唯一性判定自动生效。重复加载幂等（去重）。
     pub fn load_user(&mut self, data: &[u8]) {
         let text = String::from_utf8_lossy(data);
@@ -246,7 +381,7 @@ impl Engine {
         self.invalidate();
     }
 
-    /// 自定义词入列并插入主码表（rank 0 → 同码组内最前）。幂等。
+    /// 自定义词入列（rank 0 → 同码组内最前）。幂等。
     fn insert_user_word(&mut self, code: &str, word: &str) {
         let pair = (code.to_owned(), word.to_owned());
         match self
@@ -256,16 +391,16 @@ impl Engine {
             Ok(_) => return, // 已存在: 只刷新计数，不重复插入
             Err(pos) => self.user_words.insert(pos, pair),
         }
-        // entries 按 code 字典序，插到同码块开头（partition_point 首个 >= code 处）
+        // 用户词视图按 code 字典序，插到同码块开头（同码后插者在前，
+        // 对齐旧「entries 同码块开头插入」的相对次序）
         let at = self
-            .entries
+            .user_entries
             .partition_point(|e| e.code.as_str() < code);
-        self.entries.insert(
+        self.user_entries.insert(
             at,
-            Entry {
+            UserEntry {
                 code: code.to_owned(),
                 text: word.to_owned(),
-                rank: 0,
             },
         );
     }
@@ -294,17 +429,20 @@ impl Engine {
     }
 
     /// 反查一个字的 4 码全码（双拼2+形码2），取码表行序最靠前者。
-    /// 码表没有该字（或无全码）返回 None。
+    /// 码表没有该字（或无全码）返回 None。用户词（rank 0）恒最优先。
     pub fn char_full_code(&self, ch: char) -> Option<&str> {
-        self.entries
-            .iter()
-            .filter(|e| {
-                e.text.len() == ch.len_utf8()
-                    && e.text.starts_with(ch)
-                    && e.code.len() == 4
+        if let Some(e) = self.user_entries.iter().find(|e| {
+            e.text.len() == ch.len_utf8() && e.text.starts_with(ch) && e.code.len() == 4
+        }) {
+            return Some(e.code.as_str());
+        }
+        (0..self.entry_count())
+            .filter(|&i| {
+                let text = self.text_at(i);
+                text.len() == ch.len_utf8() && text.starts_with(ch) && self.code_at(i).len() == 4
             })
-            .min_by_key(|e| e.rank)
-            .map(|e| e.code.as_str())
+            .min_by_key(|&i| self.rank_at(i))
+            .map(|i| self.code_at(i))
     }
 
     /// 为一个词推导默认全码（加词用）:
@@ -342,11 +480,15 @@ impl Engine {
         if self.input.is_empty() {
             return Vec::new();
         }
-        let start = self.prefix_start(&self.input);
-        // 只收集索引并按组排序，截断后再物化字符串，避免全量克隆
+        // 只收集索引并按组排序，截断后再物化字符串，避免全量克隆。
+        // 索引空间见 USER_INDEX_FLAG: 用户词块在前、静态码表在后，
+        // 排序键与旧实现完全一致（用户词 rank 0 → 同码组内最前）。
         let mut exact: Vec<u32> = Vec::new();
         let mut rest: Vec<u32> = Vec::new();
-        for (i, e) in self.entries[start..].iter().enumerate() {
+        let us = self
+            .user_entries
+            .partition_point(|e| e.code.as_str() < self.input.as_str());
+        for (i, e) in self.user_entries[us..].iter().enumerate() {
             if !e.code.starts_with(&self.input) {
                 break;
             }
@@ -355,7 +497,20 @@ impl Engine {
             } else {
                 &mut rest
             }
-            .push((start + i) as u32);
+            .push(USER_INDEX_FLAG + (us + i) as u32);
+        }
+        let start = self.prefix_start(&self.input);
+        for i in start..self.entry_count() {
+            let code = self.code_at(i);
+            if !code.starts_with(&self.input) {
+                break;
+            }
+            if code.len() == self.input.len() {
+                &mut exact
+            } else {
+                &mut rest
+            }
+            .push(i as u32);
         }
         // 用户词频提权（exact 组）: 学习次数多者靠前，其次按码表行序。
         // 打包成 u64 键避免比较器里反复查表: 高 32 位 = !次数（0 次 → 全 1，
@@ -363,14 +518,14 @@ impl Engine {
         if !self.user.is_empty() && !exact.is_empty() {
             let mut keyed: Vec<(u64, u32)> = exact
                 .iter()
-                .map(|&i| {
-                    let e = &self.entries[i as usize];
-                    let c = self
+                .map(|&k| {
+                    let (c, t, rank) = self.entry_ref(k);
+                    let n = self
                         .user
-                        .get(&(e.code.clone(), e.text.clone()))
+                        .get(&(c.to_owned(), t.to_owned()))
                         .copied()
                         .unwrap_or(0);
-                    (((!(c as u64)) << 32) | e.rank as u64, i)
+                    (((!(n as u64)) << 32) | rank as u64, k)
                 })
                 .collect();
             if keyed.len() > MAX_CANDIDATES {
@@ -378,27 +533,25 @@ impl Engine {
                 keyed.truncate(MAX_CANDIDATES);
             }
             keyed.sort_unstable_by_key(|k| k.0);
-            exact = keyed.into_iter().map(|(_, i)| i).collect();
+            exact = keyed.into_iter().map(|(_, k)| k).collect();
 
             // rest 组不受词频影响，仍按行序截取排序
             if rest.len() > MAX_CANDIDATES {
-                rest.select_nth_unstable_by_key(MAX_CANDIDATES - 1, |&i| {
-                    self.entries[i as usize].rank
-                });
+                rest.select_nth_unstable_by_key(MAX_CANDIDATES - 1, |&k| self.entry_ref(k).2);
                 rest.truncate(MAX_CANDIDATES);
             }
-            rest.sort_unstable_by_key(|&i| self.entries[i as usize].rank);
+            rest.sort_unstable_by_key(|&k| self.entry_ref(k).2);
         } else {
             // 短前缀可能命中几十万条；select_nth 选出前 100 再排序，
             // O(n) 而非 O(n log n)
             for group in [&mut exact, &mut rest] {
                 if group.len() > MAX_CANDIDATES {
-                    group.select_nth_unstable_by_key(MAX_CANDIDATES - 1, |&i| {
-                        self.entries[i as usize].rank
+                    group.select_nth_unstable_by_key(MAX_CANDIDATES - 1, |&k| {
+                        self.entry_ref(k).2
                     });
                     group.truncate(MAX_CANDIDATES);
                 }
-                group.sort_unstable_by_key(|&i| self.entries[i as usize].rank);
+                group.sort_unstable_by_key(|&k| self.entry_ref(k).2);
             }
         }
         exact.reserve(rest.len());
@@ -406,15 +559,16 @@ impl Engine {
         exact.truncate(MAX_CANDIDATES);
         // 同文本去重（同一词常有多个编码变体），保留 rank 最小的首个
         let mut seen = std::collections::HashSet::with_capacity(64);
-        exact.into_iter()
-            .filter(|&i| seen.insert(self.entries[i as usize].text.as_str()))
-            .map(|i| {
-                let e = &self.entries[i as usize];
+        exact
+            .into_iter()
+            .filter(|&k| seen.insert(self.entry_ref(k).1))
+            .map(|k| {
+                let (code, text, rank) = self.entry_ref(k);
                 Candidate {
-                    text: e.text.clone(),
-                    code: e.code.clone(),
-                    rank: e.rank,
-                    exact: e.code.len() == self.input.len(),
+                    text: text.to_owned(),
+                    code: code.to_owned(),
+                    rank,
+                    exact: code.len() == self.input.len(),
                 }
             })
             .collect()
@@ -492,25 +646,55 @@ impl Engine {
     }
 
     /// 全码唯一命中: 编码恰为某词条全码、且无其他词条共用该编码。
+    /// 用户词与静态码表合并计数（用户词撞码同样阻断自动上屏）。
     fn unique_exact_text(&self) -> Option<String> {
-        let start = self.prefix_start(&self.input);
-        let e = self.entries.get(start)?;
-        if e.code != self.input {
-            return None;
+        let mut total = 0usize;
+        let mut hit: Option<String> = None;
+        // 用户词同码块（user_entries 按 code 序，同码连续）
+        let us = self
+            .user_entries
+            .partition_point(|e| e.code.as_str() < self.input.as_str());
+        for e in &self.user_entries[us..] {
+            if e.code != self.input {
+                break;
+            }
+            total += 1;
+            if hit.is_none() {
+                hit = Some(e.text.clone());
+            }
         }
-        match self.entries.get(start + 1) {
-            Some(n) if n.code == self.input => None, // 编码撞车，等用户手选
-            _ => Some(e.text.clone()),
+        // 静态码表同码块（code 字典序，exact 连续在块首）
+        let start = self.prefix_start(&self.input);
+        for i in start..self.entry_count() {
+            if self.code_at(i) != self.input {
+                break;
+            }
+            total += 1;
+            if hit.is_none() {
+                hit = Some(self.text_at(i).to_owned());
+            }
+        }
+        if total == 1 {
+            hit
+        } else {
+            None
         }
     }
 
     fn prefix_start(&self, prefix: &str) -> usize {
-        self.entries.partition_point(|e| e.code.as_str() < prefix)
+        self.partition_point(self.entry_count(), |i| self.code_at(i) < prefix)
     }
 
     fn has_prefix(&self, prefix: &str) -> bool {
+        // 用户词同样参与前缀判定（旧实现它们在 entries 内一并覆盖）
+        let us = self
+            .user_entries
+            .partition_point(|e| e.code.as_str() < prefix);
+        if us < self.user_entries.len() && self.user_entries[us].code.starts_with(prefix) {
+            return true;
+        }
         let s = self.prefix_start(prefix);
-        s < self.entries.len() && self.entries[s].code.starts_with(prefix)
+        s < self.entry_count() && self.code_at(s).starts_with(prefix)
     }
 }
 
@@ -817,11 +1001,23 @@ mod tests {
         e.load_user("zzzz|自主词|1|w\n".as_bytes());
         assert_eq!(e.user_words.len(), 1);
         let n = e
-            .entries
+            .user_entries
             .iter()
             .filter(|en| en.text == "自主词")
             .count();
         assert_eq!(n, 1, "重复加载不重复插入");
+    }
+
+    #[test]
+    fn char_full_code_user_word_wins_tie() {
+        // 用户词与 rank 0 的码表字同字: 用户词恒优先（旧实现取决于
+        // 码表文件序，属偶然行为；新实现明确为用户覆盖）
+        let e = demo_full_engine();
+        // 码表里 "好" = haiz (rank 5)
+        assert_eq!(e.char_full_code('好'), Some("haiz"));
+        let mut u = demo_full_engine();
+        u.load_user("zzzz|好|1|w\n".as_bytes());
+        assert_eq!(u.char_full_code('好'), Some("zzzz"), "用户词覆盖码表");
     }
 
     #[test]
