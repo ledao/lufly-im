@@ -6,7 +6,10 @@ license.workspace = true
 description = "小鹭音形引擎 C ABI 封装（供 fcitx5 等原生前端静态链接）"
 
 [lib]
-crate-type = ["staticlib", "cdylib"]
+# 只出 staticlib：同时出 cdylib 时，`-llufly_capi` 会被链接器挑中 dylib、
+# 留下指向 target 目录的绝对路径 install_name，分发到别的机器直接起不来
+# （实测过：vmmap 里 Lufly.app 映射的是 workspace 路径的 dylib）。
+crate-type = ["staticlib"]
 
 [dependencies]
 lufly-engine = { path = "../engine" }

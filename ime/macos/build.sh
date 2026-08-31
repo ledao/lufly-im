@@ -25,11 +25,13 @@ mkdir -p include
 cp -f ../fcitx5/src/lufly_capi.h include/
 
 # 3. Swift 编译（IMK 前端 + 引擎 staticlib）
+# 显式链接 .a 全路径，不用 -L+-l：release 目录若同时有 dylib 会被挑中，
+# 留下绝对路径 install_name，换机器分发即 dyld 加载失败（踩过）。
 mkdir -p "$APP/Contents/MacOS"
 swiftc -O -swift-version 5 \
     -target "$SWIFT_TARGET" \
     -import-objc-header BridgingHeader.h \
-    -I include -L "$IME_ROOT/target/$RUST_TARGET/release" -llufly_capi \
+    -I include "$RUST_LIB" \
     -framework Cocoa -framework InputMethodKit \
     -module-name Lufly \
     -o "$APP/Contents/MacOS/Lufly" \
