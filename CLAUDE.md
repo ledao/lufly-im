@@ -38,5 +38,6 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 
 ## 工作方式
 
+- **未经用户明确允许，不得 git commit / git push**：改完代码停在本地改动并告知用户，提交与否、何时提交由用户决定；一次允许不代表后续都允许。
 - 涉及未验证的系统 API 行为**不要凭猜测下结论**：直接读真实开源实现（PIME/libIME2、rime/weasel、本仓库 fcitx5 端）。raw.githubusercontent.com 直连抓源码最可靠；WebSearch 结果曾被污染不可用。
 - 用户以终端用户身份实测：交付**双击可用的安装包**而非脚本；安装器观感按商业软件标准（图标、DPI、许可页、完成页文案）。
