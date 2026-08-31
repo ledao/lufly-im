@@ -1,0 +1,5 @@
+# mac 端本地 cargo 镜像配置（rsproxy；根 .gitignore 也有一份，双保险）
+.cargo/
+
+# 构建时从 ../fcitx5/src/lufly_capi.h 同步生成，勿手改
+macos/include/

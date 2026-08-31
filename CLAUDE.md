@@ -27,6 +27,15 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 - regsvr32 /s 会静默失败：装完回读注册表（Description）校验，失败弹明确提示。
 - 升级安装列表里每个历史版本号都要出现在反注册与清理清单中。
 
+## macOS 打包（ime/macos）
+
+- 分发 = **传统拖拽式 dmg**（用户拍板，符合直觉）：dmg 内 Lufly.app + 「输入法」文件夹替身（`ln -s "/Library/Input Methods"`，清歌输入法同款），拖上去输密码装入系统输入法目录；装完注销重登 + 系统设置添加。曾试过独立 Bundle ID 安装器 app 与 pkg 向导，均被否——按 macOS 惯例来。
+- **TIS 注册元数据有缓存**: 系统设置里显示的名称/图标是首次注册时缓存的；改 Info.plist/InfoPlist.strings 后盘上元数据已正确（可用 `TISGetInputSourceProperty(kTISPropertyLocalizedName)` 程序化验证），但设置界面要**注销重登**才刷新；若重登/重启都不行，终极手段 = 换 bundle/mode ID 斩缓存（同 TSF 换 profile GUID 教训），代价是用户需重新添加一次。
+- **同 Bundle ID 单实例坑**: 输入法本体常驻后台时，Finder 双击另一份同 ID 的 Lufly.app 只会"激活"运行中实例、不启动新进程（无窗口、无报错、无崩溃日志）——拖拽安装不受影响，双击下载的 app 时要想到这一层。
+- app 双入口保留：bundle 路径含 `/Input Methods/` = 输入法模式，否则 = 安装窗（src/Installer.swift）；`Lufly --install` 非交互安装（install.sh 即委托它）。
+- pkg 的 `--install-location "~"` 不展开：文件落到字面 `~` 目录而 installer 仍报 success——装完必须实测验证落位。
+- 输入法列表显示 mode ID 原文 = 缺 `Resources/<lang>.lproj/InfoPlist.strings`，且 mode ID 要作为其中的 key（fcitx5-macos/Squirrel 同款）。
+
 ## 工作方式
 
 - 涉及未验证的系统 API 行为**不要凭猜测下结论**：直接读真实开源实现（PIME/libIME2、rime/weasel、本仓库 fcitx5 端）。raw.githubusercontent.com 直连抓源码最可靠；WebSearch 结果曾被污染不可用。

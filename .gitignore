@@ -129,3 +129,6 @@ lufly/sys_data/sys_table.sqlite-journal
 /lufly/win-dd/lufly-im-v4-xiaohe/$码表文件/*.txt
 /lufly/win-dd/lufly-im-v4-xiaolu/$码表文件/*.txt
 /lufly/win-dd/lufly-im-v4-ziranma/$码表文件/*.txt
+
+# mac 端本地 cargo 镜像配置（rsproxy）
+ime/.cargo/
