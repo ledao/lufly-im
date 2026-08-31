@@ -156,20 +156,24 @@ final class CandidateView: NSView {
         for (i, item) in items.enumerated() {
             let hl = i == 0
             let lStr = attr(label(i), labelFont,
-                            hl ? .white : NSColor.secondaryLabelColor)
-            let wStr = attr(item.text, wordFont, hl ? .white : .labelColor)
-            let sStr = attr(suffix(i), codeFont,
-                            hl ? NSColor.white.withAlphaComponent(0.85) : .secondaryLabelColor)
+                            hl ? .labelColor : NSColor.secondaryLabelColor)
+            let wStr = attr(item.text, wordFont, .labelColor)
+            let sStr = attr(suffix(i), codeFont, NSColor.secondaryLabelColor)
             let lW = lStr.size().width, wW = wStr.size().width, sW = sStr.size().width
 
             // 首位恒有高亮块（fcitx5/TSF 同款: 选中项始终带底色）。
-            // 不能按 items.count>1 省略——唯一候选时白字落在白底上 = 白窗（实测坑）
+            // 不能按 items.count>1 省略——唯一候选时字块兜底成纯文本窗（实测坑）。
+            // 灰色底纹（用户指定，不用系统强调色蓝色）；半透明灰在深浅色模式下
+            // 都能衬出层次，文字用自适应 label 色保证可读。
+            // 覆盖整个候选行高（上下到边框内侧 1pt）、左右各越界 6pt——
+            // 早期半高+4pt 版本用户反馈左侧、下方漏底。
+            // （曾加过窗口最前端橙色指示方块，用户裁定太抢眼已撤）
             if hl {
                 let rect = NSRect(
-                    x: x - 4, y: vpad - 2,
-                    width: lW + wW + sW + 8,
-                    height: rowTop - vpad + 2)
-                NSColor.controlAccentColor.setFill()
+                    x: x - 6, y: 1,
+                    width: lW + wW + sW + 12,
+                    height: rowTop - 2)
+                NSColor.systemGray.withAlphaComponent(0.35).setFill()
                 NSBezierPath(roundedRect: rect, xRadius: 4, yRadius: 4).fill()
             }
 
