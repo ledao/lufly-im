@@ -36,6 +36,16 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 - pkg 的 `--install-location "~"` 不展开：文件落到字面 `~` 目录而 installer 仍报 success——装完必须实测验证落位。
 - 输入法列表显示 mode ID 原文 = 缺 `Resources/<lang>.lproj/InfoPlist.strings`，且 mode ID 要作为其中的 key（fcitx5-macos/Squirrel 同款）。
 
+## 标点半角规则变更（三端已同步，fcitx5/TSF 待发版）
+
+用户裁定：标点上下文半角只由数字触发——`lastCls == 1`（3.14 / 1,000）或 Ctrl+0 强制；
+字母后（含 miss 英文缓冲）一律全角（中英混排「Mac，很好用」不再出半角逗号）。
+旧逻辑为 数字+英文（lastCls!=0）+miss 都半角，三端已全部改为新条件：
+
+- macOS：已实现并实测（含 punctErased：空缓冲退格删掉已上屏字符后，下一标点无视 lastCls 恢复全角）。
+- fcitx5（Linux）：`src/lufly.cpp` 标点分支已同步（punctErased 原有，作用范围收窄到数字），未重新构建——下次构建即生效。
+- TSF（Windows）：`src/processor.rs` 已同步（已过 x86_64-pc-windows-msvc cargo check，未出 DLL）——发版时注意更新说明。
+
 ## 工作方式
 
 - **未经用户明确允许，不得 git commit / git push**：改完代码停在本地改动并告知用户，提交与否、何时提交由用户决定；一次允许不代表后续都允许。

@@ -24,8 +24,12 @@ final class LuflyState {
     /// 挂起对应的编码（退格撤销时恢复）
     var pendingCode = ""
     /// 上一个输出/透传字符的类别（0=中文/其他 1=ASCII 数字 2=ASCII 字母），
-    /// 数字/英文后的标点保持半角（3.14 / hello.）—— 标点逻辑阶段4
+    /// 仅数字后的标点保持半角（3.14 / 1,000）；字母后保持全角（用户裁定，
+    /// 三端一致）—— 标点逻辑阶段4
     var lastCls = 0
+    /// 退格删过已上屏字符（空缓冲透传退格）: 下一个标点无视 lastCls 恢复全角
+    /// —— 删掉半角标点重打应得中文（一次性，打字母/数字/标点后清除）
+    var punctErased = false
     /// 候选当前页（页大小 5，翻页键 -/= Tab PageUp/Down）
     var page = 0
     /// 引号配对状态（“‘ 已开待闭）—— 标点阶段
@@ -53,6 +57,7 @@ final class LuflyState {
         reverse = false
         shiftArmed = false
         lastCls = 0
+        punctErased = false
         page = 0
         dqOpen = false
         sqOpen = false

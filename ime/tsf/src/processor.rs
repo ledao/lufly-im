@@ -810,15 +810,16 @@ fn compute_action(
     }
 
     // ---- 标点: 中文全角化（对齐 rime punctuator half_shape）----
-    // 上下文半角: 前一字符是数字/英文、miss 携带英文、或 Ctrl+0 强制时，
-    // 标点不映射、原样透传（编码中仍先顶字）—— 3.14 / hello. / english,
+    // 上下文半角: 仅前一字符是数字（3.14 / 1,000）或 Ctrl+0 强制时，标点
+    // 不映射、原样透传（编码中仍先顶字）；字母后保持全角——中英混排
+    // "Mac，很好用"，miss 携带的英文缓冲也原样上屏再接全角标点（用户裁定，
+    // 三端一致；旧逻辑为 数字/英文+miss 都半角）
     if s.st.add_stage == 1 {
         s.st.add_stage = 0; // 标点退出加词（视为反悔），照常处理标点
     }
     let composing = !s.st.buffer.is_empty();
     let half_punct = s.st.ascii_punct
-        || (s.st.last_cls != 0 && !s.st.punct_erased)
-        || miss;
+        || (s.st.last_cls == 1 && !s.st.punct_erased);
     s.st.punct_erased = false; // 标点键一次性（半角透传同样清除）
     let punct = if half_punct {
         None

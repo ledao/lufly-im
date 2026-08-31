@@ -82,7 +82,7 @@ public:
     // 挂起对应的编码（退格撤销时恢复）
     std::string pendingCode;
     // 上一个输出/透传字符的类别（0=中文/其他 1=ASCII 数字 2=ASCII 字母），
-    // 数字/英文后的标点保持半角（3.14 / hello.）
+    // 仅数字后的标点保持半角（3.14 / 1,000）；字母后保持全角（用户裁定）
     int lastCls = 0;
     // 退格删过已上屏字符（空缓冲透传退格）: 下一个标点无视 lastCls 恢复全角
     // —— 删掉半角标点重打应得中文（一次性，打字母/数字/标点后清除）
@@ -1143,8 +1143,10 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
     }
 
     // ---- 标点: 中文全角化（对齐 rime punctuator half_shape）----
-    // 上下文半角: 前一字符是数字/英文、miss 携带英文、或 Ctrl+0 强制时，
-    // 标点不映射、原样透传（编码中仍先顶字）—— 3.14 / hello. / english,
+    // 上下文半角: 仅前一字符是数字（3.14 / 1,000）或 Ctrl+0 强制时，标点
+    // 不映射、原样透传（编码中仍先顶字）；字母后保持全角——中英混排
+    // "Mac，很好用"，miss 携带的英文缓冲也原样上屏再接全角标点（用户裁定，
+    // 三端一致；旧逻辑为 数字/英文+miss 都半角）。
     // 编码中先顶出首选再上屏标点并消费；空缓冲直接上屏标点。
     if (state->addStage == 1) {
         state->addStage = 0; // 标点退出加词（视为反悔），照常处理标点
@@ -1152,7 +1154,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
     const bool composing = !state->buffer.empty();
     const bool halfPunct =
         state->asciiPunct ||
-        (state->lastCls != 0 && !state->punctErased) || miss;
+        (state->lastCls == 1 && !state->punctErased);
     state->punctErased = false; // 标点键一次性（半角透传同样清除）
     const char *punct = halfPunct ? nullptr : chinesePunct(sym, state);
     if (punct) {

@@ -9,7 +9,7 @@
 //   回车      编码字母原样上屏；退格删一码；Esc 清空缓冲
 //   Shift     单击: 切换中/英文模式（编码中先原样上屏字母再转英文）
 //   `         拼音反查（fuzhu 码表）
-//   标点      中文全角化（编码中先顶字；上下文半角: 数字/英文后、miss、Ctrl+0）
+//   标点      中文全角化（编码中先顶字；仅数字后/Ctrl+0 半角，字母后保持全角）
 import Cocoa
 import InputMethodKit
 import Carbon.HIToolbox // kVK_* 虚键码 + kTSMHiliteConvertedText
@@ -371,6 +371,9 @@ final class LuflyInputController: IMKInputController {
                     updateUI(client)
                     return true
                 }
+                // 空缓冲透传退格 = 应用删掉一个已上屏字符:
+                // 下一个标点无视 lastCls 恢复全角（删掉半角标点重打应得中文）
+                state.punctErased = true
                 return false // 真删字符
             }
             _ = LuflyEngine.shared.key(8, rev) // \b
@@ -402,6 +405,7 @@ final class LuflyInputController: IMKInputController {
 
         // ---- 字母 a-z 进编码缓冲（lufly.cpp:1102-1136）----
         if let c = printableChar(event), c.isASCII, c >= "a", c <= "z" {
+            state.punctErased = false // 继续打字: 退格翻转作废
             let ch = UInt32(c.asciiValue!)
             if !state.pending.isEmpty {
                 // 顶功: 下一字词的首键把挂起字顶出（快打全程不用空格）
@@ -429,14 +433,17 @@ final class LuflyInputController: IMKInputController {
             return true
         }
 
-        // ---- 标点: 中文全角化（lufly.cpp:1138-1176）----
-        // 上下文半角: 前一字符是数字/英文、miss、或 Ctrl+0 强制时，标点不映射、
-        // 原样透传（编码中仍先顶字）—— 3.14 / hello. / english,
+        // ---- 标点: 中文全角化（lufly.cpp:1138-1176；半角条件经用户裁定，
+        //      三端一致: 仅数字，字母/miss 后保持全角）----
+        // 上下文半角: 仅前一字符是数字（3.14 / 1,000）或 Ctrl+0 强制时，标点
+        // 不映射、原样透传（编码中仍先顶字）；字母后保持全角——中英混排
+        // "Mac，很好用"，miss 英文缓冲也先原样上屏再接全角标点
         if state.addStage == 1 {
             state.addStage = 0 // 标点退出加词（视为反悔），照常处理标点
         }
         let composing = !state.buffer.isEmpty
-        let halfPunct = state.asciiPunct || state.lastCls != 0 || miss
+        let halfPunct = state.asciiPunct || (state.lastCls == 1 && !state.punctErased)
+        state.punctErased = false // 标点键一次性（半角透传同样清除）
         var punct: String? = nil
         if let c = pc, !halfPunct {
             punct = chinesePunct(c, dqOpen: &state.dqOpen, sqOpen: &state.sqOpen)
@@ -497,6 +504,7 @@ final class LuflyInputController: IMKInputController {
         }
         // 空缓冲透传的数字: 记录上下文（3.14 / 1,000 后续标点保持半角）
         if let c = pc, c >= "0", c <= "9" {
+            state.punctErased = false // 继续打字: 退格翻转作废
             state.lastCls = 1
         }
         return false
