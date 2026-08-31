@@ -162,7 +162,9 @@ final class CandidateView: NSView {
                             hl ? NSColor.white.withAlphaComponent(0.85) : .secondaryLabelColor)
             let lW = lStr.size().width, wW = wStr.size().width, sW = sStr.size().width
 
-            if hl, items.count > 1 {
+            // 首位恒有高亮块（fcitx5/TSF 同款: 选中项始终带底色）。
+            // 不能按 items.count>1 省略——唯一候选时白字落在白底上 = 白窗（实测坑）
+            if hl {
                 let rect = NSRect(
                     x: x - 4, y: vpad - 2,
                     width: lW + wW + sW + 8,

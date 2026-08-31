@@ -142,6 +142,12 @@ final class LuflyEngine {
         userSize = size
         let changed = lufly_user_reload(handle) != 0
         if changed {
+            // reload 内部会全量落盘（flush_user(true)），文件 mtime 被自己顶高；
+            // 不重取属性的话下次检查又判定"有变化" → 每秒重载死循环（实测坑）
+            if let attrs = try? FileManager.default.attributesOfItem(atPath: path) {
+                userMtime = attrs[.modificationDate] as? Date ?? userMtime
+                userSize = (attrs[.size] as? NSNumber)?.intValue ?? 0
+            }
             LuflyLog.shared.info("用户词典已热更新 \(path)")
         }
         return changed

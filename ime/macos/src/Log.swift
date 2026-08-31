@@ -19,6 +19,7 @@ final class LuflyLog {
     }
 
     func info(_ msg: String) { write("INFO", msg) }
+    func debug(_ msg: String) { write("DEBUG", msg) }
     func error(_ msg: String) { write("ERROR", msg) }
 
     private func write(_ level: String, _ msg: String) {

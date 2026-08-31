@@ -1,10 +1,20 @@
 // 输入会话状态 —— 与 fcitx5 前端 LuflyState（lufly.cpp:66-97）/ tsf state.rs
 // 逐字段对齐。macOS 单焦点，全局一份；字段随阶段推进补齐。
 final class LuflyState {
-    /// 编码缓冲（引擎 input 之外前端再留一份，miss 时引擎也持有）
-    var buffer = ""
-    /// 反查模式: ` 已按下（阶段5）
-    var reverse = false
+    /// 编码缓冲（引擎 input 之外前端再留一份，miss 时引擎也持有）。
+    /// 变化 = 候选列表重建，翻页归零（对齐 fcitx5 每键重建候选列表的语义，
+    /// 否则上一个词翻过的页残留到下一个词，会切错页甚至空页）
+    var buffer = "" {
+        didSet {
+            if buffer != oldValue { page = 0 }
+        }
+    }
+    /// 反查模式: ` 已按下（阶段5）。切换 = 换引擎候选重建，翻页归零
+    var reverse = false {
+        didSet {
+            if reverse != oldValue { page = 0 }
+        }
+    }
     /// 英文直通模式（Shift 单击切换）
     var ascii = false
     /// Shift 已按下且其后无其他按键（单击切中英）
