@@ -6,7 +6,7 @@
 
 ---
 name: xiaolu_fuzhu_pinyin
-version: "20260704.164922"
+version: "20260903.003415"
 sort: original
 use_preset_vocabulary: false
 columns:
@@ -174599,7 +174599,6 @@ columns:
 最脏	zuizang
 长调	changdiao
 阀值	fazhi
-阈值	yuzhi
 基年	jinian
 晋县	jinxian
 理县	lixian
@@ -179392,6 +179391,7 @@ columns:
 时非	shifei
 雅卢	yalu
 叶陶	yetao
+阈值	yuzhi
 一瞥	yipie
 下标	xiabiao
 严令	yanling

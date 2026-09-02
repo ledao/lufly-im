@@ -62,14 +62,14 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 - capi crate-type 收窄为仅 staticlib（cdylib 移除）：cdylib 与 .a 并存时 `-llufly_capi` 会被链接器挑中 dylib，留下指向 `target/` 的绝对路径 install_name，跨机器分发 dyld 起不来（macOS 踩过，已修）。新端接入一律全路径链 `.a`（fcitx5/macOS 的 build.sh 均已如此）。
 - 引擎自测工具：`cargo test -p lufly-engine`（23 例）；`cargo run -p lufly-engine --example mem` + vmmap（内存）；`ime/macos/tools/engtest.c`（C API 打字流）。
 
-## 待办：词库源 sqlite 同步（2026-09-02，sqlite 在用户另一台机器上）
+## 词库源 sqlite 同步（2026-09-03 已闭环）
 
-码表的正源是 `lufly/sys_data/sys_table.sqlite`（wordphonetable，含各双拼变体列），`rime_*/​*.dict.yaml` 由 `scripts/generate_rime*.py` 从它生成，bin 再由 build_dict.py 编译。本次加「阈值」yù 音时**该库不在本机**（gitignore 掉 *.sqlite、分片也未提交），只直接改了 yaml + 重建 bin：
+码表的正源是 `lufly/sys_data/sys_table.sqlite`（wordphonetable，含各双拼变体列，**本机已有**：2026-05-06 从另一台机器拷来、gitignore 掉 *.sqlite），`rime_*/​*.dict.yaml` 由 `scripts/generate_rime*.py` 从它生成，bin 再由 build_dict.py 编译。「阈值」yù 音当时库不在手边，只手改了 yaml + 重建 bin，现已回填源库：
 
-- `rime_xiaohe_shuangpin_xiaohe_xing/xiaolu_he_shuangpin_he_xing.dict.yaml` 加了 `阈值	yuvi / yuvim / yuvimr`（镜像「阀值	favi/favim/favimr」变体结构，插在阀值三行后）
-- `xiaolu_fuzhu_pinyin.dict.yaml` 加了 `阈值	yuzhi`（拼音反查用，紧跟「阀值	fazhi」）
-
-**待办**：拿到 sys_table.sqlite 后，在 wordphonetable 补「阈值」的 yù 音行（full=yuzhi、xhe 对应 yuvi/yuvim/yuvimr 规则、镜像现有阀值行的 bingji/priority 写法），再重跑 `scripts/generate_rime_xhe_phone_xhe_shape.py` 比对 yaml——**否则下次从 sqlite 重新生成 yaml 时，手加的三行会被冲掉**。若生成结果与手改不一致，以生成结果为准重编 bin。同检查「阀值」行是否也该保留（错写形式，用户习惯用）。
+- wordphonetable 插入「阈值」行：`full='yu zhi', xhe/zrm/lu='yuvi', priority=6, bingji='yyvj'`（镜像「阀值」favi/fuvj 结构；bingji=首字并击+尾字并击，阈=yy、值=vj）
+- 重跑 `scripts/generate_rime_xhe_phone_xhe_shape.py`：生成 yaml 与手改内容一致（排序落位不同属正常——生成器按优先级排序），「阀值」三行保留（错写形式，用户习惯用）；以生成结果为准重编两枚 bin
+- 词组 yaml 三行变体（yuvi/yuvim/yuvimr）是生成器从单行 sqlite 记录自动展开的（generator.py `generate_full_words` + 写出时 `encode[0:-2]`/`[0:-1]`/全码），**源库只需一行**；生成脚本依赖 peewee/pypinyin/toolz/tqdm
+- 加字词的完整链路现在是：改 sqlite → 跑 generate_rime*.py → 跑 `ime/tools/build_dict.py`（无参一次编两枚）→ TSF 重编 DLL（include_bytes!）+ fcitx5/macOS 拷新 bin
 
 ## 工作方式
 
