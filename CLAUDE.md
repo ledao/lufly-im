@@ -30,12 +30,15 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 
 ## macOS 打包（ime/macos）
 
-- 分发 = **传统拖拽式 dmg**（用户拍板，符合直觉）：dmg 内 Lufly.app + 「输入法」文件夹替身（`ln -s "/Library/Input Methods"`，清歌输入法同款），拖上去输密码装入系统输入法目录；装完注销重登 + 系统设置添加。曾试过独立 Bundle ID 安装器 app 与 pkg 向导，均被否——按 macOS 惯例来。
+- 分发 = **双击安装器式 dmg**（dmg 内只有 Lufly.app + 安装说明.txt）：双击 → 弹内置 Installer → 「安装」→ 落位 `~/Library/Input Methods` + `TISRegisterInputSource` 免注销注册 → 系统设置添加。**曾用拖拽式**（Lufly.app + 「输入法」替身，清歌同款），实证缺陷：拖拽路径无代码可执行、注册全靠 TIS 自动扫描，彻底删除重装后 TIS 缓存不认同 Bundle ID → 输入法消失且无任何报错（2026-09 实测）；且拖拽会在 `/Library/Input Methods` 留残留，Installer 现会请求管理员密码清理（osascript with administrator privileges）。曾试过独立 Bundle ID 安装器 app 与 pkg 向导，均被否。
+- dmg 窗口要布置**背景引导图**（"双击「Lufly」开始安装"，`tools/mkdmgbg.swift` 生成）+ AppleScript 定位图标——裸 dmg 用户不知道要双击安装（用户反馈）。**样式持久化坑**：必须先建可写 UDRW → 挂载 → Finder 布置（写 .DS_Store）→ 卸载 → `hdiutil convert` 成 UDZO；直接对 UDZO 布置是只读卷，样式静默丢失。
 - **TIS 注册元数据有缓存**: 系统设置里显示的名称/图标是首次注册时缓存的；改 Info.plist/InfoPlist.strings 后盘上元数据已正确（可用 `TISGetInputSourceProperty(kTISPropertyLocalizedName)` 程序化验证），但设置界面要**注销重登**才刷新；若重登/重启都不行，终极手段 = 换 bundle/mode ID 斩缓存（同 TSF 换 profile GUID 教训），代价是用户需重新添加一次。
 - **同 Bundle ID 单实例坑**: 输入法本体常驻后台时，Finder 双击另一份同 ID 的 Lufly.app 只会"激活"运行中实例、不启动新进程（无窗口、无报错、无崩溃日志）——拖拽安装不受影响，双击下载的 app 时要想到这一层。
 - app 双入口保留：bundle 路径含 `/Input Methods/` = 输入法模式，否则 = 安装窗（src/Installer.swift）；`Lufly --install` 非交互安装（install.sh 即委托它）。
 - pkg 的 `--install-location "~"` 不展开：文件落到字面 `~` 目录而 installer 仍报 success——装完必须实测验证落位。
 - 输入法列表显示 mode ID 原文 = 缺 `Resources/<lang>.lproj/InfoPlist.strings`，且 mode ID 要作为其中的 key（fcitx5-macos/Squirrel 同款）。
+- **菜单栏/输入源列表图标只认矢量 PDF**：渲染管线不吃位图 alpha——sips 转 PDF、位图 XObject+/SMask、透明底 PNG 全变实心方块（注销重登+杀各 UI 进程均无效；NSImage/sips 渲染正常所以本地测不出，坑只在真机 UI 暴露）。本机 Squirrel/微信/豆包的图标全是纯矢量路径、零位图 XObject。`tools/mkiconpdf.swift`：亮度提取鸟形 → crack-following 描摹轮廓 → RDP 简化 → 手写最小矢量 PDF（零外部依赖）。名字能热更新（InfoPlist.strings 渲染期解析）而图标缓存顽固——改图标务必连格式一起换。另注意图标文件**词干不能与 lufly.icns 撞名**（TIS 按扩展名无关的 imageForResource: 查找会命中 icns，见 build.sh 注释），故命名 menu_icon.pdf。
+- **未解搁置（2026-09-02 用户裁定）**：菜单栏图标已正常后，**Ctrl+Space 切换 HUD 的图标仍显示占位方块**。已排除：plist 键位（与 Squirrel 完全同构）、矢量格式（菜单栏同文件正常）、TextInputSwitcher/TextInputMenuAgent 进程缓存（kill -9 后依旧）、图标文件名。线索：`TISGetInputSourceProperty(TISPropertyIconURL)` 对所有输入源（含正常的 Squirrel）都返回 nil，说明 HUD 走的不是这条属性链。下次接手可从「HUD 图标到底怎么解析」入手（反编 TextInputSwitcher / 对比 Squirrel HUD 行为）。
 
 ## 标点半角规则变更（三端已同步，fcitx5/TSF 待发版）
 

@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-# 打包 dmg —— 传统拖拽安装式（用户拍板，符合直觉）:
-#   Lufly.app + 「输入法」文件夹替身（指向 /Library/Input Methods，清歌输入法同款）
-# 拖拽到替身上 → Finder 要求输密码 → 装入系统输入法目录（机器所有用户可用）。
-# 装完需注销重登: 既让 TIS 发现/刷新注册（名称、图标元数据有缓存，同 TSF ctfmon 坑），
-# 也是系统设置里添加输入法的前提。
+# 打包 dmg —— 双击安装器式:
+#   dmg 内只有 Lufly.app（自带 Installer）+ 安装说明.txt。
+#   双击 → 「安装」→ 落位 ~/Library/Input Methods + TISRegisterInputSource
+#   免注销注册 → 系统设置添加。
+# 不再放「输入法」文件夹替身（拖拽式）: 拖拽路径无代码可执行，TIS 注册全靠
+# 系统扫描；彻底删除重装后 TIS 缓存不认同 Bundle ID → 输入法消失且无报错
+# （2026-09 实测）。Installer 会请求管理员密码清理拖拽时代残留的
+# /Library/Input Methods/Lufly.app。
 # 公证（拿到 Developer ID 证书后）:
 #   codesign --deep --options runtime --sign "Developer ID Application: ..." <app>
 #   xcrun notarytool submit <dmg> --keychain ... && xcrun stapler staple <dmg>
@@ -32,26 +35,64 @@ OUT="build/Lufly-${VERSION}-aarch64.dmg"
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/Lufly.app"
-# 拖拽目标: 系统输入法目录的替身（/Library/Input Methods 各机皆有）
-ln -s "/Library/Input Methods" "$STAGE/输入法"
 # 去隔离属性，防 Gatekeeper 误拦（本地构建通常没有，防御性处理）
 xattr -dr com.apple.quarantine "$STAGE/Lufly.app" 2>/dev/null || true
+
+# 背景引导图（「双击安装」提示；裸 dmg 用户不知道要干什么——用户反馈）
+mkdir -p "$STAGE/.background"
+BG_TOOL="build/mkdmgbg"
+if [ ! -x "$BG_TOOL" ] || [ "tools/mkdmgbg.swift" -nt "$BG_TOOL" ]; then
+    swiftc -O tools/mkdmgbg.swift -o "$BG_TOOL"
+fi
+"$BG_TOOL" "$STAGE/.background/bg.png"
 
 cat > "$STAGE/安装说明.txt" <<'EOF'
 小鹭音形 —— 安装两步:
 
-1. 把 Lufly 拖到旁边的「输入法」文件夹上（会要求输入开机密码）。
-2. 注销并重新登录，然后添加输入法（仅需一次）:
+1. 双击 Lufly.app → 点「安装」。
+   装到当前用户输入法目录，装完即可添加，一般无需注销。
+   （若机器上有拖拽式安装的旧版本，会请求一次管理员密码做清理）
+
+2. 添加输入法（仅需一次）:
    系统设置 → 键盘 → 输入法 → 编辑… → ＋ → 简体中文 → 选「小鹭音形」。
+   若列表里暂时没有它: 注销并重新登录后再添加。
 
 菜单栏切到「小鹭音形」即可打字，Shift 单击切换中/英文。
 
 提示:
-- 注销重登既是添加输入法的前提，也会刷新系统缓存的名称/图标。
-- 若之前装过用户目录版（~/Library/Input Methods/Lufly.app），
-  建议删掉避免两份重复。
+- 双击被系统拦截（未公证的开发者包）: 右键 Lufly.app → 「打开」；
+  或 系统设置 → 隐私与安全性 → 点「仍要打开」。
 EOF
 
-hdiutil create -volname "Lufly ${VERSION}" -srcfolder "$STAGE" -ov -format UDZO "$OUT"
+# 布置 dmg 窗口: 背景引导图 + 图标定位。注意必须先建**可写**镜像（UDRW）
+# 让 Finder 写入 .DS_Store，再 convert 成压缩 UDZO——直接对 UDZO 布置是
+# 只读卷，样式静默丢失（踩过）。自动化权限被拒等失败不阻塞打包。
+TMP_DMG="build/Lufly-${VERSION}-rw.dmg"
+hdiutil create -volname "Lufly ${VERSION}" -srcfolder "$STAGE" -ov -format UDRW "$TMP_DMG" >/dev/null
+hdiutil attach "$TMP_DMG" -nobrowse -quiet
+osascript <<APPLESCRIPT || echo "警告: dmg 窗口布置失败（Finder 自动化权限？）"
+tell application "Finder"
+    tell disk "Lufly ${VERSION}"
+        open
+        set current view of container window to icon view
+        set toolbar visible of container window to false
+        set statusbar visible of container window to false
+        set bounds of container window to {200, 160, 860, 580}
+        set opts to icon view options of container window
+        set arrangement of opts to not arranged
+        set icon size of opts to 96
+        set background picture of opts to file ".background:bg.png"
+        set position of item "Lufly.app" to {330, 215}
+        set position of item "安装说明.txt" to {565, 90}
+        close
+        open
+    end tell
+end tell
+APPLESCRIPT
+sync; sleep 2
+hdiutil detach "/Volumes/Lufly ${VERSION}" -quiet
+hdiutil convert "$TMP_DMG" -format UDZO -o "$OUT" -ov >/dev/null
+rm -f "$TMP_DMG"
+
 echo "OK: $OUT"
 du -h "$OUT"

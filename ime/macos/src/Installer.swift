@@ -88,6 +88,45 @@ enum Installer {
         // 免注销注册（macOS 13+ 多数场景即时生效；不行则注销重登兜底）
         let status = TISRegisterInputSource(dst as CFURL)
         print(status == noErr ? "TIS 注册请求已发出" : "TIS 注册失败 err=\(status)")
+        cleanupLegacySystemCopy()
         return true
+    }
+
+    /// 清理拖拽式安装时代残留的系统目录版本: 同 Bundle ID 两份并存会让
+    /// TIS 注册混乱（实测: 删除重装后拖拽版不被重新注册 → 输入法消失）。
+    /// /Library/Input Methods 归 root，普通删除失败时请求管理员授权
+    /// （搜狗/百度安装器同款密码弹窗）；非交互模式只打警告。
+    private static func cleanupLegacySystemCopy() {
+        let path = "/Library/Input Methods/Lufly.app"
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: path) else { return }
+        // 目录恰好可写（如同用户装过）则静默删除
+        if (try? fm.removeItem(atPath: path)) != nil, !fm.fileExists(atPath: path) {
+            print("已清理旧版残留: \(path)")
+            return
+        }
+        let interactive = !CommandLine.arguments.contains("--install") && NSApp.isActive
+        guard interactive else {
+            print("警告: 检测到旧版残留 \(path)（需管理员删除，避免与新版本冲突）")
+            return
+        }
+        var err: NSDictionary?
+        NSAppleScript(source:
+            "do shell script \"rm -rf '/Library/Input Methods/Lufly.app'\" "
+                + "with administrator privileges")?
+            .executeAndReturnError(&err)
+        if err == nil, !fm.fileExists(atPath: path) {
+            print("已清理旧版残留（管理员授权）: \(path)")
+            return
+        }
+        // 用户取消授权或删除失败: 不阻塞安装，但要讲清楚后果
+        let alert = NSAlert()
+        alert.messageText = "检测到旧版本残留"
+        alert.informativeText =
+            "系统输入法目录里存在旧版 Lufly（之前拖拽安装留下的），"
+            + "可能与新版冲突导致输入法无法使用。\n\n"
+            + "请在终端执行以下命令手动删除后重新安装:\n"
+            + "sudo rm -rf \"/Library/Input Methods/Lufly.app\""
+        alert.runModal()
     }
 }
