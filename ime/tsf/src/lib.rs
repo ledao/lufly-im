@@ -60,7 +60,8 @@ pub fn log(msg: &str) {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis())
             .unwrap_or(0);
-        let _ = writeln!(f, "[{ts}] {msg}");
+        // 同一日志文件多进程共写（ctfmon/各应用进程都加载本 DLL），pid 前缀必须
+        let _ = writeln!(f, "[{ts} pid={}] {msg}", std::process::id());
     }
 }
 

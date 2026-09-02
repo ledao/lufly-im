@@ -14,12 +14,14 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 - **注册必须走 COM API**（ITfInputProcessorProfiles + ITfCategoryMgr），手写 CTF 注册表键会导致设置界面名字空白/键盘列表缺失；六个类别（TIP_KEYBOARD、INPUTMODECOMPARTMENT、UIELEMENTENABLED、IMMERSIVESUPPORT、SYSTRAYSUPPORT、DISPLAYATTRIBUTEPROVIDER）缺一不可，缺 INPUTMODECOMPARTMENT 会被现代应用禁用。
 - **AddLanguageProfile 的名字/图标串必须 NUL 结尾**：CTF 存 Description 时不按 cch 截断、按 NUL 读，未补 NUL 会混入堆垃圾显示乱码（图标路径恰好踩在归零缓冲上才侥幸正常）。
 - **ctfmon 会缓存并复活旧注册数据**（乱码/幽灵条目删了又回来）：换 profile GUID 才能斩断；任务栏图标有系统缓存，注销刷新。
-- **OnTestKeyDown 必须对想接的键返回 TRUE**，否则 OnKeyDown 永远收不到（激活成功≠能打字）。
+- **按键决策必须在 OnTestKeyDown 阶段完成**（对齐 weasel `_ProcessKeyEvent`：Test 时跑完整状态机并执行，OnKeyDown 只回放缓存判定，不二次决策）。「Test 返回 TRUE 但 OnKeyDown 放行」的键在 CUAS 应用（企业微信）被系统吃掉后**不回注、凭空消失**——Edge 等 TSF 感知应用会回注，造成「别处正常、仅企业微信坏」的假象（实例：空缓冲退格无效）。同键多次 Test（WORD 2010 x64 类应用）需缓存判定、只决策一次；只缓存 TRUE，FALSE 键系统不会路由 OnKeyDown。
 - 大码表（43MB）不能在 Activate 里同步解析（堵死切换输入法）：后台线程预载 + 全局槽，首次按键兜底同步加载。
 - ctfmon 锁旧 DLL 导致安装 write 拒绝：装到**版本号子目录** + 装前 regsvr32 /u + taskkill ctfmon + Delete /REBOOTOK。
 - windows-rs 0.61：`#[implement]` 的 trait 实现写在生成的 `Xxx_Impl` 上（不是原结构体）；COM 的 (指针, 长度) 参数对映射成 `&[u16]` 切片；VARIANT 手工构造要 explicit deref（`(*v.Anonymous.Anonymous).vt = VT_I4`）；接口指针非 Send，放全局槽需 newtype 包装。
 - 任务栏「中/EN」模式图标：ITfLangBarItemButton 且 **guidItem 必须用系统保留的 `GUID_LBI_INPUTMODE`**——任务栏只收纳这一项，自定义 GUID 只会进默认隐藏的经典浮动语言栏（参考 weasel `WeaselTSF/LanguageBar.cpp`）；图标变化时 `ITfLangBarItemSink::OnUpdate(TF_LBI_ICON)`。搜狗那种「logo+模式」双图标里的 logo 是其私有托盘（Shell_NotifyIcon），非 TSF 能力。
-- 诊断日志写 `%APPDATA%\lufly\tsf.log`；「有/无 OnKeyDown」是定位按键链路问题的关键证据。
+- **32 位应用读 WOW6432Node 视图**：微信/企业微信（WXWork.exe）/QQ 主程序多为 32 位，只注册 x64 视图时 TIP 在这些进程根本装不进去（无任何报错，仅 64 位子进程能加载）；必须 x86/x64 双 DLL，各自用对应位数的 regsvr32 注册（32 位安装器里 x64 走 `$WINDIR\Sysnative`，x86 走 `SysWOW64`），DeleteRegKey/ReadRegStr 要 `SetRegView` 切视图。
+- **CUAS 应用自愈要挂「线程默认 HIMC」而不是 ImmCreateContext 新造的**：新建上下文 CUAS 不认、fOpen=false，挂上后按键照样绕过 TIP；默认上下文用临时窗口 `ImmGetContext` 取（无显式关联的窗口返回的就是它，TIP 激活后由 CUAS 托管）。企业微信 5.x（Flutter）会断开焦点窗口的 IME 关联，只能进程内定时体检重挂。
+- 诊断日志写 `%APPDATA%\lufly\tsf.log`（每行带 pid 前缀——多进程共写，无 pid 无法归因）；「有/无 OnKeyDown」是定位按键链路问题的关键证据。
 
 ## 打包（NSIS，lufly.nsi）
 

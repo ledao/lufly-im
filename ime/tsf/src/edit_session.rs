@@ -83,17 +83,23 @@ fn update_cand_win(shared: &mut Shared, ec: u32, ctx: &ITfContext) {
         return;
     };
 
-    // 当前页条目: 「序号.词 剩余编码」（fcitx5 横排风格；已敲前缀不重复）
+    // 当前页条目: 三分段「序号. 词 剩余编码」（fcitx5 横排风格；已敲前缀不重复；
+    // 分段独立样式——皮肤对齐 macOS 定稿，绘制在 cand.rs）
     let start = st_page * PAGE_SIZE;
     let mut items = Vec::with_capacity(PAGE_SIZE);
     for (i, (text, code)) in cands.iter().enumerate().skip(start).take(PAGE_SIZE) {
-        let mut disp = format!("{}.", i - start + 1);
-        disp.push_str(text);
+        let label = format!("{}.", i - start + 1);
+        let mut suffix = String::new();
         if code.len() > buffer.len() && code.starts_with(&buffer) {
-            disp.push(' ');
-            disp.push_str(&code[buffer.len()..]);
+            suffix.push(' ');
+            suffix.push_str(&code[buffer.len()..]);
         }
-        items.push((disp, i == start));
+        items.push(crate::cand::CandItem {
+            label,
+            word: text.clone(),
+            suffix,
+            hl: i == start,
+        });
     }
     crate::log(&format!("cand show: {} items, rect=({},{},{},{})", items.len(), caret.left, caret.top, caret.right, caret.bottom));
     shared.cand_win.show(items, caret);

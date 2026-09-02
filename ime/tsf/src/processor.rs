@@ -30,17 +30,17 @@ enum Act {
     CommitThenPass(String),
 }
 
-use windows::core::*;
+use windows::core::{w, *};
 use windows::Win32::Foundation::*;
+use windows::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows::Win32::System::Threading::{GetCurrentProcessId, GetCurrentThreadId};
 use windows::Win32::System::Variant::{VARIANT, VT_I4};
-use windows::Win32::UI::Input::Ime::{
-    ImmAssociateContext, ImmCreateContext, ImmGetContext, ImmReleaseContext,
-};
+use windows::Win32::UI::Input::Ime::{HIMC, ImmAssociateContext, ImmGetContext, ImmReleaseContext};
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::TextServices::*;
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetGUIThreadInfo, GetWindowThreadProcessId, KillTimer, SetTimer, GUITHREADINFO,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, GetGUIThreadInfo, GetWindowThreadProcessId,
+    KillTimer, RegisterClassW, SetTimer, GUITHREADINFO, WINDOW_EX_STYLE, WNDCLASSW, WS_OVERLAPPED,
 };
 
 use lufly_engine::Engine;
@@ -49,8 +49,8 @@ use crate::cand::CandWindow;
 use crate::edit_session::{EditSession, SessionKind};
 use crate::state::{chinese_punct, State};
 
-/// 候选页大小: 对齐 fcitx5 横排风格，数字 1-6 对应本页 6 个候选。
-pub const PAGE_SIZE: usize = 6;
+/// 候选页大小: 数字 1-5 选词，;'[] 选第 2-5 个
+pub const PAGE_SIZE: usize = 5;
 
 /// 用户词典落盘间隔（与 capi USER_FLUSH_INTERVAL 一致）
 const USER_FLUSH_INTERVAL: u32 = 64;
@@ -63,29 +63,89 @@ struct HealShared(Arc<Mutex<Shared>>);
 unsafe impl Send for HealShared {}
 static HEALS: Mutex<Vec<(usize, HealShared)>> = Mutex::new(Vec::new());
 
+static HEAL_WND_CLASS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+unsafe extern "system" fn heal_wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
+    DefWindowProcW(hwnd, msg, wp, lp)
+}
+
+/// 取线程默认 HIMC（激活后即 CUAS 托管上下文）：临时窗口不显式关联时，
+/// ImmGetContext 返回的就是线程默认。窗口只是读取载体，取完即销毁——
+/// 默认上下文归线程所有，不随窗口销毁。
+unsafe fn capture_default_himc() -> HIMC {
+    let hinstance = match GetModuleHandleW(None) {
+        Ok(h) => h.into(),
+        Err(_) => return HIMC::default(),
+    };
+    if !HEAL_WND_CLASS.swap(true, std::sync::atomic::Ordering::AcqRel) {
+        let wc = WNDCLASSW {
+            lpfnWndProc: Some(heal_wnd_proc),
+            hInstance: hinstance,
+            lpszClassName: w!("LuflyHealWnd"),
+            ..Default::default()
+        };
+        RegisterClassW(&wc);
+    }
+    let hwnd = CreateWindowExW(
+        WINDOW_EX_STYLE::default(),
+        w!("LuflyHealWnd"),
+        w!("LuflyHealWnd"),
+        WS_OVERLAPPED,
+        0,
+        0,
+        0,
+        0,
+        None,
+        None,
+        Some(hinstance),
+        None,
+    )
+    .unwrap_or_default();
+    if hwnd.is_invalid() {
+        return HIMC::default();
+    }
+    let himc = ImmGetContext(hwnd);
+    let _ = DestroyWindow(hwnd);
+    himc
+}
+
 /// 企业微信 5.x 类应用（Flutter/自绘框架）会断开窗口的 IME 关联，按键在
 /// ImmProcessKey 层被判「此窗口不走 IME」——字母直出，任何键都到不了 TIP。
 /// 注意 HIMC 是进程私有句柄，外部进程读到的恒为 0、外部进程挂的上下文本进程
 /// 也认不了，只能进程内自愈；本 TIP 恰被加载在这些应用进程里，定时体检：
-///   1) 本进程焦点窗口无 HIMC → 现挂一个，键路由即刻恢复
+///   1) 本进程焦点窗口无 HIMC → 重挂「线程默认 HIMC」，键路由即刻恢复
 ///   2) 键盘开关 compartment 被拨到关 → 拨回开（对齐 weasel OnCompartmentChanged）
+///
+/// 必须挂线程默认上下文而不是 ImmCreateContext 新造的：新建上下文 CUAS 不认、
+/// fOpen=false，ImmProcessKey 照样判「IME 关」——0.5.5 实测挂新上下文后键
+/// 依旧绕过 TIP（日志：heal attached 后 TestKeyDown 无字母键）。
+/// 默认上下文用临时窗口取：无显式关联的窗口 ImmGetContext 返回的就是它，
+/// TIP 激活后它由 CUAS 托管，挂回去 = 恢复正常 IME 状态。
 fn heal_once(shared: &Arc<Mutex<Shared>>) {
     unsafe {
+        let default_himc = {
+            let s = shared.lock().unwrap();
+            HIMC(s.default_himc as *mut _)
+        };
         let tid = GetCurrentThreadId();
         let mut gi = GUITHREADINFO::default();
         gi.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
         if GetGUIThreadInfo(tid, &mut gi).is_ok() && !gi.hwndFocus.is_invalid() {
             let focus = gi.hwndFocus;
             let mut pid = 0u32;
-            let _ = GetWindowThreadProcessId(focus, Some(&mut pid));
+            let ftid = GetWindowThreadProcessId(focus, Some(&mut pid));
             if pid == GetCurrentProcessId() {
                 let himc = ImmGetContext(focus);
                 if himc.is_invalid() {
-                    let fresh = ImmCreateContext();
-                    if !fresh.is_invalid() {
-                        ImmAssociateContext(focus, fresh);
+                    if !default_himc.is_invalid() {
+                        let prev = ImmAssociateContext(focus, default_himc);
                         crate::log(&format!(
-                            "ime heal: focus hwnd={focus:?} had no HIMC -> attached fresh"
+                            "ime heal: hwnd={focus:?} tid={ftid} no HIMC -> attach default (prev={:?})",
+                            prev.0
+                        ));
+                    } else {
+                        crate::log(&format!(
+                            "ime heal: hwnd={focus:?} tid={ftid} no HIMC, default HIMC unavailable"
                         ));
                     }
                 } else {
@@ -156,6 +216,11 @@ pub struct Shared {
     pub user_mtime: Option<SystemTime>,
     /// 语言栏托盘项（logo + 中/EN 模式按钮），Deactivate 时 RemoveItem
     pub langbar: Vec<ITfLangBarItem>,
+    /// 线程默认 HIMC（CUAS 托管），IME 关联自愈时重挂用；0 = 未抓取
+    pub default_himc: isize,
+    /// Test 阶段已决策待 OnKeyDown 确认的吞键判定（只缓存 TRUE；
+    /// 对齐 weasel _fTestKeyDownPending——防同键多次 Test 重复决策）
+    pub test_eaten: Option<bool>,
 }
 
 impl Shared {
@@ -384,6 +449,8 @@ impl LuflyTsf {
             last_user_check: None,
             user_mtime: None,
             langbar: Vec::new(),
+            default_himc: 0,
+            test_eaten: None,
         };
 
         Self {
@@ -391,8 +458,10 @@ impl LuflyTsf {
         }
     }
 
-    /// 按键处理主入口（镜像 fcitx5 keyEvent；返回 TRUE=吃键）
-    fn handle_key(&self, vk: VIRTUAL_KEY) -> BOOL {
+    /// 完整按键管线（决策+执行），返回 TRUE=吃键。
+    /// Test 与 OnKeyDown 共用——决策在 Test 阶段一次完成（对齐 weasel
+    /// _ProcessKeyEvent），OnKeyDown 只回放缓存判定，不二次执行
+    fn process_key(&self, vk: VIRTUAL_KEY) -> BOOL {
         let shift = unsafe { GetKeyState(VK_SHIFT.0 as i32) as u16 } & 0x8000 != 0;
         let ctrl = unsafe { GetKeyState(VK_CONTROL.0 as i32) as u16 } & 0x8000 != 0;
         let alt = unsafe { GetKeyState(VK_MENU.0 as i32) as u16 } & 0x8000 != 0;
@@ -466,19 +535,6 @@ impl LuflyTsf {
             crate::log(&format!("RequestEditSession failed: 0x{:08X}", hr.0 as u32));
             Err(Error::from_hresult(hr))
         }
-    }
-}
-
-/// 中文模式下 IME 可能处理的键（Test 阶段据此声明接管）
-fn wants_key(vk: VIRTUAL_KEY) -> bool {
-    match vk.0 {
-        // 字母 / 数字 / OEM 标点
-        0x41..=0x5A | 0x30..=0x39 | 0xBA..=0xC0 | 0xDB..=0xDE => true,
-        // Space Back Return Tab Esc Capital PgUp PgDn
-        0x20 | 0x08 | 0x0D | 0x09 | 0x1B | 0x14 | 0x21 | 0x22 => true,
-        // Shift（单击切中英）
-        0x10 | 0xA0 | 0xA1 => true,
-        _ => false,
     }
 }
 
@@ -634,7 +690,7 @@ fn compute_action(
     // ---- 选词: 数字 1-5 与 ; ' [ ] = 第2/3/4/5（对齐 rime key_binder）----
     let mut sel: i32 = -1;
     let mut digit_sel = false;
-    if !shift && matches!(ch, '1'..='6') {
+    if !shift && matches!(ch, '1'..='5') {
         sel = (ch as u8 - b'1') as i32;
         digit_sel = true;
     } else if ch == ';' {
@@ -1158,6 +1214,12 @@ impl LuflyTsf_Impl {
             }
         }
 
+        // 抓线程默认 HIMC（CUAS 托管）供自愈重挂；ImmCreateContext 新造的
+        // 上下文 CUAS 不认，0.5.5 实测无效
+        let default_himc = unsafe { capture_default_himc() };
+        self.shared.lock().unwrap().default_himc = default_himc.0 as isize;
+        crate::log(&format!("default himc: 0x{:X}", default_himc.0 as usize));
+
         // 进程内 IME 关联体检（1s 周期，Deactivate 时停）
         let timer = unsafe { SetTimer(None, 0, 1000, Some(heal_tick)) };
         HEALS.lock().unwrap().push((timer, HealShared(self.shared.clone())));
@@ -1256,22 +1318,25 @@ impl ITfKeyEventSink_Impl for LuflyTsf_Impl {
         wparam: WPARAM,
         _lparam: LPARAM,
     ) -> Result<BOOL> {
-        // TSF 按键协议: Test 返回 TRUE 才会回调 OnKeyDown（OnKeyDown 的返回
-        // 值才决定是否吞键）。中文模式下声明接管可能处理的键。
-        // Shift 不受 ascii 门控: 英文模式下也要收 Shift 单击（切回中文）
+        // TSF 按键协议: Test 返回 TRUE 才会回调 OnKeyDown。
+        // 决策+执行在 Test 阶段一次完成（对齐 weasel: Test 时跑完整状态机），
+        // OnKeyDown 只回放缓存判定。绝不能「Test 声明、OnKeyDown 放行」——
+        // 该类键在 CUAS 应用（企业微信）被系统吃掉后不回注，凭空消失
+        // （Edge 等 TSF 感知应用会回注，故那边一直正常）；空缓冲退格/空格
+        // 由此返回 FALSE，键原生直达应用
         let vk = VIRTUAL_KEY(wparam.0 as u16);
-        let is_shift = vk == VK_SHIFT || vk == VK_LSHIFT || vk == VK_RSHIFT;
-        let shift = unsafe { GetKeyState(VK_SHIFT.0 as i32) as u16 } & 0x8000 != 0;
-        let ctrl = unsafe { GetKeyState(VK_CONTROL.0 as i32) as u16 } & 0x8000 != 0;
-        let alt = unsafe { GetKeyState(VK_MENU.0 as i32) as u16 } & 0x8000 != 0;
-        let ascii = self.shared.lock().unwrap().st.ascii;
-
-        let want = !alt
-            && (!ctrl || (vk.0 == 0x30 && !shift)) // Ctrl+0 切标点半角
-            && (is_shift || (!ascii && wants_key(vk)));
-        // 诊断：区分「键到了但 Test 拒绝」与「键根本没到键槽」（企业微信排查）
-        crate::log(&format!("TestKeyDown vk=0x{:02X} want={}", vk.0, want as i32));
-        Ok(BOOL(want as i32))
+        let cached = self.shared.lock().unwrap().test_eaten;
+        let eaten = match cached {
+            Some(e) => e, // 同键多次 Test（WORD 2010 x64 类应用）: 只决策一次
+            None => {
+                let e = self.process_key(vk).as_bool();
+                // 只缓存 TRUE: FALSE 的键不会被路由 OnKeyDown，键会自然到应用
+                self.shared.lock().unwrap().test_eaten = if e { Some(true) } else { None };
+                e
+            }
+        };
+        crate::log(&format!("TestKeyDown vk=0x{:02X} eaten={}", vk.0, eaten as i32));
+        Ok(BOOL(eaten as i32))
     }
 
     fn OnKeyDown(
@@ -1281,8 +1346,15 @@ impl ITfKeyEventSink_Impl for LuflyTsf_Impl {
         _lparam: LPARAM,
     ) -> Result<BOOL> {
         let vk = VIRTUAL_KEY(wparam.0 as u16);
-        crate::log(&format!("OnKeyDown vk=0x{:02X}", vk.0));
-        Ok(self.handle_key(vk))
+        // Test 阶段已决策: 只回放判定（不重复执行管线）
+        let cached = self.shared.lock().unwrap().test_eaten.take();
+        let eaten = match cached {
+            Some(e) => e,
+            // 无 Test 直来的键（QQ2012 类应用只发 OnKeyDown）: 现场决策
+            None => self.process_key(vk).as_bool(),
+        };
+        crate::log(&format!("OnKeyDown vk=0x{:02X} eaten={}", vk.0, eaten as i32));
+        Ok(BOOL(eaten as i32))
     }
 
     fn OnTestKeyUp(
