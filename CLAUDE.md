@@ -37,8 +37,11 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 - app 双入口保留：bundle 路径含 `/Input Methods/` = 输入法模式，否则 = 安装窗（src/Installer.swift）；`Lufly --install` 非交互安装（install.sh 即委托它）。
 - pkg 的 `--install-location "~"` 不展开：文件落到字面 `~` 目录而 installer 仍报 success——装完必须实测验证落位。
 - 输入法列表显示 mode ID 原文 = 缺 `Resources/<lang>.lproj/InfoPlist.strings`，且 mode ID 要作为其中的 key（fcitx5-macos/Squirrel 同款）。
-- **菜单栏/输入源列表图标只认矢量 PDF**：渲染管线不吃位图 alpha——sips 转 PDF、位图 XObject+/SMask、透明底 PNG 全变实心方块（注销重登+杀各 UI 进程均无效；NSImage/sips 渲染正常所以本地测不出，坑只在真机 UI 暴露）。本机 Squirrel/微信/豆包的图标全是纯矢量路径、零位图 XObject。`tools/mkiconpdf.swift`：亮度提取鸟形 → crack-following 描摹轮廓 → RDP 简化 → 手写最小矢量 PDF（零外部依赖）。名字能热更新（InfoPlist.strings 渲染期解析）而图标缓存顽固——改图标务必连格式一起换。另注意图标文件**词干不能与 lufly.icns 撞名**（TIS 按扩展名无关的 imageForResource: 查找会命中 icns，见 build.sh 注释），故命名 menu_icon.pdf。
-- **未解搁置（2026-09-02 用户裁定）**：菜单栏图标已正常后，**Ctrl+Space 切换 HUD 的图标仍显示占位方块**。已排除：plist 键位（与 Squirrel 完全同构）、矢量格式（菜单栏同文件正常）、TextInputSwitcher/TextInputMenuAgent 进程缓存（kill -9 后依旧）、图标文件名。线索：`TISGetInputSourceProperty(TISPropertyIconURL)` 对所有输入源（含正常的 Squirrel）都返回 nil，说明 HUD 走的不是这条属性链。下次接手可从「HUD 图标到底怎么解析」入手（反编 TextInputSwitcher / 对比 Squirrel HUD 行为）。
+- **图标两条硬坑（2026-09-02 全链路实证，`tools/mkiconpdf.swift` 头注释同步）**：
+  ① 图标文件**词干不能与 lufly.icns 撞名**——TIS 按扩展名无关的 `imageForResource:` 查找，词干 "lufly" 会命中 icns → 菜单栏图标占位方块（曾误判为矢量/位图/缓存问题，换内容对照实验才定位，真因就这一个），故命名 menu_icon.pdf；
+  ② **必须经 CGPDFContext 生成标准结构 PDF，不能手写极简 PDF**——Ctrl+Space 切换器 HUD 由**远端视图服务**渲染（TextInputUIMacHelper `TUINSCursorUIController`/ViewBridge，反汇编+_selectCurrentInputSource 崩溃栈实证），它消化不了手写的 4 对象未压缩 PDF：菜单栏（NSImage 路径）正常、切换器白方块；换 CG 生成的 PDF（内嵌 Flate 位图）两端全通。HUD 磁贴数据与 TIS 的 IconImageURL/IconRef 均无关（后者对所有源都为 NULL）。
+  调试手段：ObjC 运行时反射 dump 私有框架（dlopen + objc_copyClassNamesForImage + class_copyMethodList），共享缓存二进制可从进程内存抠字符串；lldb attach 自建 dlopen 宿主进程可反汇编任意私有方法。
+- **安装器不做主动注册（TISRegisterInputSource）**：实测自动注册出的输入法条目能出现在列表里但打不了字，用户仍须「− 删除 + ＋ 添加」手动来一遍，白注册还留坏条目（用户裁定）。安装器只落位 + 弹指引（含先减后加提示）。
 
 ## 标点半角规则变更（三端已同步，fcitx5/TSF 待发版）
 
@@ -58,6 +61,15 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 - TSF（Windows）：`processor.rs` 的 `include_bytes!` 已指向新 bin，重编 DLL + NSIS 即可；升级安装注意覆盖旧码表。
 - capi crate-type 收窄为仅 staticlib（cdylib 移除）：cdylib 与 .a 并存时 `-llufly_capi` 会被链接器挑中 dylib，留下指向 `target/` 的绝对路径 install_name，跨机器分发 dyld 起不来（macOS 踩过，已修）。新端接入一律全路径链 `.a`（fcitx5/macOS 的 build.sh 均已如此）。
 - 引擎自测工具：`cargo test -p lufly-engine`（23 例）；`cargo run -p lufly-engine --example mem` + vmmap（内存）；`ime/macos/tools/engtest.c`（C API 打字流）。
+
+## 待办：词库源 sqlite 同步（2026-09-02，sqlite 在用户另一台机器上）
+
+码表的正源是 `lufly/sys_data/sys_table.sqlite`（wordphonetable，含各双拼变体列），`rime_*/​*.dict.yaml` 由 `scripts/generate_rime*.py` 从它生成，bin 再由 build_dict.py 编译。本次加「阈值」yù 音时**该库不在本机**（gitignore 掉 *.sqlite、分片也未提交），只直接改了 yaml + 重建 bin：
+
+- `rime_xiaohe_shuangpin_xiaohe_xing/xiaolu_he_shuangpin_he_xing.dict.yaml` 加了 `阈值	yuvi / yuvim / yuvimr`（镜像「阀值	favi/favim/favimr」变体结构，插在阀值三行后）
+- `xiaolu_fuzhu_pinyin.dict.yaml` 加了 `阈值	yuzhi`（拼音反查用，紧跟「阀值	fazhi」）
+
+**待办**：拿到 sys_table.sqlite 后，在 wordphonetable 补「阈值」的 yù 音行（full=yuzhi、xhe 对应 yuvi/yuvim/yuvimr 规则、镜像现有阀值行的 bingji/priority 写法），再重跑 `scripts/generate_rime_xhe_phone_xhe_shape.py` 比对 yaml——**否则下次从 sqlite 重新生成 yaml 时，手加的三行会被冲掉**。若生成结果与手改不一致，以生成结果为准重编 bin。同检查「阀值」行是否也该保留（错写形式，用户习惯用）。
 
 ## 工作方式
 
