@@ -43,10 +43,12 @@ mkdir -p "$APP/Contents/Resources"
 cp -f ../data/xiaolu_he_he.bin  "$APP/Contents/Resources/dict.bin"
 cp -f ../data/xiaolu_fuzhu.bin  "$APP/Contents/Resources/fuzhu.bin"
 
-# 菜单栏/输入法列表图标: 透明底黑鸟矢量 PDF，命名 menu_icon.pdf（同微信/豆包）。
-# **词干绝不能与 lufly.icns 撞名**: TIS 按扩展名无关的 imageForResource: 查找，
-# 词干 "lufly" 会命中 icns → 图标加载失败显示占位方块（2026-09-02 实测，
-# 与矢量/位图、安装位置、签名、缓存均无关，名字是唯一根因）
+# 菜单栏/切换器图标: 透明底黑鸟，命名 menu_icon.pdf（同微信/豆包）。两条实测坑:
+# 1) **词干绝不能与 lufly.icns 撞名**: TIS 按扩展名无关的 imageForResource: 查找，
+#    词干 "lufly" 会命中 icns → 图标加载失败显示占位方块（2026-09-02 实测，
+#    与矢量/位图、安装位置、签名、缓存均无关，名字是唯一根因）
+# 2) **必须经 CGPDFContext 出标准结构 PDF**（见 tools/mkiconpdf.swift 头注释）:
+#    手写极简 PDF 菜单栏正常、Ctrl+Space 切换器（远端视图服务渲染）白方块
 ICON_SRC="../fcitx5/data/lufly.png"
 [ -f "$ICON_SRC" ] || { echo "图标缺失: $ICON_SRC"; exit 1; }
 ICON_TOOL="build/mkiconpdf"

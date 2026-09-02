@@ -35,8 +35,9 @@ enum Installer {
         done.messageText = "安装完成"
         done.informativeText = "最后一步 —— 添加输入法（仅需一次）：\n\n"
             + "① 系统设置 → 键盘 → 输入法 → 编辑…\n"
-            + "② 点 ＋ → 简体中文 → 选「小鹭音形」→ 添加\n"
-            + "③ 菜单栏切换到「小鹭音形」即可打字（Shift 单击切中英）\n\n"
+            + "② 若列表里已有「小鹭音形」，先选中点 − 删除\n"
+            + "③ 点 ＋ → 简体中文 → 选「小鹭音形」→ 添加\n"
+            + "④ 菜单栏切换到「小鹭音形」即可打字（Shift 单击切中英）\n\n"
             + "若列表里暂时没有它：注销并重新登录后再添加。"
         done.addButton(withTitle: "打开系统设置")
         done.addButton(withTitle: "完成")
@@ -85,9 +86,10 @@ enum Installer {
             }
             return false
         }
-        // 免注销注册（macOS 13+ 多数场景即时生效；不行则注销重登兜底）
-        let status = TISRegisterInputSource(dst as CFURL)
-        print(status == noErr ? "TIS 注册请求已发出" : "TIS 注册失败 err=\(status)")
+        // 不做主动注册（TISRegisterInputSource）: 实测自动注册出来的输入法条目
+        // 能出现在列表里但打不了字，用户仍须「− 删除 + 添加」手动来一遍，等于
+        // 白注册还留了个要清理的坏条目（2026-09-02 用户实测裁定）。安装器只负责
+        // 落位 + 弹指引让用户自己添加。
         cleanupLegacySystemCopy()
         return true
     }

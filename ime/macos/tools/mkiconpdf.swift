@@ -1,15 +1,16 @@
-// 生成输入法菜单栏图标（透明底黑鸟 —— **矢量** PDF）。
+// 生成输入法图标（透明底黑鸟，单页 16x16pt PDF，经 CoreGraphics 输出标准结构）。
 // 源图标 fcitx5/data/lufly.png 实为「白圆角块上的黑鸟」：alpha = 圆角块本身，
 // 鸟形藏在 RGB 亮暗里（PIL/raw 探针实证）。这里从亮度提取鸟形（暗=鸟），
-// 描摹成矢量路径填黑输出。
+// crack-following 描摹轮廓 → RDP 简化 → 高分辨率位图化 → CGPDFContext 封装。
 //
-// 为什么必须是矢量 PDF（2026-09-02 实测定论）: 菜单栏/输入源列表的图标渲染
-// 管线不吃位图 alpha——PDF 位图 XObject 的 /SMask、透明底 PNG 全部被渲染成
-// 实心方块（注销重登、清各进程缓存均无效；NSImage/sips 渲染正常所以本地
-// 测不出）。本机三个正常显示图标的输入法 Squirrel(AI 导出)/微信/豆包
-// （rsvg 类工具导出）的 menu_icon.pdf 无一例外全是纯矢量路径、零位图
-// XObject。故此处不做位图嵌入，直接 crack-following 提取轮廓 → RDP 简化
-// → 手写最小矢量 PDF（无外部依赖，potrace/rsvg-convert 本机均无）。
+// 两条实证结论（2026-09-01/02，勿回退）:
+// 1) 图标文件名必须是 menu_icon.pdf——**词干不能与 lufly.icns 撞名**: TIS 按扩展
+//    名无关的 imageForResource: 查找，词干 "lufly" 会命中 icns → 菜单栏图标变成
+//    占位方块（与矢量/位图、安装位置、签名、缓存均无关，名字是唯一根因）。
+// 2) **必须经 CGPDFContext 生成标准结构 PDF，不能手写极简 PDF**: Ctrl+Space
+//    切换器 HUD 由远端视图服务渲染（TextInputUIMacHelper/ViewBridge），它消化
+//    不了手写的 4 对象未压缩 PDF——菜单栏（NSImage 路径）正常、切换器白方块。
+//    换 CG 生成的 PDF（内嵌 Flate 位图）后两端全部正常。
 //
 // 用法: mkiconpdf <bird.png> <out.pdf>
 import Foundation
@@ -109,8 +110,7 @@ func rdp(_ pts: [(Double, Double)], _ eps: Double) -> [(Double, Double)] {
 }
 let simplified = loops.map { rdp($0, 1.2) }
 
-// 3.5 归一化到满画布: 源图里鸟只占圆角块 ~60%，等比描摹在 16pt 菜单栏里显得
-// 小（Squirrel 字形几乎满画布）。按最大维度等比放大，留 4% 边距居中。
+// 3.5 归一化到画布: 按最大维度等比放大，留 8% 边距居中（用户实测 4% 偏大）。
 var drawn: [[(Double, Double)]] = []
 if !simplified.isEmpty {
     var minX = Double.greatestFiniteMagnitude, minY = minX
@@ -119,7 +119,7 @@ if !simplified.isEmpty {
         minX = min(minX, pt.0); minY = min(minY, pt.1)
         maxX = max(maxX, pt.0); maxY = max(maxY, pt.1)
     } }
-    let margin = Double(N) * 0.04
+    let margin = Double(N) * 0.08
     let k = (Double(N) - margin * 2) / max(maxX - minX, maxY - minY)
     let cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, c = Double(N) / 2
     drawn = simplified.map { $0.map { (c + ($0.0 - cx) * k, c + ($0.1 - cy) * k) } }
@@ -129,32 +129,38 @@ if drawn.isEmpty {
     exit(1)
 }
 
-// 4. 手写最小矢量 PDF：单页 16x16pt，cm 把位图坐标（y 向下）映射到 PDF
-//    （y 向上），even-odd 填充让洞自动镂空。Squirrel/微信/豆包同构：纯路径、
-//    零位图 XObject。
-func num(_ d: Double) -> String { String(format: "%.2f", d) }
-var stream = "0.125 0 0 -0.125 0 16 cm\n0 0 0 rg\n"
+// 4. 高分辨率位图化 + CGPDFContext 封装: 掩膜坐标 y 向下，CG y 向上，翻转绘制。
+//    位图 256px 对 16pt 图标（3x Retina 66px）绰绰有余。CGPDFContext 产出标准
+//    结构（Flate 压缩流 + 正规 xref/Info），切换器远端渲染服务与菜单栏都能吃。
+let px = 256
+let bitmap = CGContext(data: nil, width: px, height: px, bitsPerComponent: 8,
+                       bytesPerRow: px * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                       bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+let k = CGFloat(px) / CGFloat(N)
+bitmap.translateBy(x: 0, y: CGFloat(px))
+bitmap.scaleBy(x: k, y: -k)
+bitmap.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
 for loop in drawn {
-    stream += "\(num(loop[0].0)) \(num(loop[0].1)) m\n"
-    for pt in loop.dropFirst() { stream += "\(num(pt.0)) \(num(pt.1)) l\n" }
-    stream += "h\n"
+    guard let first = loop.first else { continue }
+    let path = CGMutablePath()
+    path.move(to: CGPoint(x: first.0, y: first.1))
+    for pt in loop.dropFirst() { path.addLine(to: CGPoint(x: pt.0, y: pt.1)) }
+    path.closeSubpath()
+    bitmap.addPath(path)
 }
-stream += "f*\n"
-let streamData = Array(stream.utf8)
+bitmap.fillPath(using: .evenOdd)
+guard let birdImage = bitmap.makeImage() else {
+    fputs("位图化失败\n", stderr)
+    exit(1)
+}
 
-var pdf = "%PDF-1.4\n"
-var offsets: [Int] = []
-func emit(_ s: String) { offsets.append(pdf.utf8.count); pdf += s }
-emit("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
-emit("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n")
-emit("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 16 16] /Contents 4 0 R /Resources << >> >>\nendobj\n")
-emit("4 0 obj\n<< /Length \(streamData.count) >>\nstream\n")
-pdf += stream
-pdf += "endstream\nendobj\n"
-let xrefPos = pdf.utf8.count
-pdf += "xref\n0 5\n0000000000 65535 f \n"
-for off in offsets { pdf += String(format: "%010d 00000 n \n", off) }
-pdf += "trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n\(xrefPos)\n%%EOF\n"
-
-try! Data(pdf.utf8).write(to: URL(fileURLWithPath: CommandLine.arguments[2]))
-print("矢量 PDF 已生成: \(drawn.count) 条轮廓, \(drawn.reduce(0) { $0 + $1.count }) 个顶点")
+var mediaBox = CGRect(x: 0, y: 0, width: 16, height: 16)
+guard let pdf = CGContext(outURL, mediaBox: &mediaBox, nil) else {
+    fputs("CGPDFContext 创建失败\n", stderr)
+    exit(1)
+}
+pdf.beginPDFPage(nil)
+pdf.draw(birdImage, in: mediaBox)
+pdf.endPDFPage()
+pdf.closePDF()
+print("标准 PDF 已生成（CGPDFContext，内嵌 \(px)px 位图）: \(drawn.count) 条轮廓, \(drawn.reduce(0) { $0 + $1.count }) 个顶点")
