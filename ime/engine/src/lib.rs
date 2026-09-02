@@ -627,11 +627,12 @@ impl Engine {
 
         if self.has_prefix(&next) {
             self.input = next;
-            // 6/8/10… 偶数全码唯一 → 自动上屏（对齐 rime auto_select_pattern；
-            // auto_select 只在唯一候选时生效）。4/5 码只显示候选。
+            // 6/8/10… 偶数全码唯一 **且无更长延展** → 自动上屏（对齐 rime
+            // auto_select：唯一候选才生效——延展词条也是候选）。4/5 码只显示候选。
+            // 只判唯一不判延展时，长词会被挂起的短词在下一键顶出打断。
             let n = self.input.len();
             if n >= 6 && n % 2 == 0 {
-                if let Some(text) = self.unique_exact_text() {
+                if let Some(text) = self.auto_commit_text() {
                     self.input.clear();
                     return Some(text);
                 }
@@ -679,6 +680,29 @@ impl Engine {
         } else {
             None
         }
+    }
+
+    /// 自动上屏判定: 全码唯一 **且无更长编码延展**。
+    /// 有延展时绝不自动上屏，否则长词永远打不完: 3 字词 yrigjp（袁成杰）被
+    /// 挂起后，用户继续敲 4 字词 yrigjpdmzl（远程节点，用户词典）的第 7 键
+    /// 会按「下一键顶出」把袁成杰送上屏（2026-09-02 用户实测报障）。
+    /// 延展存在时短词仍是首选候选，空格上屏；长词敲到头自然触发自己的上屏。
+    fn auto_commit_text(&self) -> Option<String> {
+        let text = self.unique_exact_text()?;
+        // 全码块（code == input，排序后连续在块首）之后的首个词条若仍带本
+        // 前缀，即存在更长延展。用户词块与静态码表各二分一次。
+        let ue = self
+            .user_entries
+            .partition_point(|e| e.code.as_str() <= self.input.as_str());
+        if ue < self.user_entries.len() && self.user_entries[ue].code.starts_with(&self.input) {
+            return None;
+        }
+        let se =
+            self.partition_point(self.entry_count(), |i| self.code_at(i) <= self.input.as_str());
+        if se < self.entry_count() && self.code_at(se).starts_with(&self.input) {
+            return None;
+        }
+        Some(text)
     }
 
     fn prefix_start(&self, prefix: &str) -> usize {
@@ -965,6 +989,60 @@ mod tests {
         let commit = e.key('b');
         assert_eq!(commit, Some("多多".into()), "全码唯一自动上屏");
         assert!(e.is_empty());
+    }
+
+    #[test]
+    fn extendable_code_not_autocommitted_user_ext() {
+        // 静态 3 字词全码是用户 4 字词的前缀: 第 6 键不得自动上屏（否则第 7 键
+        // 顶出挂起短词，长词被打断——远程节点 vs 袁成杰 实测报障）。
+        // 短词仍首选、空格上屏；长词敲满 10 键自然上屏。
+        let mut e = Engine::from_entries(vec![("yrigjp".into(), "袁成杰".into(), 0)]);
+        e.add_user_word("yrigjpdmzl", "远程节点").unwrap();
+        for c in "yrigjp".chars() {
+            assert_eq!(e.key(c), None, "有延展不自动上屏 @{}", e.input());
+        }
+        assert_eq!(e.input(), "yrigjp");
+        assert_eq!(e.candidates()[0].text, "袁成杰", "短词仍是首选");
+        assert_eq!(e.key(' '), Some("袁成杰".into()), "短词走空格");
+
+        let mut g = Engine::from_entries(vec![("yrigjp".into(), "袁成杰".into(), 0)]);
+        g.add_user_word("yrigjpdmzl", "远程节点").unwrap();
+        for c in "yrigjpdmzl".chars() {
+            let commit = g.key(c);
+            if c == 'l' {
+                assert_eq!(commit, Some("远程节点".into()), "长词敲满自然上屏");
+            } else {
+                assert_eq!(commit, None);
+            }
+        }
+        assert!(g.is_empty());
+    }
+
+    #[test]
+    fn extendable_code_not_autocommitted_static_ext() {
+        // 纯静态码表同理: 长词前缀上的短词全码不得自动上屏
+        let mut e = Engine::from_entries(vec![
+            ("yrigjp".into(), "袁成杰".into(), 0),
+            ("yrigjpdmzl".into(), "远程节点".into(), 1),
+        ]);
+        for c in "yrigjp".chars() {
+            assert_eq!(e.key(c), None, "静态延展同样阻断 @{}", e.input());
+        }
+        assert_eq!(e.candidates()[0].text, "袁成杰");
+        assert_eq!(e.key(' '), Some("袁成杰".into()), "短词走空格");
+        let mut f = Engine::from_entries(vec![
+            ("yrigjp".into(), "袁成杰".into(), 0),
+            ("yrigjpdmzl".into(), "远程节点".into(), 1),
+        ]);
+        for c in "yrigjpdmzl".chars() {
+            let commit = f.key(c);
+            if c == 'l' {
+                assert_eq!(commit, Some("远程节点".into()));
+            } else {
+                assert_eq!(commit, None);
+            }
+        }
+        assert!(f.is_empty());
     }
 
     #[test]
