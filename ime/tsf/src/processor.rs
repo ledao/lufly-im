@@ -32,8 +32,16 @@ enum Act {
 
 use windows::core::*;
 use windows::Win32::Foundation::*;
+use windows::Win32::System::Threading::{GetCurrentProcessId, GetCurrentThreadId};
+use windows::Win32::System::Variant::{VARIANT, VT_I4};
+use windows::Win32::UI::Input::Ime::{
+    ImmAssociateContext, ImmCreateContext, ImmGetContext, ImmReleaseContext,
+};
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::TextServices::*;
+use windows::Win32::UI::WindowsAndMessaging::{
+    GetGUIThreadInfo, GetWindowThreadProcessId, KillTimer, SetTimer, GUITHREADINFO,
+};
 
 use lufly_engine::Engine;
 
@@ -46,6 +54,81 @@ pub const PAGE_SIZE: usize = 6;
 
 /// 用户词典落盘间隔（与 capi USER_FLUSH_INTERVAL 一致）
 const USER_FLUSH_INTERVAL: u32 = 64;
+
+/// 活跃实例的 IME 自愈定时器（timer id → 该实例的 Shared）。
+/// TIMERPROC 无上下文，用全局槽把定时器与实例关联。
+/// Shared 含 COM 指针（!Send），但实际只在其所属 STA 线程使用
+/// （定时器建在该线程、回调也在该线程），仿 langbar SendSink 包装。
+struct HealShared(Arc<Mutex<Shared>>);
+unsafe impl Send for HealShared {}
+static HEALS: Mutex<Vec<(usize, HealShared)>> = Mutex::new(Vec::new());
+
+/// 企业微信 5.x 类应用（Flutter/自绘框架）会断开窗口的 IME 关联，按键在
+/// ImmProcessKey 层被判「此窗口不走 IME」——字母直出，任何键都到不了 TIP。
+/// 注意 HIMC 是进程私有句柄，外部进程读到的恒为 0、外部进程挂的上下文本进程
+/// 也认不了，只能进程内自愈；本 TIP 恰被加载在这些应用进程里，定时体检：
+///   1) 本进程焦点窗口无 HIMC → 现挂一个，键路由即刻恢复
+///   2) 键盘开关 compartment 被拨到关 → 拨回开（对齐 weasel OnCompartmentChanged）
+fn heal_once(shared: &Arc<Mutex<Shared>>) {
+    unsafe {
+        let tid = GetCurrentThreadId();
+        let mut gi = GUITHREADINFO::default();
+        gi.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
+        if GetGUIThreadInfo(tid, &mut gi).is_ok() && !gi.hwndFocus.is_invalid() {
+            let focus = gi.hwndFocus;
+            let mut pid = 0u32;
+            let _ = GetWindowThreadProcessId(focus, Some(&mut pid));
+            if pid == GetCurrentProcessId() {
+                let himc = ImmGetContext(focus);
+                if himc.is_invalid() {
+                    let fresh = ImmCreateContext();
+                    if !fresh.is_invalid() {
+                        ImmAssociateContext(focus, fresh);
+                        crate::log(&format!(
+                            "ime heal: focus hwnd={focus:?} had no HIMC -> attached fresh"
+                        ));
+                    }
+                } else {
+                    let _ = ImmReleaseContext(focus, himc);
+                }
+            }
+        }
+
+        let (tm, client_id) = {
+            let s = shared.lock().unwrap();
+            (s.thread_mgr.clone(), s.client_id)
+        };
+        if let Some(tm) = tm {
+            if let Ok(cm) = tm.cast::<ITfCompartmentMgr>() {
+                if let Ok(c) = cm.GetCompartment(&GUID_COMPARTMENT_KEYBOARD_OPENCLOSE) {
+                    let mut open = true;
+                    if let Ok(v) = c.GetValue() {
+                        let vt = (*v.Anonymous.Anonymous).vt;
+                        let lval = (*v.Anonymous.Anonymous).Anonymous.lVal;
+                        open = vt == VT_I4 && lval != 0;
+                    }
+                    if !open {
+                        let mut v = VARIANT::default();
+                        (*v.Anonymous.Anonymous).vt = VT_I4;
+                        (*v.Anonymous.Anonymous).Anonymous.lVal = 1;
+                        let _ = c.SetValue(client_id, &v);
+                        crate::log("ime heal: keyboard openclose was off -> reopened");
+                    }
+                }
+            }
+        }
+    }
+}
+
+unsafe extern "system" fn heal_tick(_hwnd: HWND, _msg: u32, id: usize, _time: u32) {
+    let shared = {
+        let heals = HEALS.lock().unwrap();
+        heals.iter().find(|(t, _)| *t == id).map(|(_, s)| s.0.clone())
+    };
+    if let Some(shared) = shared {
+        heal_once(&shared);
+    }
+}
 
 /// 线程共享状态（TIP 与各编辑会话共用）
 pub struct Shared {
@@ -268,7 +351,12 @@ fn build_preedit(st: &State, eng_input: &str) -> String {
     s
 }
 
-#[implement(ITfTextInputProcessor, ITfKeyEventSink, ITfCompositionSink)]
+#[implement(
+    ITfTextInputProcessor,
+    ITfTextInputProcessorEx,
+    ITfKeyEventSink,
+    ITfCompositionSink
+)]
 pub struct LuflyTsf {
     pub shared: Arc<Mutex<Shared>>,
 }
@@ -980,8 +1068,16 @@ impl LuflyTsf {
     }
 }
 
-impl ITfTextInputProcessor_Impl for LuflyTsf_Impl {
-    fn Activate(&self, ptim: Ref<'_, ITfThreadMgr>, tid: u32) -> Result<()> {
+impl ITfTextInputProcessorEx_Impl for LuflyTsf_Impl {
+    fn ActivateEx(&self, ptim: Ref<'_, ITfThreadMgr>, tid: u32, dwflags: u32) -> Result<()> {
+        self.activate_ex(ptim, tid, dwflags)
+    }
+}
+
+impl LuflyTsf_Impl {
+    /// 真正的激活逻辑（Activate 与 ActivateEx 共用，对齐 weasel ActivateEx）
+    fn activate_ex(&self, ptim: Ref<'_, ITfThreadMgr>, tid: u32, flags: u32) -> Result<()> {
+        crate::log(&format!("ActivateEx tid={tid} flags=0x{flags:X}"));
         let tm = ptim
             .as_ref()
             .ok_or_else(|| Error::from_hresult(E_INVALIDARG))?
@@ -998,7 +1094,10 @@ impl ITfTextInputProcessor_Impl for LuflyTsf_Impl {
 
         unsafe {
             let keystroke: ITfKeystrokeMgr = tm.cast()?;
-            keystroke.AdviseKeyEventSink(tid, &key_sink, true)?;
+            if let Err(e) = keystroke.AdviseKeyEventSink(tid, &key_sink, true) {
+                crate::log(&format!("AdviseKeyEventSink: {e}"));
+                return Err(e);
+            }
         }
 
         // 语言栏托盘项（对齐 weasel/微软拼音：logo + 中/EN 模式双图标）
@@ -1041,6 +1140,28 @@ impl ITfTextInputProcessor_Impl for LuflyTsf_Impl {
             Err(e) => crate::log(&format!("langbar mgr: {e}")),
         }
 
+        // 强制打开键盘开关 compartment（对齐 weasel ActivateEx 的 _SetKeyboardOpen）：
+        // 区室为空/0 时按键直接绕过 TIP —— 部分应用（企业微信等）按它决定是否把键
+        // 交给 IME，症状正是「Activate ok 但收不到任何按键」
+        if let Ok(cm) = tm.cast::<ITfCompartmentMgr>() {
+            match unsafe { cm.GetCompartment(&GUID_COMPARTMENT_KEYBOARD_OPENCLOSE) } {
+                Ok(c) => {
+                    let mut v = VARIANT::default();
+                    unsafe {
+                        (*v.Anonymous.Anonymous).vt = VT_I4;
+                        (*v.Anonymous.Anonymous).Anonymous.lVal = 1;
+                        let r = c.SetValue(tid, &v);
+                        crate::log(&format!("openclose set open: {}", r.is_ok()));
+                    }
+                }
+                Err(e) => crate::log(&format!("openclose get: {e}")),
+            }
+        }
+
+        // 进程内 IME 关联体检（1s 周期，Deactivate 时停）
+        let timer = unsafe { SetTimer(None, 0, 1000, Some(heal_tick)) };
+        HEALS.lock().unwrap().push((timer, HealShared(self.shared.clone())));
+
         // 后台预载主码表（不阻塞 Activate；首次按键由 ensure_engine 兜底）
         std::thread::spawn(|| {
             static MAIN_DICT: &[u8] = include_bytes!("../../data/xiaolu_he_he.bin");
@@ -1051,9 +1172,28 @@ impl ITfTextInputProcessor_Impl for LuflyTsf_Impl {
         crate::log("Activate ok");
         Ok(())
     }
+}
+
+impl ITfTextInputProcessor_Impl for LuflyTsf_Impl {
+    fn Activate(&self, ptim: Ref<'_, ITfThreadMgr>, tid: u32) -> Result<()> {
+        // 对齐 weasel：Activate 一律委托 ActivateEx(0)。
+        // TSF 不感知应用（CUAS 路径，如企业微信）由系统激活时可能直接走 Ex 入口，
+        // 缺 Ex 实现会导致该类应用里激活不完整（键槽虽 Advise 但收不到键）
+        self.activate_ex(ptim, tid, 0)
+    }
 
     fn Deactivate(&self) -> Result<()> {
         let mut shared = self.shared.lock().unwrap();
+        // 停掉 IME 关联体检定时器
+        {
+            let mut heals = HEALS.lock().unwrap();
+            if let Some(pos) = heals.iter().position(|(_, s)| Arc::ptr_eq(&s.0, &self.shared)) {
+                let (t, _) = heals.swap_remove(pos);
+                unsafe {
+                    let _ = KillTimer(None, t);
+                }
+            }
+        }
         if let Some(tm) = &shared.thread_mgr {
             unsafe {
                 let keystroke: ITfKeystrokeMgr = tm.cast()?;
@@ -1100,6 +1240,8 @@ impl ITfKeyEventSink_Impl for LuflyTsf_Impl {
             shared.st.reset();
             shared.cand_win.hide();
             crate::log("focus lost: reset");
+        } else {
+            crate::log("focus gained");
         }
         Ok(())
     }
@@ -1127,6 +1269,8 @@ impl ITfKeyEventSink_Impl for LuflyTsf_Impl {
         let want = !alt
             && (!ctrl || (vk.0 == 0x30 && !shift)) // Ctrl+0 切标点半角
             && (is_shift || (!ascii && wants_key(vk)));
+        // 诊断：区分「键到了但 Test 拒绝」与「键根本没到键槽」（企业微信排查）
+        crate::log(&format!("TestKeyDown vk=0x{:02X} want={}", vk.0, want as i32));
         Ok(BOOL(want as i32))
     }
 

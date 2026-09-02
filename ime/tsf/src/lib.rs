@@ -85,7 +85,11 @@ extern "system" fn DllGetClassObject(
         if *rclsid != CLSID_LUFLY_TIP {
             return CLASS_E_CLASSNOTAVAILABLE;
         }
-        log("DllGetClassObject");
+        // 进程身份：区分日志条目来自哪个应用（同一日志文件多进程共写）
+        let exe = std::env::current_exe()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| "?".into());
+        log(&format!("DllGetClassObject pid={} exe={exe}", std::process::id()));
         let factory: IUnknown = ClassFactory.into();
         factory.query(riid, ppv)
     }

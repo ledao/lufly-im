@@ -1,6 +1,7 @@
 ﻿; 小鹭音形输入法 Windows 安装包（NSIS / MUI2）
-; 构建: makensis lufly.nsi  →  ..\dist\LuflyIME-Setup-0.5.2.exe
-; 升级安装: DLL 装在版本号子目录，新目录永无文件锁；旧文件重启后清理
+; 构建: makensis lufly.nsi  →  ..\dist\LuflyIME-Setup-0.5.5.exe
+; 升级安装: DLL 装在版本号子目录，跨版本新目录永无文件锁；同版本重跑时
+; 旧 DLL 改名腾位（被加载中删不掉、同卷可改名）；旧文件重启后清理
 
 Unicode true
 ; 高分屏（150%/4K）下向导不模糊
@@ -13,7 +14,7 @@ SetCompressor /SOLID lzma
 ; --- 常量 ---
 !define PRODUCT_NAME "小鹭音形输入法"
 !define PRODUCT_PUBLISHER "小鹭音形开发组"
-!define VER "0.5.2"
+!define VER "0.5.5"
 !define PROFILE_GUID "{7C3A1E92-5D4F-4B68-9A2C-E1F0B3D4A5C6}"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\LuflyIME"
 !define CLSID_STR "{2E168808-0490-43E1-9481-F2662BB32954}"
@@ -75,14 +76,23 @@ Section "Install"
   ExecWait 'regsvr32 /u /s "$INSTDIR\0.4.2\lufly_tsf.dll"'
   ExecWait 'regsvr32 /u /s "$INSTDIR\0.5.0\lufly_tsf.dll"'
   ExecWait 'regsvr32 /u /s "$INSTDIR\0.5.1\lufly_tsf.dll"'
+  ExecWait 'regsvr32 /u /s "$INSTDIR\0.5.2\lufly_tsf.dll"'
   ; 旧 DLL 可能已删除导致 regsvr32 /u 无效 —— 直接清掉自己的残留键（含手写时代的脏数据）
   DeleteRegKey HKLM "SOFTWARE\Microsoft\CTF\TIP\${CLSID_STR}"
   DeleteRegKey HKLM "SOFTWARE\Classes\CLSID\${CLSID_STR}"
   ExecWait 'taskkill /f /im ctfmon.exe'
   Sleep 800
 
-  ; 2. 写入新版本子目录（新路径不存在文件锁）
+  ; 2. 写入新版本子目录（跨版本升级 = 新路径永无文件锁；同版本重跑时旧 DLL
+  ;    仍被 msedge 等应用加载 —— 删不掉但同卷可改名：挪成带时戳的 .old 腾位，
+  ;    .old 安排重启后清理）
   SetOutPath "$INSTDIR\${VER}"
+  Delete /REBOOTOK "$INSTDIR\${VER}\lufly_tsf.*.old" ; 清上次重跑遗留的 .old
+  System::Call 'kernel32::GetTickCount()i.R0'
+  Rename "$INSTDIR\${VER}\lufly_tsf.dll" "$INSTDIR\${VER}\lufly_tsf.$R0.old"
+  ${If} ${FileExists} "$INSTDIR\${VER}\lufly_tsf.$R0.old"
+    Delete /REBOOTOK "$INSTDIR\${VER}\lufly_tsf.$R0.old"
+  ${EndIf}
   File /oname=lufly_tsf.dll "..\target\release\lufly_tsf.dll"
   File "lufly.ico"
   File "lufly-zh.ico"
@@ -104,6 +114,9 @@ Section "Install"
   ; 旧文件被占用删不掉时安排重启后清
   Delete /REBOOTOK "$INSTDIR\lufly_tsf.dll"
   Delete /REBOOTOK "$INSTDIR\bin\lufly_tsf.dll"
+  ; 早期版本把卸载器写在根目录/bin 下的残留
+  Delete /REBOOTOK "$INSTDIR\uninstall.exe"
+  Delete /REBOOTOK "$INSTDIR\bin\uninstall.exe"
   RMDir /r /REBOOTOK "$INSTDIR\0.2.1"
   RMDir /r /REBOOTOK "$INSTDIR\0.2.2"
   RMDir /r /REBOOTOK "$INSTDIR\0.2.3"
@@ -120,6 +133,7 @@ Section "Install"
   RMDir /r /REBOOTOK "$INSTDIR\0.4.2"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.0"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.1"
+  RMDir /r /REBOOTOK "$INSTDIR\0.5.2"
   RMDir /REBOOTOK "$INSTDIR\bin"
 
   ; 5. 卸载器与控制面板卸载项
