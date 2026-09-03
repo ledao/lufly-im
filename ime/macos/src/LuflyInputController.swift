@@ -211,8 +211,9 @@ final class LuflyInputController: IMKInputController {
             let idx = sel + state.page * pageSize
             if let text = LuflyEngine.shared.candidateText(idx, rev) {
                 if state.addStage == 1 {
-                    // 加词·选字阶段: 选中的字进词槽，继续选下一个字
-                    appendAddWord(text)
+                    // 加词·选字阶段: 选中的字进词槽（记录所选码），继续选下一个字
+                    let code = rev ? nil : LuflyEngine.shared.candidateCode(idx, rev)
+                    appendAddWord(text, code: code)
                     updateUI(client)
                     return true
                 }
@@ -236,7 +237,8 @@ final class LuflyInputController: IMKInputController {
             let idx = 1 + state.page * pageSize
             if let text = LuflyEngine.shared.candidateText(idx, rev) {
                 if state.addStage == 1 {
-                    appendAddWord(text)
+                    let code = rev ? nil : LuflyEngine.shared.candidateCode(idx, rev)
+                    appendAddWord(text, code: code)
                     updateUI(client)
                     return true
                 }
@@ -260,6 +262,9 @@ final class LuflyInputController: IMKInputController {
                     if state.addStage == 1 {
                         // 加词中: 挂起字进词槽（不能漏进文档）
                         state.addWord += state.pending
+                        state.addSegs.append(
+                            (code: state.reverse ? "" : state.pendingCode,
+                             text: state.pending))
                     } else {
                         // 空格确认挂起字（空格被消费，不会漏成真空格）
                         LuflyEngine.shared.learn(code: state.pendingCode, text: state.pending)
@@ -280,10 +285,12 @@ final class LuflyInputController: IMKInputController {
                 return false // 空缓冲透传
             }
             let code = state.buffer
+            let selCode = (state.addStage == 1 && !rev)
+                ? LuflyEngine.shared.candidateCode(0, rev) : nil
             if let text = LuflyEngine.shared.key(UInt32(Unicode.Scalar(" ").value), rev) {
                 if state.addStage == 1 {
-                    // 加词·选字阶段: 空格选中首选进词槽，不提交
-                    appendAddWord(text)
+                    // 加词·选字阶段: 空格选中首选进词槽（记录所选码），不提交
+                    appendAddWord(text, code: selCode)
                     updateUI(client)
                     return true
                 }
@@ -314,6 +321,9 @@ final class LuflyInputController: IMKInputController {
                 // 空缓冲: 挂起字进词槽，完成选字 → 编码阶段
                 if !state.pending.isEmpty {
                     state.addWord += state.pending
+                    state.addSegs.append(
+                        (code: state.reverse ? "" : state.pendingCode,
+                         text: state.pending))
                     state.pending = ""
                     state.pendingCode = ""
                 }
@@ -365,6 +375,19 @@ final class LuflyInputController: IMKInputController {
                 if state.addStage == 1 {
                     if !state.addWord.isEmpty {
                         state.addWord.removeLast() // 删词槽最后一个字
+                        // segs 同步: 末段减一字；段码不足 2k（简码）时整段码作废
+                        if let last = state.addSegs.last {
+                            let n = last.text.count
+                            if n <= 1 {
+                                state.addSegs.removeLast()
+                            } else {
+                                var seg = last
+                                seg.text.removeLast()
+                                seg.code = seg.code.count >= 2 * n
+                                    ? String(seg.code.prefix(2 * (n - 1))) : ""
+                                state.addSegs[state.addSegs.count - 1] = seg
+                            }
+                        }
                     } else {
                         cancelAddWord() // 退无可退: 退出加词
                     }
@@ -408,8 +431,17 @@ final class LuflyInputController: IMKInputController {
             state.punctErased = false // 继续打字: 退格翻转作废
             let ch = UInt32(c.asciiValue!)
             if !state.pending.isEmpty {
-                // 顶功: 下一字词的首键把挂起字顶出（快打全程不用空格）
-                commit(client, state.pending)
+                // 顶功: 下一字词的首键把挂起字顶出（快打全程不用空格）；
+                // 加词中顶进词槽而非上屏（对齐 lufly.cpp:1214-1227）
+                if state.addStage == 1 {
+                    state.addWord += state.pending
+                    state.addSegs.append(
+                        (code: state.reverse ? "" : state.pendingCode,
+                         text: state.pending))
+                } else {
+                    noteAutoCommit(state.pendingCode, state.pending)
+                    commit(client, state.pending)
+                }
                 state.pending = ""
                 state.pendingCode = ""
                 state.lastCls = 0
@@ -426,7 +458,11 @@ final class LuflyInputController: IMKInputController {
             if state.buffer == "ojc" {
                 state.buffer = ""
                 state.reverse = false
+                // 每次输入 ojc = 全新加词（清残留，防上一轮反悔的词混入）
                 state.addStage = 1
+                state.addWord = ""
+                state.addCode = ""
+                state.addSegs = []
                 LuflyEngine.shared.replay(state.buffer, rev)
             }
             updateUI(client)
@@ -514,21 +550,31 @@ final class LuflyInputController: IMKInputController {
 
     /// 用户连续以 4 键全码打字上屏时，把这些字拼成自动词（≥2 字成词，
     /// 上限 4 字）。其余任何上屏断链。走 user_add_word: rank0/计数1/落盘。
+    /// 组码直接用逐字记录的全码（不再 derive——多音字会踩码表行序）。
     private func noteAutoCommit(_ code: String, _ text: String) {
         guard code.count == 4, text.count == 1 else {
             state.autoBuf = ""
+            state.autoCodes = []
             return
         }
+        // 防御: 链头不齐（断链路径漏清 autoCodes）时重置，宁退回旧行为
+        if state.autoCodes.count != state.autoBuf.count {
+            state.autoBuf = ""
+            state.autoCodes = []
+        }
         state.autoBuf += text
+        state.autoCodes.append(code)
         let n = state.autoBuf.count
         if n < 2 {
             return
         }
         if n > 4 { // 词长上限 4 字，超长断链防串词
             state.autoBuf = ""
+            state.autoCodes = []
             return
         }
-        if let d = LuflyEngine.shared.deriveWord(state.autoBuf) {
+        let segs = zip(state.autoCodes, state.autoBuf).map { (code: $0, text: String($1)) }
+        if let d = LuflyEngine.shared.composeWordCode(segs: segs) {
             _ = LuflyEngine.shared.userAddWord(code: d, text: state.autoBuf)
         }
     }
@@ -537,17 +583,22 @@ final class LuflyInputController: IMKInputController {
     //         lufly.cpp:361-385）
 
     /// 加词·选字: 选中候选追加进词槽，留在选字阶段继续选下一个字；
+    /// 记录所选候选的码供组词（所见即所得；反查选字码无效传 nil）；
     /// 反查选中后一并退出反查
-    private func appendAddWord(_ text: String) {
+    private func appendAddWord(_ text: String, code: String?) {
         state.addWord += text
+        state.addSegs.append((code: code ?? "", text: text))
         state.buffer = ""
         state.reverse = false
         state.addStage = 1
     }
 
-    /// 选字完成 → 编码阶段: 推导默认码（固定查主码表，反查态的引擎是 fuzhu）
+    /// 选字完成 → 编码阶段: 先用选字记录的码段组码（所见即所得，多音字
+    /// 不踩码表行序），失败回退 derive（固定查主码表，反查态的引擎是 fuzhu）
     private func finishAddWord() {
-        state.addCode = LuflyEngine.shared.deriveWord(state.addWord) ?? ""
+        state.addCode = LuflyEngine.shared.composeWordCode(segs: state.addSegs)
+            ?? LuflyEngine.shared.deriveWord(state.addWord)
+            ?? ""
         state.buffer = ""
         state.reverse = false
         state.addStage = 2
@@ -558,7 +609,9 @@ final class LuflyInputController: IMKInputController {
         state.addStage = 0
         state.addWord = ""
         state.addCode = ""
+        state.addSegs = []
         state.autoBuf = ""
+        state.autoCodes = []
     }
 
     // MARK: - Shift 单击切中英（对齐 lufly.cpp:634-695 + fcitx5-macos 防误切）

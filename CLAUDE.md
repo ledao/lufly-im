@@ -55,6 +55,23 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 - fcitx5（Linux）：`src/lufly.cpp` 标点分支已同步（punctErased 原有，作用范围收窄到数字），未重新构建——下次构建即生效。
 - TSF（Windows）：`src/processor.rs` 已同步（已过 x86_64-pc-windows-msvc cargo check，未出 DLL）——发版时注意更新说明。
 
+## ojc 加词组码改为「选字记录码」（2026-09-03，macOS/fcitx5 已同步，TSF 未同步）
+
+加词/自动造词的词码来源从 `derive_word_code`（按码表行序猜多音字读音，曾把「提」推成 dī 的
+`dijntvss`）改为 ojc 选字阶段逐段记录所选候选的码，`compose_word_code`（engine）按记录码组词：
+用户选字敲什么音，词就是什么音（所见即所得）。缺的双拼/形码按「该字+记录双拼」锚定查全码
+（`char_full_code_for_sp`），无效段（反查选字）回退 derive 行序。ojc 入口现为全新加词（清 addWord 残留）。
+注意：capi 字符串借用「下次调用前有效」——fcitx5 空格选首选路径必须先把 `lufly_candidate_code`
+**拷贝**成 std::string 再调 `lufly_key`（key 会刷新候选缓存，借用随即悬空）。自动造词
+（noteAutoCommit）同样直接用逐字记录的 4 键全码组码，不再 derive。
+
+- macOS/fcitx5：已实现，fcitx5 未重新构建（下次 Linux 构建即生效）。
+- TSF（Windows）：processor.rs/state.rs 的同款 ojc/自动造词流程**尚未同步**，仍走 derive。
+  同步时挂起字（顶功 pending）的**全部出口**都要动：空格确认、回车合并、字母顶出（最常用、
+  两端都曾在此漏记 segs/漏 addStage 分支）、标点顶出、退格撤销，缺一即组码段数与词不符。
+- 弹窗管线（lufly-cli addword/derive）不经过选字，仍走 derive——多音字踩行序的坑在那条路径仍在。
+
+
 ## 码表 v2 升级（fcitx5/TSF 待重编上线）
 
 引擎码表格式已升级 v2（MAGIC `LUFLYD01`→`LUFLYD02`）：文件内嵌「(数据偏移, rank) × N」索引，引擎整体 mmap/托管后按索引借用、**堆上零索引**；`ime/data/xiaolu_he_he.bin`（32.5MiB/137.3万条）与 `xiaolu_fuzhu.bin` 已重新生成。实测（vmmap）：mmap 路径进程物理占用 **~1.5MB**（码表全为可回收干净文件页），旧 v0 约 140MB；同方案本机对比 Rime/Squirrel 常驻 27.9MB。**C ABI 除新增 `lufly_new_file`（mmap 加载）外不变**，前端逻辑零改动，重编即接入：

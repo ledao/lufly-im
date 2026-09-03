@@ -445,6 +445,31 @@ impl Engine {
             .map(|i| self.code_at(i))
     }
 
+    /// 单字的 4 码全码，双拼部分须匹配 `sp`（多音字按用户实际敲的读音取码）。
+    /// 用户词优先，其余取码表行序最靠前者。无匹配返回 None。
+    /// 码表按 code 排序 → 二分到 sp 前缀区间内扫，不全表扫。
+    fn char_full_code_for_sp(&self, ch: char, sp: &str) -> Option<&str> {
+        if let Some(e) = self.user_entries.iter().find(|e| {
+            e.code.len() == 4
+                && e.code.starts_with(sp)
+                && e.text.len() == ch.len_utf8()
+                && e.text.starts_with(ch)
+        }) {
+            return Some(e.code.as_str());
+        }
+        let start = self.prefix_start(sp);
+        (start..self.entry_count())
+            .take_while(|&i| self.code_at(i).starts_with(sp))
+            .filter(|&i| {
+                let text = self.text_at(i);
+                text.len() == ch.len_utf8()
+                    && text.starts_with(ch)
+                    && self.code_at(i).len() == 4
+            })
+            .min_by_key(|&i| self.rank_at(i))
+            .map(|i| self.code_at(i))
+    }
+
     /// 为一个词推导默认全码（加词用）:
     /// - 单字词: 该字 4 码全码（双拼2+形码2）
     /// - 2 字词: 首末字双拼(2+2) + 首末字形码各 1 键，共 6 码
@@ -474,6 +499,106 @@ impl Engine {
                 Ok(out)
             }
         }
+    }
+
+    /// 用 ojc 选字阶段记录的 (码, 文本) 段序组词码（组码规则与
+    /// derive_word_code 一致: 单字=4 码全码；多字=每字双拼+首末形码各 1）。
+    /// 记录码优先——用户选字敲什么音，词就是什么音（多音字所见即所得，
+    /// 不依赖码表行序）；缺的双拼/形码按「该字+记录的双拼」锚定查全码，
+    /// 仍缺回退 char_full_code（行序）。码无效（空串=反查选字/一键简码）的
+    /// 段只提供文本。任一字查不到全码时返回 Err(说明)。
+    pub fn compose_word_code(&self, segs: &[(&str, &str)]) -> Result<String, String> {
+        // 摊平成逐字 (ch, 记录双拼, 记录形码首键)
+        let mut recs: Vec<(char, Option<String>, Option<char>)> = Vec::new();
+        for &(code, text) in segs {
+            let chars: Vec<char> = text.chars().collect();
+            if chars.is_empty() {
+                return Err("空段".into());
+            }
+            let k = chars.len();
+            let ok = !code.is_empty() && code.bytes().all(|b| b.is_ascii_lowercase());
+            // 结构约定: 多字段码长须在 [2k, 2k+2]（不足是简码如「问题 wt」，
+            // 超长是自造非双拼结构码如「<-」= leftarrow，按 2i..2i+2 拆会出
+            // 垃圾双拼）→ 都不拆、整段走兜底。单字宽松（≥2 即可）: 符号码
+            // 形如 oxomega（ox 是输入前缀、可超 4 键），[0..2] 正是所敲前缀
+            let usable = ok
+                && if k == 1 {
+                    code.len() >= 2
+                } else {
+                    (2 * k..=2 * k + 2).contains(&code.len())
+                };
+            let base = recs.len();
+            for (i, &ch) in chars.iter().enumerate() {
+                let sp = if usable && code.len() >= 2 * (i + 1) {
+                    Some(code[2 * i..2 * i + 2].to_owned())
+                } else {
+                    None
+                };
+                recs.push((ch, sp, None));
+            }
+            if usable {
+                let cb: Vec<char> = code.chars().collect();
+                // 段形码位置: 2k 键之后依次是首字形码、末字形码
+                if code.len() >= 2 * k + 1 {
+                    recs[base].2 = Some(cb[2 * k]);
+                }
+                // k==1 时首末同字，cb[3] 是形码第二键，不能顶掉首键
+                if k >= 2 && code.len() >= 2 * k + 2 {
+                    recs[base + k - 1].2 = Some(cb[2 * k + 1]);
+                }
+            }
+        }
+        let n = recs.len();
+        if n == 0 {
+            return Err("空词".into());
+        }
+        if n == 1 {
+            let (ch, sp, _) = &recs[0];
+            let (code, _) = segs[0];
+            if code.len() == 4 && code.bytes().all(|b| b.is_ascii_lowercase()) {
+                return Ok(code.to_owned()); // 记录码已是全码，直接用
+            }
+            return sp
+                .as_ref()
+                .and_then(|s| self.char_full_code_for_sp(*ch, s))
+                .or_else(|| self.char_full_code(*ch))
+                .map(str::to_owned)
+                .ok_or_else(|| format!("「{}」不在码表（无全码）", ch));
+        }
+        let mut out = String::with_capacity(2 * n + 2);
+        // 双拼: 记录值优先；缺了按行序兜底（顺带缓存全码给形码复用）
+        let mut fulls: Vec<Option<&str>> = vec![None; n];
+        for (i, (ch, sp, _)) in recs.iter().enumerate() {
+            match sp {
+                Some(s) => out.push_str(s),
+                None => {
+                    let c = self
+                        .char_full_code(*ch)
+                        .ok_or_else(|| format!("「{}」不在码表（无全码）", ch))?;
+                    fulls[i] = Some(c);
+                    out.push_str(&c[..2]);
+                }
+            }
+        }
+        // 首末形码: 记录值 → 双拼锚定查全码 → 行序兜底
+        for &i in &[0usize, n - 1] {
+            let (ch, sp, x) = &recs[i];
+            if let Some(x) = x {
+                out.push(*x);
+                continue;
+            }
+            if let Some(c) = fulls[i] {
+                out.push(c.as_bytes()[2] as char);
+                continue;
+            }
+            let c = sp
+                .as_ref()
+                .and_then(|s| self.char_full_code_for_sp(*ch, s))
+                .or_else(|| self.char_full_code(*ch))
+                .ok_or_else(|| format!("「{}」不在码表（无全码）", ch))?;
+            out.push(c.as_bytes()[2] as char);
+        }
+        Ok(out)
     }
 
     fn compute_candidates(&self) -> Vec<Candidate> {
@@ -1058,6 +1183,106 @@ mod tests {
             e.key(c);
         }
         assert_eq!(e.candidates()[0].text, "自主词", "加词救活 miss");
+    }
+
+    // ---- compose_word_code（ojc 选字记录码组词）----
+
+    #[test]
+    fn compose_word_code_uses_recorded_reading() {
+        // 多音字「提」: dī(difr) 行序在前、tí(tifr) 在后——derive 取 di，
+        // compose 按选字记录的码取 ti（所见即所得）
+        let e = Engine::from_entries(vec![
+            ("difr".into(), "提".into(), 0),
+            ("tifr".into(), "提".into(), 1),
+            ("dif".into(), "提".into(), 2),
+            ("jnwq".into(), "交".into(), 0),
+            ("tvfq".into(), "推".into(), 0),
+            ("ssdq".into(), "送".into(), 0),
+        ]);
+        let segs = [("tif", "提"), ("jnwq", "交"), ("tvfq", "推"), ("ssdq", "送")];
+        assert_eq!(e.compose_word_code(&segs).unwrap(), "tijntvssfd");
+        // derive 对照: 行序在前的 dī 音被选中（旧路径的问题所在）
+        assert_eq!(e.derive_word_code("提交推送").unwrap(), "dijntvssfd");
+        // 记录 dī 音则按 di 组码
+        let segs_di = [("dif", "提"), ("jnwq", "交"), ("tvfq", "推"), ("ssdq", "送")];
+        assert_eq!(e.compose_word_code(&segs_di).unwrap(), "dijntvssfd");
+    }
+
+    #[test]
+    fn compose_word_code_anchors_missing_xing() {
+        let e = Engine::from_entries(vec![
+            ("tifr".into(), "提".into(), 0),
+            ("difr".into(), "提".into(), 1),
+            ("jnwq".into(), "交".into(), 0),
+        ]);
+        // 2 键纯双拼选「提」: 形码按记录双拼锚定补（ti → tifr 的 f），
+        // 「交」的形码取自记录码 jnwq 的第 3 键 → 6 码与码表「提交 tijnfw」同构
+        assert_eq!(e.compose_word_code(&[("ti", "提"), ("jnwq", "交")]).unwrap(), "tijnfw");
+    }
+
+    #[test]
+    fn compose_word_code_falls_back_to_rank() {
+        let e = Engine::from_entries(vec![
+            ("difr".into(), "提".into(), 0),
+            ("tifr".into(), "提".into(), 1),
+            ("jnwq".into(), "交".into(), 0),
+        ]);
+        // 无效码段（反查选字）: 该字按行序兜底 → difr 的 di
+        assert_eq!(e.compose_word_code(&[("", "提"), ("jnwq", "交")]).unwrap(), "dijnfw");
+        // 一键简码段同理
+        assert_eq!(e.compose_word_code(&[("t", "提"), ("jnwq", "交")]).unwrap(), "dijnfw");
+    }
+
+    #[test]
+    fn compose_word_code_multi_char_segment() {
+        let e = Engine::from_entries(vec![
+            ("tifr".into(), "提".into(), 0),
+            ("ssdq".into(), "送".into(), 0),
+            ("tijnfw".into(), "提交".into(), 0),
+        ]);
+        // 选了双字段「提交」(tijnfw): 拆出 ti/jn 与首字形码 f；「推送」为
+        // 纯双拼段，末字形码按送的双拼 ss 锚定补
+        assert_eq!(
+            e.compose_word_code(&[("tijnfw", "提交"), ("tvss", "推送")])
+                .unwrap(),
+            "tijntvssfd"
+        );
+        // 简码多字段（码长 < 2k）拆不出逐字双拼 → 整段按行序兜底
+        let g = Engine::from_entries(vec![
+            ("wtvb".into(), "问".into(), 0),
+            ("tbvb".into(), "题".into(), 0),
+        ]);
+        assert_eq!(g.compose_word_code(&[("wt", "问题")]).unwrap(), "wttbvv");
+    }
+
+    #[test]
+    fn compose_word_code_rejects_overlong_multi_char_code() {
+        // 自造非双拼结构码（如「多多=duoduobb」，2 字 8 键 > 2k+2=6）:
+        // 按 2i..2i+2 拆会出垃圾双拼（du/od）→ 整段按行序兜底
+        let e = Engine::from_entries(vec![
+            ("duob".into(), "多".into(), 0),
+            ("haoz".into(), "好".into(), 0),
+        ]);
+        assert_eq!(
+            e.compose_word_code(&[("duoduobb", "多多"), ("haoz", "好")])
+                .unwrap(),
+            "duduhaoo"
+        );
+    }
+
+    #[test]
+    fn compose_word_code_single_char() {
+        let e = Engine::from_entries(vec![
+            ("difr".into(), "提".into(), 0),
+            ("tifr".into(), "提".into(), 1),
+        ]);
+        // 单字: 记录 4 键全码直接用
+        assert_eq!(e.compose_word_code(&[("tifr", "提")]).unwrap(), "tifr");
+        // 2 键: 双拼锚定到 tifr（而非行序靠前的 difr）
+        assert_eq!(e.compose_word_code(&[("ti", "提")]).unwrap(), "tifr");
+        // 无效码: 行序兜底
+        assert_eq!(e.compose_word_code(&[("", "提")]).unwrap(), "difr");
+        assert!(e.compose_word_code(&[]).is_err());
     }
 
     #[test]

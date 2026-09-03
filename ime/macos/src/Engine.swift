@@ -202,6 +202,19 @@ final class LuflyEngine {
         lufly_derive_word(handle, word.cString(using: .utf8)).map { String(cString: $0) }
     }
 
+    /// 用 ojc 选字记录的 (码,文本) 段组词码（所见即所得，多音字不踩
+    /// 码表行序）；段为空/解析失败返回 nil
+    func composeWordCode(segs: [(code: String, text: String)]) -> String? {
+        guard !segs.isEmpty else { return nil }
+        let codes = segs.map { $0.code }.joined(separator: "|")
+        let texts = segs.map { $0.text }.joined(separator: "|")
+        return codes.withCString { cp in
+            texts.withCString { tp in
+                lufly_compose_word_code(handle, cp, tp).map { String(cString: $0) }
+            }
+        }
+    }
+
     /// 添加自定义词（立即生效并落盘）。成功返回 true
     func userAddWord(code: String, text: String) -> Bool {
         lufly_user_add_word(handle, code.cString(using: .utf8), text.cString(using: .utf8)) != 0

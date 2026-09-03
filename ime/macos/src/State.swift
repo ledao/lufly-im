@@ -44,11 +44,16 @@ final class LuflyState {
     /// 自动造词: 连续全码(4键)上屏的单字链，≥2 字即成词。
     /// 任何非「单字+4码」的上屏（简码/选词/标点/英文/回车原样）都断链。
     var autoBuf = ""
+    /// 与 autoBuf 逐字对应的 4 键全码（组词码直接用，不再 derive）
+    var autoCodes: [String] = []
     /// ojc 加词模式: 1=选词阶段 2=编码编辑阶段（0=非加词）。
     /// 全程复用候选窗/预编辑，无外部弹窗（对齐 fcitx5 lufly.cpp:89-94）
     var addStage = 0
     var addWord = "" // 已选定的词（stage1 逐字拼，stage2 显示）
     var addCode = "" // 编码，初始为自动推导（stage2）
+    /// 选字记录: 每段 (码, 文本)，码空 = 无效（反查选字）。组词码用
+    /// （所见即所得，多音字不踩码表行序；对齐 fcitx5 LuflyState addSegs）
+    var addSegs: [(code: String, text: String)] = []
 
     /// 会话级 reset（对齐 fcitx5 LuflyIm::reset lufly.cpp:1217-1235）:
     /// 挂起字需由调用方先落地；ascii 跨焦点保留。含 cancelAddWord（lufly.cpp:380-385）。
@@ -63,8 +68,10 @@ final class LuflyState {
         sqOpen = false
         pendingPunct = nil
         autoBuf = ""
+        autoCodes = []
         addStage = 0
         addWord = ""
         addCode = ""
+        addSegs = []
     }
 }

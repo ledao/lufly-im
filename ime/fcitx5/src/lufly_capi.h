@@ -59,6 +59,12 @@ int lufly_user_reload(LuflyEngine *handle);
 /// 失败返回 NULL。返回指针在下次调用前有效。
 const char *lufly_derive_word(LuflyEngine *handle, const char *word);
 
+/// 用 ojc 选字阶段记录的 (码,文本) 段组词码（所见即所得，多音字不踩
+/// 码表行序）: codes/texts 均以 '|' 分隔且段数一致，码可空串（反查选字
+/// 等无效码）。失败返回 NULL。返回指针在下次调用前有效。
+const char *lufly_compose_word_code(LuflyEngine *handle, const char *codes,
+                                    const char *texts);
+
 /// 添加自定义词（ojc 加词）: 词条立即生效并强制落盘。成功返回 1。
 int lufly_user_add_word(LuflyEngine *handle, const char *code, const char *text);
 

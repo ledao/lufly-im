@@ -32,7 +32,8 @@ pub struct LuflyEngine {
     user_path: Option<PathBuf>,
     /// 上次落盘时的 user_ops 基线
     saved_ops: u32,
-    /// 推导编码缓存（`lufly_derive_word` 返回的指针指向这里）
+    /// 推导/组码缓存（`lufly_derive_word` / `lufly_compose_word_code`
+    /// 返回的指针指向这里）
     derive: Option<CString>,
 }
 
@@ -333,6 +334,45 @@ pub unsafe extern "C" fn lufly_derive_word(handle: *mut LuflyEngine, word: *cons
     e.derive = e
         .engine
         .derive_word_code(word)
+        .ok()
+        .and_then(|s| CString::new(s.as_bytes()).ok());
+    e.derive
+        .as_ref()
+        .map(|s| s.as_ptr())
+        .unwrap_or(std::ptr::null())
+}
+
+/// 用 ojc 选字阶段记录的 (码,文本) 段组词码（所见即所得，多音字不踩
+/// 码表行序）: codes/texts 均以 '|' 分隔且段数一致，码可空串（反查选字
+/// 等无效码）。失败返回 NULL。返回指针为内部缓存借用，下次调用前有效。
+///
+/// # Safety
+/// `handle`/`codes`/`texts` 须为有效指针。
+#[no_mangle]
+pub unsafe extern "C" fn lufly_compose_word_code(
+    handle: *mut LuflyEngine,
+    codes: *const c_char,
+    texts: *const c_char,
+) -> *const c_char {
+    if handle.is_null() || codes.is_null() || texts.is_null() {
+        return std::ptr::null();
+    }
+    let e = &mut *handle;
+    let (Ok(codes), Ok(texts)) = (
+        CStr::from_ptr(codes).to_str(),
+        CStr::from_ptr(texts).to_str(),
+    ) else {
+        return std::ptr::null();
+    };
+    let cs: Vec<&str> = codes.split('|').collect();
+    let ts: Vec<&str> = texts.split('|').collect();
+    if cs.len() != ts.len() {
+        return std::ptr::null();
+    }
+    let segs: Vec<(&str, &str)> = cs.into_iter().zip(ts).collect();
+    e.derive = e
+        .engine
+        .compose_word_code(&segs)
         .ok()
         .and_then(|s| CString::new(s.as_bytes()).ok());
     e.derive

@@ -94,9 +94,14 @@ public:
     int addStage = 0;
     std::string addWord; // 已选定的词（stage2）
     std::string addCode; // 编码，初始为自动推导（stage2）
+    // 选字记录: 每段 (码, 文本)，码空 = 无效（反查选字）。组词码用
+    // （所见即所得，多音字不踩码表行序）
+    std::vector<std::pair<std::string, std::string>> addSegs;
     // 自动造词: 连续全码(4键)上屏的单字链（UTF-8 拼接），≥2 字即成词。
     // 任何非「单字+4码」的上屏（简码/选词/标点/英文/回车原样）都断链。
     std::string autoBuf;
+    // 与 autoBuf 逐字对应的 4 键全码（组词码直接用，不再 derive）
+    std::vector<std::string> autoCodes;
 };
 
 class LuflyStateFactory : public InputContextPropertyFactory {
@@ -153,16 +158,19 @@ int utf8Chars(const char *s) {
 
 // 候选词: 点击/回车选中后提交并清缓冲。显示文本可带编码后缀，
 // 上屏固定用纯词文本（commitText），两者分离防编码漏进文档。
+// code_ = 该候选在码表中的条目码（ojc 加词·选字记录用）。
 class LuflyCandidateWord : public CandidateWord {
 public:
-    LuflyCandidateWord(Text text, std::string commitText, class LuflyIm *im)
+    LuflyCandidateWord(Text text, std::string commitText, std::string code,
+                       class LuflyIm *im)
         : CandidateWord(std::move(text)), commitText_(std::move(commitText)),
-          im_(im) {}
+          code_(std::move(code)), im_(im) {}
 
     void select(InputContext *ic) const override;
 
 private:
     std::string commitText_;
+    std::string code_;
     LuflyIm *im_;
 };
 
@@ -179,7 +187,8 @@ public:
                InputContextEvent &event) override;
 
     // 供 LuflyCandidateWord::select 回调。
-    void commitCandidate(InputContext *ic, const std::string &text);
+    void commitCandidate(InputContext *ic, const std::string &text,
+                         const std::string &code);
 
     // 子模式图标/标签: 随中英文模式切换，托盘 SNI 图标据此刷新
     std::string subModeIconImpl(const InputMethodEntry &,
@@ -214,7 +223,7 @@ private:
     void updateUI(InputContext *ic, LuflyState *state);
 
     // ojc 加词·选字: 选中候选追加进词槽，留在选字阶段继续选下一个字
-    void appendAddWord(LuflyState *state, const char *text);
+    void appendAddWord(LuflyState *state, const char *text, const char *code);
     // ojc 加词·选字完成: 推导默认码（固定查主码表）进入编码阶段
     void finishAddWord(LuflyState *state);
     // 退出/取消加词模式
@@ -362,19 +371,39 @@ void LuflyIm::checkUserReload() {
 }
 
 // ojc 加词·选字: 选中候选进词槽（要加的词不在码表，整词选不出，只能逐字
-// 选出来拼成词），留在选字阶段；反查选中后一并退出反查。
-void LuflyIm::appendAddWord(LuflyState *state, const char *text) {
+// 选出来拼成词），留在选字阶段；记录所选候选的码供组词（所见即所得，
+// 多音字不踩码表行序；反查选字码无效传 nullptr）；反查选中后一并退出反查。
+void LuflyIm::appendAddWord(LuflyState *state, const char *text,
+                            const char *code) {
     state->addWord += text;
+    state->addSegs.emplace_back(code ? code : "", text);
     state->buffer.clear();
     state->reverse = false;
     state->addStage = 1;
 }
 
-// 选字完成 → 编码阶段: derive 固定查主码表（反查态的 eng 是 fuzhu）
+// 选字完成 → 编码阶段: 先用选字记录的码段组码（所见即所得），失败回退
+// derive（固定查主码表，反查态的 eng 是 fuzhu）
 void LuflyIm::finishAddWord(LuflyState *state) {
-    const char *d =
-        scratch_ ? lufly_derive_word(scratch_, state->addWord.c_str()) : nullptr;
-    state->addCode = d ? d : "";
+    state->addCode.clear();
+    if (scratch_) {
+        std::string codes, texts;
+        for (size_t i = 0; i < state->addSegs.size(); i++) {
+            if (i) {
+                codes += '|';
+                texts += '|';
+            }
+            codes += state->addSegs[i].first;
+            texts += state->addSegs[i].second;
+        }
+        if (const char *d =
+                lufly_compose_word_code(scratch_, codes.c_str(), texts.c_str())) {
+            state->addCode = d;
+        } else if (const char *d =
+                       lufly_derive_word(scratch_, state->addWord.c_str())) {
+            state->addCode = d;
+        }
+    }
     state->buffer.clear();
     state->reverse = false;
     state->addStage = 2;
@@ -384,31 +413,62 @@ void LuflyIm::cancelAddWord(LuflyState *state) {
     state->addStage = 0;
     state->addWord.clear();
     state->addCode.clear();
+    state->addSegs.clear();
     state->autoBuf.clear();
+    state->autoCodes.clear();
 }
 
 // 自动造词: 用户连续以 4 键全码打字上屏时，把这些字拼成自动词。
 // 例: 连续全码打「乐」「乐」→ 造出 lelemb（双拼+首末形码）→ 乐乐，
 // 之后打该码即可出词；learn 随使用自然提频。断链 = 任何非「单字+4码」
 // 的上屏（简码选字/词上屏/标点/英文/回车原样都到不了这里或被显式清）。
+// 组码直接用逐字记录的全码（不再 derive——多音字会踩码表行序）。
 void LuflyIm::noteAutoCommit(LuflyState *state, const std::string &code,
                              const char *text) {
     if (code.size() != 4 || utf8Chars(text) != 1) {
         state->autoBuf.clear();
+        state->autoCodes.clear();
         return;
     }
+    // 防御: 链头不齐（断链路径漏清 autoCodes）时重置，宁退回旧行为
+    if (state->autoCodes.size() !=
+        static_cast<size_t>(utf8Chars(state->autoBuf.c_str()))) {
+        state->autoBuf.clear();
+        state->autoCodes.clear();
+    }
     state->autoBuf += text;
+    state->autoCodes.push_back(code);
     const int n = utf8Chars(state->autoBuf.c_str());
     if (n < 2) {
         return;
     }
     if (n > 4) { // 词长上限 4 字，超长断链防串词
         state->autoBuf.clear();
+        state->autoCodes.clear();
         return;
     }
     if (scratch_) {
-        if (const char *d =
-                lufly_derive_word(scratch_, state->autoBuf.c_str())) {
+        // 逐字拆 autoBuf 成段（每字一码），并行 '|' 连接传给组码
+        std::string codes, texts;
+        size_t seg = 0;
+        for (const unsigned char *p = reinterpret_cast<const unsigned char *>(
+                 state->autoBuf.c_str());
+             *p;) {
+            const int len = (*p & 0x80) == 0   ? 1
+                            : (*p & 0xF0) == 0xF0 ? 4
+                            : (*p & 0xE0) == 0xE0 ? 3
+                                                  : 2;
+            if (seg) {
+                codes += '|';
+                texts += '|';
+            }
+            codes += state->autoCodes[seg];
+            texts.append(reinterpret_cast<const char *>(p), len);
+            seg++;
+            p += len;
+        }
+        if (const char *d = lufly_compose_word_code(scratch_, codes.c_str(),
+                                                    texts.c_str())) {
             lufly_user_add_word(scratch_, d, state->autoBuf.c_str());
         }
     }
@@ -592,7 +652,8 @@ void LuflyIm::updateUI(InputContext *ic, LuflyState *state) {
             }
         }
         list->insert(i, std::make_unique<LuflyCandidateWord>(
-                            std::move(text), std::move(commitText), this));
+                            std::move(text), std::move(commitText),
+                            code ? code : "", this));
     }
     // 空候选列表上调 setGlobalCursorIndex 会抛异常（fcitx5 直接 abort），
     // 必须有候选时才置高亮游标。
@@ -605,12 +666,14 @@ void LuflyIm::updateUI(InputContext *ic, LuflyState *state) {
     ic->updateUserInterface(UserInterfaceComponent::InputPanel);
 }
 
-void LuflyIm::commitCandidate(InputContext *ic, const std::string &text) {
+void LuflyIm::commitCandidate(InputContext *ic, const std::string &text,
+                              const std::string &code) {
     auto *state = this->state(ic);
     LuflyEngine *eng = state->reverse ? rev_ : scratch_;
     if (state->addStage == 1 && eng && !state->buffer.empty()) {
-        // 加词·选字阶段: 鼠标点选进词槽，不提交
-        appendAddWord(state, text.c_str());
+        // 加词·选字阶段: 鼠标点选进词槽（记录所选码，反查码无效），不提交
+        appendAddWord(state, text.c_str(),
+                      state->reverse ? nullptr : code.c_str());
         updateUI(ic, state);
         return;
     }
@@ -625,7 +688,7 @@ void LuflyIm::commitCandidate(InputContext *ic, const std::string &text) {
 }
 
 void LuflyCandidateWord::select(InputContext *ic) const {
-    im_->commitCandidate(ic, commitText_);
+    im_->commitCandidate(ic, commitText_, code_);
 }
 
 void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
@@ -881,8 +944,10 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             const int idx = sel + common->currentPage() * common->pageSize();
             if (const char *text = lufly_candidate_text(eng, idx)) {
                 if (state->addStage == 1) {
-                    // 加词·选字阶段: 选中的字进词槽，继续选下一个字
-                    appendAddWord(state, text);
+                    // 加词·选字阶段: 选中的字进词槽（记录所选码），继续选下一个字
+                    appendAddWord(state, text,
+                                  state->reverse ? nullptr
+                                                 : lufly_candidate_code(eng, idx));
                     updateUI(ic, state);
                     event.accept();
                     return;
@@ -912,7 +977,9 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             const int idx = 1 + common->currentPage() * common->pageSize();
             if (const char *text = lufly_candidate_text(eng, idx)) {
                 if (state->addStage == 1) {
-                    appendAddWord(state, text);
+                    appendAddWord(state, text,
+                                  state->reverse ? nullptr
+                                                 : lufly_candidate_code(eng, idx));
                     updateUI(ic, state);
                     event.accept();
                     return;
@@ -935,10 +1002,14 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
     if (key.check(FcitxKey_space)) {
         if (state->buffer.empty()) {
             if (!state->pending.empty()) {
+                // 挂起可能产自反查态（码无效），先取再清 reverse
+                const bool wasRev = state->reverse;
                 state->reverse = false;
                 if (state->addStage == 1) {
                     // 加词中: 挂起字进词槽（不能漏进文档）
                     state->addWord += state->pending;
+                    state->addSegs.emplace_back(wasRev ? "" : state->pendingCode,
+                                                state->pending);
                 } else {
                     // 空格确认挂起字（空格被消费，不会漏成真空格）
                     if (scratch_) {
@@ -964,10 +1035,19 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             return; // 空缓冲透传
         }
         const std::string code = state->buffer;
+        // 空格选首选: 先取首选码并**拷贝**（lufly_key 会刷新候选缓存，
+        // 借用指针随即失效——capi 字符串借用「下次调用前有效」的约束），
+        // 再喂键
+        std::string selCode;
+        if (state->addStage == 1 && !state->reverse) {
+            if (const char *c = lufly_candidate_code(eng, 0)) {
+                selCode = c;
+            }
+        }
         if (const char *text = lufly_key(eng, ' ')) {
             if (state->addStage == 1) {
-                // 加词·选字阶段: 空格选中首选进词槽，不提交
-                appendAddWord(state, text);
+                // 加词·选字阶段: 空格选中首选进词槽（记录所选码），不提交
+                appendAddWord(state, text, selCode.c_str());
                 updateUI(ic, state);
                 event.accept();
                 return;
@@ -1000,6 +1080,8 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             }
             if (!state->pending.empty()) {
                 state->addWord += state->pending;
+                state->addSegs.emplace_back(
+                    state->reverse ? "" : state->pendingCode, state->pending);
                 state->pending.clear();
                 state->pendingCode.clear();
             }
@@ -1063,6 +1145,27 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
                     if (!state->addWord.empty()) {
                         state->addWord.pop_back();
                     }
+                    // segs 同步: 末段减一字；段码不足 2k（简码）时整段码作废
+                    if (!state->addSegs.empty()) {
+                        auto &seg = state->addSegs.back();
+                        const size_t n = utf8Chars(seg.second.c_str());
+                        if (n <= 1) {
+                            state->addSegs.pop_back();
+                        } else {
+                            while (!seg.second.empty() &&
+                                   (static_cast<unsigned char>(
+                                        seg.second.back()) &
+                                    0xC0) == 0x80) {
+                                seg.second.pop_back();
+                            }
+                            if (!seg.second.empty()) {
+                                seg.second.pop_back();
+                            }
+                            seg.first = seg.first.size() >= 2 * n
+                                            ? seg.first.substr(0, 2 * (n - 1))
+                                            : std::string();
+                        }
+                    }
                 } else {
                     cancelAddWord(state); // 退无可退: 退出加词
                 }
@@ -1113,6 +1216,8 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             // 加词中顶进词槽而非上屏
             if (state->addStage == 1) {
                 state->addWord += state->pending;
+                state->addSegs.emplace_back(
+                    state->reverse ? "" : state->pendingCode, state->pending);
             } else {
                 noteAutoCommit(state, state->pendingCode,
                                state->pending.c_str());
@@ -1134,7 +1239,11 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
         if (state->buffer == "ojc") {
             state->buffer.clear();
             state->reverse = false;
+            // 每次输入 ojc = 全新加词（清残留，防上一轮反悔的词混入）
             state->addStage = 1;
+            state->addWord.clear();
+            state->addCode.clear();
+            state->addSegs.clear();
             replay(eng, state->buffer);
         }
         updateUI(ic, state);
