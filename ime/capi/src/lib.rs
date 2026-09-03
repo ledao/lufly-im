@@ -17,9 +17,6 @@ use std::path::PathBuf;
 
 use lufly_engine::Engine;
 
-/// 每累计 N 次学习自动把用户词典写回磁盘（原子替换写，开销 ~KB 级）
-const USER_FLUSH_INTERVAL: u32 = 64;
-
 pub struct LuflyEngine {
     engine: Engine,
     /// 上屏文本缓存（`lufly_key` 返回的指针指向这里）
@@ -291,7 +288,9 @@ pub unsafe extern "C" fn lufly_user_flush(handle: *mut LuflyEngine) -> c_int {
 }
 
 /// 记录一次真实上屏: 用户以 `code` 选定了 `text`（词频自学习）。
-/// 累计 64 次自动落盘。
+/// 每次落盘（临时文件 + 原子 rename，文件仅几十 KB）——前端进程随时可被
+/// 杀/注销，攒批落盘会把短会话里的学习全部丢掉（调频失效根因: 磁盘计数
+/// 停在远古长会话，之后的选词从未生效）。
 ///
 /// # Safety
 /// `handle`/`code`/`text` 须为有效指针。
@@ -312,9 +311,7 @@ pub unsafe extern "C" fn lufly_learn(
         return;
     };
     e.engine.learn(code, text);
-    if e.engine.user_ops().wrapping_sub(e.saved_ops) >= USER_FLUSH_INTERVAL {
-        e.flush_user(false);
-    }
+    e.flush_user(false);
 }
 
 /// 推导一个词的默认全码（ojc 加词用: 单字=4码全码；多字=双拼+首末形码各1）。

@@ -103,6 +103,12 @@ pub struct Engine {
     user_words: Vec<(String, String)>,
     /// learn 累计次数（自上次 load_user 起）。前端/capi 据此决定落盘时机。
     user_ops: u32,
+    /// 按码记录的最近一次所选 (码 → 词): 该词在其编码的 exact 候选组内置顶
+    /// ——「刚选过的就在第一位」（次数追赶需连选多次才反超，不符合调频
+    /// 预期）。会话态: 新进程为空退回次数序（落盘后次数已收敛，次序稳）；
+    /// 热重载（load_user）不清——清了会让周期热重载把置顶抹掉（「只能
+    /// 生效一轮」实证）；残留项无候选命中时无效果，无需清理。
+    last_learned: HashMap<String, String>,
 }
 
 impl Engine {
@@ -174,6 +180,7 @@ impl Engine {
             user: HashMap::new(),
             user_words: Vec::new(),
             user_ops: 0,
+            last_learned: HashMap::new(),
         })
     }
 
@@ -286,7 +293,8 @@ impl Engine {
     }
 
     /// 记录一次真实上屏: 用户以 `code` 选定了 `text`。此后该词条在其编码的
-    /// exact 候选组内排到未学词条之前（次数多的更靠前），用于词频自学习。
+    /// exact 候选组内排到未学词条之前（次数多的更靠前），该码最近一次所选
+    /// 再置顶（「刚选过的就在第一位」），用于词频自学习。
     ///
     /// 注意: 只影响排序，不影响结构性行为——全码唯一判定/自动上屏仍按
     /// 码表词条数，学得再多也不会让撞码词条自动上屏。
@@ -299,6 +307,8 @@ impl Engine {
             .entry((code.to_owned(), text.to_owned()))
             .or_insert(0);
         *n = n.saturating_add(1);
+        self.last_learned
+            .insert(code.to_owned(), text.to_owned());
         self.user_ops = self.user_ops.wrapping_add(1);
         self.invalidate();
     }
@@ -637,20 +647,30 @@ impl Engine {
             }
             .push(i as u32);
         }
-        // 用户词频提权（exact 组）: 学习次数多者靠前，其次按码表行序。
-        // 打包成 u64 键避免比较器里反复查表: 高 32 位 = !次数（0 次 → 全 1，
-        // 退化为纯行序，与无用户词典时排序完全一致），低 32 位 = 行序。
+        // 用户词频提权（exact 组）: 最近一次所选置顶，其次学习次数多者靠前，
+        // 未学词条按码表行序。learn 以「敲入的码」为键 → 按当前输入筛出
+        // 词→次数小表，逐词条查表；三档打包成 (class, !次数, 行序) 键。
         if !self.user.is_empty() && !exact.is_empty() {
-            let mut keyed: Vec<(u64, u32)> = exact
+            let learned: std::collections::HashMap<&str, u32> = self
+                .user
+                .iter()
+                .filter(|((c, _), _)| *c == self.input)
+                .map(|((_, t), n)| (t.as_str(), *n))
+                .collect();
+            let last_text = self.last_learned.get(&self.input).map(|t| t.as_str());
+            let mut keyed: Vec<((u8, u32, u32), u32)> = exact
                 .iter()
                 .map(|&k| {
-                    let (c, t, rank) = self.entry_ref(k);
-                    let n = self
-                        .user
-                        .get(&(c.to_owned(), t.to_owned()))
-                        .copied()
-                        .unwrap_or(0);
-                    (((!(n as u64)) << 32) | rank as u64, k)
+                    let (_, t, rank) = self.entry_ref(k);
+                    let n = learned.get(t).copied().unwrap_or(0);
+                    let class = if last_text == Some(t) {
+                        0u8
+                    } else if n > 0 {
+                        1
+                    } else {
+                        2
+                    };
+                    ((class, !n, rank), k)
                 })
                 .collect();
             if keyed.len() > MAX_CANDIDATES {
@@ -1042,6 +1062,68 @@ mod tests {
         e.key('n');
         e.key('i');
         assert_eq!(e.candidates()[0].text, "尼", "次数多者靠前");
+    }
+
+    #[test]
+    fn learn_recent_pick_tops_higher_count() {
+        let mut e = two_way_engine();
+        // 先尼后你: 你 12 次 > 尼 10 次，且最后所选也是你 → 次数序你在前
+        for _ in 0..10 {
+            e.learn("ni", "尼");
+        }
+        for _ in 0..12 {
+            e.learn("ni", "你");
+        }
+        e.key('n');
+        e.key('i');
+        assert_eq!(e.candidates()[0].text, "你", "次数多者在前");
+        // 最近所选置顶: 尼 11 次仍少于 你 12 次，但刚选过 → 第一位
+        // （调频预期「点一次就该第一」；纯次数追赶需连选 3 次才反超）
+        e.learn("ni", "尼");
+        e.reset();
+        e.key('n');
+        e.key('i');
+        assert_eq!(e.candidates()[0].text, "尼", "最近所选置顶");
+        // 会话态: 新进程无最近所选，退回次数序
+        let bytes = e.save_user();
+        let mut f = two_way_engine();
+        f.load_user(&bytes);
+        f.key('n');
+        f.key('i');
+        assert_eq!(f.candidates()[0].text, "你", "重启后退回次数序");
+    }
+
+    #[test]
+    fn learn_recent_survives_hot_reload() {
+        // 热重载（load_user 合并磁盘）不得清掉最近所选——否则周期热重载
+        // 会把置顶抹掉（「只能生效一轮」实证，2026-09-03）
+        let mut e = two_way_engine();
+        for _ in 0..12 {
+            e.learn("ni", "你");
+        }
+        e.learn("ni", "尼");
+        let bytes = e.save_user();
+        e.load_user(&bytes); // 模拟热重载: 磁盘内容合并回内存
+        e.reset();
+        e.key('n');
+        e.key('i');
+        assert_eq!(e.candidates()[0].text, "尼", "热重载后最近所选仍置顶");
+    }
+
+    #[test]
+    fn learn_recent_is_per_code() {
+        // 其他码的学习不得顶掉本码的最近所选（单槽实现会: 打句中选了
+        // 别的词，回来 lcge 置顶就没了）
+        let mut e = two_way_engine();
+        for _ in 0..12 {
+            e.learn("ni", "你");
+        }
+        e.learn("ni", "尼");
+        e.learn("nix", "呢"); // 别的码
+        e.reset();
+        e.key('n');
+        e.key('i');
+        assert_eq!(e.candidates()[0].text, "尼", "按码隔离: 本码置顶仍在");
     }
 
     #[test]
