@@ -4,11 +4,16 @@
 // 不需要 fcitx5 端的「单 scratch 引擎重放」机制。
 // 双入口: 从已安装位置（~/Library/Input Methods）启动 = 正常输入法；
 // 从其他位置（如 dmg）双击 = 自安装器（搜狗 Mac 版同款惯例，见 Installer.swift）。
+// 另有命令行: --install 静默安装（install.sh 用）、--uninstall 静默卸载（任何位置）。
 import Cocoa
 import InputMethodKit
 
+if CommandLine.arguments.contains("--uninstall") {
+    Installer.runUninstallCli() // 停用输入源 + 删本体后 exit，不进输入法流程
+}
+
 if !Installer.isInstalledLocation {
-    Installer.run() // 自安装流程，结束即 exit
+    Installer.run() // 自安装/卸载流程，结束即 exit
 }
 
 LuflyLog.shared.info("==== Lufly 启动 pid=\(ProcessInfo.processInfo.processIdentifier) ====")

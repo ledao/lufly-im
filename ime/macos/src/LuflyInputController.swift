@@ -29,6 +29,26 @@ final class LuflyInputController: IMKInputController {
     // 页大小对齐 fcitx5 kPageSize（lufly.cpp:63，数字 1-5 对应本页 5 个候选）
     private let pageSize = 5
 
+    // MARK: - 输入法菜单（菜单栏点输入法图标弹出）
+
+    /// 卸载入口。输入法装在 ~/Library/Input Methods（隐藏目录），不在
+    /// /Applications，用户没有「拖废纸篓」的标准删除动作可做；对齐搜狗/百度
+    /// Mac 版惯例，把「卸载」放进输入法自己的菜单——用户唯一确定会点的地方。
+    override func menu() -> NSMenu! {
+        let m = NSMenu()
+        let item = NSMenuItem(
+            title: "卸载小鹭音形…",
+            action: #selector(uninstallFromMenu(_:)),
+            keyEquivalent: "")
+        item.target = self
+        m.addItem(item)
+        return m
+    }
+
+    @objc private func uninstallFromMenu(_ sender: Any?) {
+        Installer.confirmUninstall() // 确认 → 停用+删文件 → 结果弹窗 → exit
+    }
+
     // MARK: - 生命周期
 
     override func activateServer(_ sender: Any!) {

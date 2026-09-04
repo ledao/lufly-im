@@ -60,6 +60,15 @@ cat > "$STAGE/安装说明.txt" <<'EOF'
 
 菜单栏切到「小鹭音形」即可打字，Shift 单击切换中/英文。
 
+卸载:
+菜单栏点输入法图标（小鹭音形激活时）→ 「卸载小鹭音形」→ 确认。
+会自动从系统输入法列表移除并删除程序本体，无需注销。
+备选方式（dmg 还在手边）: 双击 Lufly.app → 点「卸载」。
+备选方式（终端）:
+  "~/Library/Input Methods/Lufly.app/Contents/MacOS/Lufly" --uninstall
+造词词典保留在 ~/Library/Application Support/lufly，
+彻底清除可手动删除该文件夹。
+
 提示:
 - 双击被系统拦截（未公证的开发者包）: 右键 Lufly.app → 「打开」；
   或 系统设置 → 隐私与安全性 → 点「仍要打开」。

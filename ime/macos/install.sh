@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 开发用快捷安装: 委托 app 自带的非交互安装（落位 + TIS 注册）。
 # 等价于用户在 dmg 里双击 Lufly.app 点「安装」。
+# 卸载: "$APP_SRC/Contents/MacOS/Lufly" --uninstall（或 dmg 双击 → 卸载）。
 set -euo pipefail
 cd "$(dirname "$0")"
 

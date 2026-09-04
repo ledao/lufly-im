@@ -44,6 +44,7 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
   ② **必须经 CGPDFContext 生成标准结构 PDF，不能手写极简 PDF**——Ctrl+Space 切换器 HUD 由**远端视图服务**渲染（TextInputUIMacHelper `TUINSCursorUIController`/ViewBridge，反汇编+_selectCurrentInputSource 崩溃栈实证），它消化不了手写的 4 对象未压缩 PDF：菜单栏（NSImage 路径）正常、切换器白方块；换 CG 生成的 PDF（内嵌 Flate 位图）两端全通。HUD 磁贴数据与 TIS 的 IconImageURL/IconRef 均无关（后者对所有源都为 NULL）。
   调试手段：ObjC 运行时反射 dump 私有框架（dlopen + objc_copyClassNamesForImage + class_copyMethodList），共享缓存二进制可从进程内存抠字符串；lldb attach 自建 dlopen 宿主进程可反汇编任意私有方法。
 - **安装器不做主动注册（TISRegisterInputSource）**：实测自动注册出的输入法条目能出现在列表里但打不了字，用户仍须「− 删除 + ＋ 添加」手动来一遍，白注册还留坏条目（用户裁定）。安装器只落位 + 弹指引（含先减后加提示）。
+- **卸载**（2026-09-04）：**主入口 = 输入法自己的菜单**（菜单栏点输入法图标 → 「卸载小鹭音形」，`LuflyInputController.menu()`，搜狗/百度 Mac 版惯例）——输入法不在 /Applications，用户没有「拖废纸篓」可做，dmg 不会被保留，别把卸载绑在 dmg/终端上。备选：dmg 双击 → 「卸载」按钮、任意位置 `Lufly --uninstall`（main.swift 里先于 isInstalledLocation 分支，已安装本体也能自卸载）。三条路径共用 `Installer.uninstall()`，顺序必须 **TIS 停用（deselect+disable，等价设置里按 −）→ terminate 旧进程（排除自身 pid，菜单内卸载时自己是运行中 IM）→ 删 `~/Library/Input Methods/Lufly.app`**——先删文件后停用会留幽灵条目（TIS 缓存）。用户词典 `~/Library/Application Support/lufly` 刻意保留，弹窗/输出里提示手动删；日志 `~/Library/Logs/lufly.log` 同理不动。
 
 ## 标点半角规则变更（三端已同步，fcitx5/TSF 待发版）
 
