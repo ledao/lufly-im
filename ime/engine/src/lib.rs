@@ -125,7 +125,9 @@ impl Engine {
 
     /// mmap 文件加载: 打开 `path` 并映射整个文件。码表页保持文件后备
     /// （干净页，内存压力下系统直接丢弃、不进 swap），加载近乎零拷贝。
-    pub fn open_mmap(path: &str) -> Result<Self, String> {
+    /// 接受任意路径形式（Windows 安装目录可能含非 UTF-8 字符，Path 不经
+    /// 字符串转换才能原样交给文件系统）
+    pub fn open_mmap(path: impl AsRef<std::path::Path>) -> Result<Self, String> {
         let file = std::fs::File::open(path).map_err(|e| format!("open dict: {e}"))?;
         let mmap =
             unsafe { memmap2::Mmap::map(&file) }.map_err(|e| format!("mmap dict: {e}"))?;

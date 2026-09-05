@@ -80,7 +80,7 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 引擎码表格式已升级 v2（MAGIC `LUFLYD01`→`LUFLYD02`）：文件内嵌「(数据偏移, rank) × N」索引，引擎整体 mmap/托管后按索引借用、**堆上零索引**；`ime/data/xiaolu_he_he.bin`（32.5MiB/137.3万条）与 `xiaolu_fuzhu.bin` 已重新生成。实测（vmmap）：mmap 路径进程物理占用 **~1.5MB**（码表全为可回收干净文件页），旧 v0 约 140MB；同方案本机对比 Rime/Squirrel 常驻 27.9MB。**C ABI 除新增 `lufly_new_file`（mmap 加载）外不变**，前端逻辑零改动，重编即接入：
 
 - fcitx5（Linux）：重跑 `build.sh` → `install.sh` 即可（build.sh 本就全路径链 `liblufly_capi.a`，不受 capi 改动影响）。**已部署机器必须升级 `/usr/share/fcitx5/lufly/*.bin`**——旧 bin 加载直接报 "bad dict: invalid magic"，不会静默出错词。快速回归：`cargo run -p lufly-cli` REPL 跑几组键序。
-- TSF（Windows）：`processor.rs` 的 `include_bytes!` 已指向新 bin，重编 DLL + NSIS 即可；升级安装注意覆盖旧码表。
+- TSF（Windows）：0.5.10 起码表**不再嵌入 DLL**（原 include_bytes! + `Engine::load` 堆拷贝，每激活一个进程多 ~43MB **私有内存**；实测 msedge 私有 175MB 中含此拷贝）。改为安装器把两枚 bin 落到版本目录（与 DLL 同目录），运行时 `dll_dir()` 定位 + `Engine::open_mmap`（memmap2）加载——文件后备共享页，跨进程一份、可回收，DLL 44MB→0.46MB。**NSIS 引用的 x64 产物路径是 `target\release\`（无 --target 参数构建）**，带 `--target x86_64-pc-windows-msvc` 构建会落到 `target\x86_64-pc-windows-msvc\release\` 而 NSIS 打进旧文件（0.5.10 出包时踩过）。码表文件缺失 = 引擎加载失败 = 按键全透传（安全降级，无崩溃）。
 - capi crate-type 收窄为仅 staticlib（cdylib 移除）：cdylib 与 .a 并存时 `-llufly_capi` 会被链接器挑中 dylib，留下指向 `target/` 的绝对路径 install_name，跨机器分发 dyld 起不来（macOS 踩过，已修）。新端接入一律全路径链 `.a`（fcitx5/macOS 的 build.sh 均已如此）。
 - 引擎自测工具：`cargo test -p lufly-engine`（23 例）；`cargo run -p lufly-engine --example mem` + vmmap（内存）；`ime/macos/tools/engtest.c`（C API 打字流）。
 

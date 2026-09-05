@@ -194,6 +194,17 @@ unsafe extern "system" fn heal_tick(_hwnd: HWND, _msg: u32, id: usize, _time: u3
     });
 }
 
+/// 码表文件名（与 DLL 同目录，安装器落盘）。旧版把码表 include_bytes 进
+/// DLL 且 Engine::load 堆拷贝——每激活一个进程就多 ~43MB 私有内存；
+/// mmap 后码表为文件后备的共享只读页，跨进程一份、内存压力下可回收
+const DICT_MAIN: &str = "xiaolu_he_he.bin";
+const DICT_REV: &str = "xiaolu_fuzhu.bin";
+
+/// 码表路径（DLL 同目录）
+fn dict_path(name: &str) -> Option<std::path::PathBuf> {
+    crate::dll_dir().map(|d| d.join(name))
+}
+
 /// 线程共享状态（TIP 与各编辑会话共用）
 pub struct Shared {
     pub thread_mgr: Option<ITfThreadMgr>,
@@ -241,8 +252,10 @@ impl Shared {
             self.engine = Some(e);
             return true;
         }
-        static MAIN_DICT: &[u8] = include_bytes!("../../data/xiaolu_he_he.bin");
-        match Engine::load(MAIN_DICT) {
+        match dict_path(DICT_MAIN)
+            .ok_or_else(|| "no dll dir".to_string())
+            .and_then(|p| Engine::open_mmap(&p))
+        {
             Ok(mut e) => {
                 self.attach_user_dict(&mut e);
                 self.engine = Some(e);
@@ -403,8 +416,7 @@ impl Shared {
         if self.rev.is_some() {
             return true;
         }
-        static FUZHU: &[u8] = include_bytes!("../../data/xiaolu_fuzhu.bin");
-        self.rev = Engine::load(FUZHU).ok();
+        self.rev = dict_path(DICT_REV).and_then(|p| Engine::open_mmap(&p).ok());
         self.rev.is_some()
     }
 
@@ -1537,10 +1549,11 @@ impl LuflyTsf_Impl {
         let timer = unsafe { SetTimer(None, 0, 1000, Some(heal_tick)) };
         HEALS.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push((timer, HealShared(self.shared.clone())));
 
-        // 后台预载主码表（不阻塞 Activate；首次按键由 ensure_engine 兜底）
-        std::thread::spawn(|| {
-            static MAIN_DICT: &[u8] = include_bytes!("../../data/xiaolu_he_he.bin");
-            let e = lufly_engine::Engine::load(MAIN_DICT).ok();
+        // 后台预载主码表（不阻塞 Activate；首次按键由 ensure_engine 兜底）。
+        // mmap 文件加载，路径先在当前线程解析好
+        let dict = dict_path(DICT_MAIN);
+        std::thread::spawn(move || {
+            let e = dict.and_then(|p| Engine::open_mmap(&p).ok());
             crate::log(&format!("engine preload: {}", e.is_some()));
             crate::store_preload(e);
         });

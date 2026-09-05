@@ -126,6 +126,10 @@ Section "Install"
   ${EndIf}
   File /oname=lufly_tsf.dll "..\target\release\lufly_tsf.dll"
   File /oname=lufly_tsf32.dll "..\target\i686-pc-windows-msvc\release\lufly_tsf.dll"
+  ; 码表独立文件（DLL 内不再嵌入; 引擎 mmap 文件页——跨进程共享、
+  ; 内存压力下可回收; 0.5.9 及之前为 DLL 自包含）
+  File "..\data\xiaolu_he_he.bin"
+  File "..\data\xiaolu_fuzhu.bin"
   File "lufly.ico"
   File "lufly-zh.ico"
   File "lufly-en.ico"
