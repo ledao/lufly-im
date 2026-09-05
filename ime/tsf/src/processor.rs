@@ -124,7 +124,7 @@ unsafe fn capture_default_himc() -> HIMC {
 fn heal_once(shared: &Arc<Mutex<Shared>>) {
     unsafe {
         let default_himc = {
-            let s = shared.lock().unwrap();
+            let s = shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             HIMC(s.default_himc as *mut _)
         };
         let tid = GetCurrentThreadId();
@@ -155,7 +155,7 @@ fn heal_once(shared: &Arc<Mutex<Shared>>) {
         }
 
         let (tm, client_id) = {
-            let s = shared.lock().unwrap();
+            let s = shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             (s.thread_mgr.clone(), s.client_id)
         };
         if let Some(tm) = tm {
@@ -181,13 +181,17 @@ fn heal_once(shared: &Arc<Mutex<Shared>>) {
 }
 
 unsafe extern "system" fn heal_tick(_hwnd: HWND, _msg: u32, id: usize, _time: u32) {
-    let shared = {
-        let heals = HEALS.lock().unwrap();
-        heals.iter().find(|(t, _)| *t == id).map(|(_, s)| s.0.clone())
-    };
-    if let Some(shared) = shared {
-        heal_once(&shared);
-    }
+    // TIMERPROC 也是 extern "system" 入口（且每秒执行）: 同样不得让 panic 冲出
+    let _ = crate::ffi_guard("heal_tick", || {
+        let shared = {
+            let heals = HEALS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            heals.iter().find(|(t, _)| *t == id).map(|(_, s)| s.0.clone())
+        };
+        if let Some(shared) = shared {
+            heal_once(&shared);
+        }
+        Ok(())
+    });
 }
 
 /// 线程共享状态（TIP 与各编辑会话共用）
@@ -258,23 +262,28 @@ impl Shared {
         self.saved_ops = 0;
     }
 
-    /// 主引擎（调用前须 ensure_engine 成功）
-    fn main_engine(&mut self) -> &mut Engine {
-        self.engine.as_mut().unwrap()
+    /// 主引擎。可能未加载: 激活后码表后台预载需几百 ms，此间切换输入法
+    /// （Deactivate→flush_user）或按键都会走到这里 —— FFI 内 unwrap panic
+    /// 会直接杀死宿主进程（explorer 任务栏重启/UU 远程崩溃的根因），
+    /// 调用方必须按 None 降级，绝不能 unwrap
+    fn main_engine(&mut self) -> Option<&mut Engine> {
+        self.engine.as_mut()
     }
 
     /// 当前按键上下文应使用的引擎（反查=rev，普通=主引擎）
-    pub fn active_engine(&mut self) -> &mut Engine {
+    pub fn active_engine(&mut self) -> Option<&mut Engine> {
         if self.st.reverse && self.rev.is_some() {
-            self.rev.as_mut().unwrap()
+            self.rev.as_mut()
         } else {
-            self.engine.as_mut().unwrap()
+            self.engine.as_mut()
         }
     }
 
     /// 把编码重放进引擎（恢复该会话状态，切换反查/撤销挂起后用）
     fn replay(&mut self, buffer: &str) {
-        let eng = self.active_engine();
+        let Some(eng) = self.active_engine() else {
+            return;
+        };
         eng.reset();
         for c in buffer.chars() {
             eng.key(c);
@@ -284,7 +293,9 @@ impl Shared {
     /// 引擎 input 与前端 buffer 不一致时重放（反查切换后等）
     fn sync_engine(&mut self) {
         let buffer = self.st.buffer.clone();
-        let eng_input = self.active_engine().input().to_string();
+        let Some(eng_input) = self.active_engine().map(|e| e.input().to_string()) else {
+            return;
+        };
         if eng_input != buffer {
             self.replay(&buffer);
         }
@@ -324,8 +335,11 @@ impl Shared {
             .map(|(c, t)| (c, t.to_string()))
             .collect();
         let refs: Vec<(&str, &str)> = segs.iter().map(|(c, t)| (c.as_str(), t.as_str())).collect();
-        if let Ok(d) = self.main_engine().compose_word_code(&refs) {
-            if self.main_engine().add_user_word(&d, &word).is_ok() {
+        let Some(eng) = self.main_engine() else {
+            return;
+        };
+        if let Ok(d) = eng.compose_word_code(&refs) {
+            if eng.add_user_word(&d, &word).is_ok() {
                 self.maybe_flush_user();
             }
         }
@@ -340,16 +354,21 @@ impl Shared {
         let Some(path) = self.user_path.clone() else {
             return false;
         };
-        if !force && self.main_engine().user_ops().wrapping_sub(self.saved_ops) < USER_FLUSH_INTERVAL {
+        // 引擎未加载（激活后预载未完成即 Deactivate）: 无可落盘，直接返回
+        // ——这里曾是 unwrap，切换输入法快了就崩宿主进程（explorer/UU）
+        let Some(eng) = self.engine.as_mut() else {
+            return false;
+        };
+        if !force && eng.user_ops().wrapping_sub(self.saved_ops) < USER_FLUSH_INTERVAL {
             return false;
         }
-        let bytes = self.main_engine().save_user();
+        let bytes = eng.save_user();
         let tmp = path.with_extension("txt.tmp");
         let ok = std::fs::create_dir_all(path.parent().unwrap_or(Path::new("."))).is_ok()
             && std::fs::write(&tmp, &bytes).is_ok()
             && std::fs::rename(&tmp, &path).is_ok();
         if ok {
-            self.saved_ops = self.main_engine().user_ops();
+            self.saved_ops = self.engine.as_mut().map(|e| e.user_ops()).unwrap_or(0);
         }
         ok
     }
@@ -372,8 +391,10 @@ impl Shared {
         }
         self.user_mtime = mtime;
         if let Ok(bytes) = std::fs::read(&path) {
-            self.main_engine().load_user(&bytes);
-            self.saved_ops = self.main_engine().user_ops();
+            if let Some(eng) = self.main_engine() {
+                eng.load_user(&bytes);
+                self.saved_ops = eng.user_ops();
+            }
         }
     }
 
@@ -405,9 +426,13 @@ impl Shared {
         let word = self.st.add_word.clone();
         let segs: Vec<(String, String)> = self.st.add_segs.clone();
         let refs: Vec<(&str, &str)> = segs.iter().map(|(c, t)| (c.as_str(), t.as_str())).collect();
-        self.st.add_code = match self.main_engine().compose_word_code(&refs) {
-            Ok(c) => c,
-            Err(_) => self.main_engine().derive_word_code(&word).unwrap_or_default(),
+        let composed = self.main_engine().and_then(|e| e.compose_word_code(&refs).ok());
+        self.st.add_code = match composed {
+            Some(c) => c,
+            None => self
+                .main_engine()
+                .and_then(|e| e.derive_word_code(&word).ok())
+                .unwrap_or_default(),
         };
         self.st.buffer.clear();
         self.st.reverse = false;
@@ -494,7 +519,7 @@ impl LuflyTsf {
         let is_shift = vk == VK_SHIFT || vk == VK_LSHIFT || vk == VK_RSHIFT;
 
         let act = {
-            let mut s = self.shared.lock().unwrap();
+            let mut s = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             compute_action(&mut s, vk, shift, ctrl, alt, is_shift)
         };
         self.exec_act(act)
@@ -502,10 +527,11 @@ impl LuflyTsf {
 
     fn request_session_kind(&self, text: &str, kind: SessionKind) -> Result<()> {
         {
-            let mut s = self.shared.lock().unwrap();
+            let mut s = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             s.pending_commit = text.to_owned();
-            // 预计算回显（Commit 会话也会按需隐藏候选窗）
-            let input = s.active_engine().input().to_string();
+            // 预计算回显（Commit 会话也会按需隐藏候选窗）；
+            // 引擎未加载（预载中）时 input 取空串，不 panic
+            let input = s.active_engine().map(|e| e.input().to_string()).unwrap_or_default();
             s.preedit = build_preedit(&s.st, &input);
         }
         self.request_session(kind)
@@ -514,18 +540,18 @@ impl LuflyTsf {
     fn request_compose(&self) -> Result<()> {
         // Start 或 Update 由 composition 是否存在决定
         let kind = {
-            let mut s = self.shared.lock().unwrap();
-            let input = s.active_engine().input().to_string();
+            let mut s = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            let input = s.active_engine().map(|e| e.input().to_string()).unwrap_or_default();
             s.preedit = build_preedit(&s.st, &input);
             // 候选快照（含反查引擎），供候选窗显示「词 剩余编码」
-            s.cands = if s.st.buffer.is_empty() {
-                Vec::new()
-            } else {
-                s.active_engine()
+            let has_buffer = !s.st.buffer.is_empty();
+            s.cands = match s.active_engine() {
+                Some(e) if has_buffer => e
                     .candidates()
                     .iter()
                     .map(|c| (c.text.clone(), c.code.clone()))
-                    .collect()
+                    .collect(),
+                _ => Vec::new(),
             };
             if s.composition.is_some() {
                 SessionKind::Update
@@ -540,7 +566,7 @@ impl LuflyTsf {
         // 注意: 不能持锁调 RequestEditSession —— 同步编辑会话回调里会再次
         // 加锁（DoEditSession），否则死锁。
         let (tm, cid) = {
-            let s = self.shared.lock().unwrap();
+            let s = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             let tm = s
                 .thread_mgr
                 .as_ref()
@@ -636,7 +662,11 @@ fn compute_action(
                     return Act::Compose; // 编码太短: 等待继续输入
                 }
                 let (code, word) = (s.st.add_code.clone(), s.st.add_word.clone());
-                if s.main_engine().add_user_word(&code, &word).is_ok() {
+                let added = s
+                    .main_engine()
+                    .map(|e| e.add_user_word(&code, &word).is_ok())
+                    .unwrap_or(false);
+                if added {
                     s.flush_user(false);
                     s.st.cancel_add_word();
                     s.st.last_cls = 0;
@@ -669,10 +699,13 @@ fn compute_action(
     // 候选快照（含全码，供选词与显示「词 剩余编码」）
     let cands: Vec<(String, String)> = s
         .active_engine()
-        .candidates()
-        .iter()
-        .map(|c| (c.text.clone(), c.code.clone()))
-        .collect();
+        .map(|e| {
+            e.candidates()
+                .iter()
+                .map(|c| (c.text.clone(), c.code.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
     let n_cands = cands.len();
     let has_menu = !s.st.buffer.is_empty() && n_cands > 0;
     let miss = !has_menu && !s.st.buffer.is_empty();
@@ -739,7 +772,9 @@ fn compute_action(
                 return Act::Compose;
             }
             let code = s.st.buffer.clone();
-            s.active_engine().learn(&code, &text);
+            if let Some(e) = s.active_engine() {
+                e.learn(&code, &text);
+            }
             s.note_auto_commit(&code, &text);
             s.st.last_cls = 0;
             s.st.buffer.clear();
@@ -764,7 +799,9 @@ fn compute_action(
                 return Act::Compose;
             }
             let code = s.st.buffer.clone();
-            s.active_engine().learn(&code, &text);
+            if let Some(e) = s.active_engine() {
+                e.learn(&code, &text);
+            }
             s.note_auto_commit(&code, &text);
             s.st.last_cls = 0;
             s.st.buffer.clear();
@@ -792,7 +829,9 @@ fn compute_action(
                         text.clone(),
                     ));
                 } else {
-                    s.main_engine().learn(&code, &text);
+                    if let Some(e) = s.main_engine() {
+                        e.learn(&code, &text);
+                    }
                     s.note_auto_commit(&code, &text);
                     s.maybe_flush_user();
                 }
@@ -829,7 +868,9 @@ fn compute_action(
         if has_menu {
             let text = cands[0].0.clone();
             let code = s.st.buffer.clone();
-            s.active_engine().learn(&code, &text);
+            if let Some(e) = s.active_engine() {
+                e.learn(&code, &text);
+            }
             s.note_auto_commit(&code, &text);
             out.push_str(&text);
         }
@@ -988,11 +1029,11 @@ fn compute_action(
             s.st.last_cls = 0;
         }
         let prev = s.st.buffer.clone();
-        let auto = {
-            let eng = s.active_engine();
-            eng.key(ch) // 全码唯一(6/8/10…偶数)时返回 Some → 挂起
-        };
-        s.st.buffer = s.active_engine().input().to_string();
+        let auto = s.active_engine().and_then(|eng| eng.key(ch)); // 全码唯一(6/8/10…偶数)时返回 Some → 挂起
+        s.st.buffer = s
+            .active_engine()
+            .map(|e| e.input().to_string())
+            .unwrap_or_default();
         if let Some(text) = auto {
             s.st.pending = text;
             s.st.pending_code = format!("{}{}", prev, ch);
@@ -1047,7 +1088,9 @@ fn compute_action(
         } else if composing && has_menu {
             let text = cands[0].0.clone();
             let code = s.st.buffer.clone();
-            s.active_engine().learn(&code, &text);
+            if let Some(e) = s.active_engine() {
+                e.learn(&code, &text);
+            }
             s.note_auto_commit(&code, &text);
             out.push_str(&text);
         }
@@ -1086,7 +1129,9 @@ fn compute_action(
         }
         let mut text = cands[0].0.clone();
         let code = s.st.buffer.clone();
-        s.active_engine().learn(&code, &text);
+        if let Some(e) = s.active_engine() {
+            e.learn(&code, &text);
+        }
         s.note_auto_commit(&code, &text);
         // 挂起字随首选一并顶出
         if !s.st.pending.is_empty() {
@@ -1187,11 +1232,214 @@ impl LuflyTsf {
             }
         }
     }
+
+    // ---- COM 入口的实现体（trait impl 只留 ffi_guard 包装: panic 一律
+    // 转错误码，绝不冲出 extern "system" 边界杀死宿主进程）----
+
+    fn on_set_focus_inner(&self, pfocused: BOOL) -> Result<()> {
+        if !pfocused.as_bool() {
+            // 失焦（切窗口/切文档）: 关候选窗、清输入缓冲。
+            // 候选窗钉住后不会自己消失，必须在这里收尾
+            let mut shared = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            shared.composition = None;
+            if let Some(e) = shared.engine.as_mut() {
+                e.reset();
+            }
+            shared.st.reset();
+            shared.cand_win.hide();
+            crate::log("focus lost: reset");
+        } else {
+            crate::log("focus gained");
+        }
+        Ok(())
+    }
+
+    fn on_test_key_down_inner(&self, wparam: WPARAM) -> Result<BOOL> {
+        // TSF 按键协议: Test 返回 TRUE 才会回调 OnKeyDown。
+        // 决策+执行在 Test 阶段一次完成（对齐 weasel: Test 时跑完整状态机），
+        // OnKeyDown 只回放缓存判定。绝不能「Test 声明、OnKeyDown 放行」——
+        // 该类键在 CUAS 应用（企业微信）被系统吃掉后不回注，凭空消失
+        // （Edge 等 TSF 感知应用会回注，故那边一直正常）；空缓冲退格/空格
+        // 由此返回 FALSE，键原生直达应用
+        let vk = VIRTUAL_KEY(wparam.0 as u16);
+        let cached = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner).test_eaten;
+        let eaten = match cached {
+            Some(e) => e, // 同键多次 Test（WORD 2010 x64 类应用）: 只决策一次
+            None => {
+                let e = self.process_key(vk).as_bool();
+                // 只缓存 TRUE: FALSE 的键不会被路由 OnKeyDown，键会自然到应用
+                self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner).test_eaten = if e { Some(true) } else { None };
+                e
+            }
+        };
+        crate::log(&format!("TestKeyDown vk=0x{:02X} eaten={}", vk.0, eaten as i32));
+        Ok(BOOL(eaten as i32))
+    }
+
+    fn on_key_down_inner(&self, wparam: WPARAM) -> Result<BOOL> {
+        let vk = VIRTUAL_KEY(wparam.0 as u16);
+        // Test 阶段已决策: 只回放判定（不重复执行管线）
+        let cached = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner).test_eaten.take();
+        let eaten = match cached {
+            Some(e) => e,
+            // 无 Test 直来的键（QQ2012 类应用只发 OnKeyDown）: 现场决策
+            None => self.process_key(vk).as_bool(),
+        };
+        crate::log(&format!("OnKeyDown vk=0x{:02X} eaten={}", vk.0, eaten as i32));
+        Ok(BOOL(eaten as i32))
+    }
+
+    fn on_test_key_up_inner(&self, wparam: WPARAM) -> Result<BOOL> {
+        // Shift 单击（切中英）与 $/| 抬键补标点需要在 OnKeyUp 里收尾。
+        // Shift 不受 ascii 门控: 英文模式下单击 Shift 切回中文
+        let vk = VIRTUAL_KEY(wparam.0 as u16);
+        let is_shift = vk == VK_SHIFT || vk == VK_LSHIFT || vk == VK_RSHIFT;
+        let ascii = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner).st.ascii;
+        let want = is_shift
+            || (!ascii
+                && (vk.0 == 0x34 || vk == VK_OEM_5)
+                && self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner).st.pending_punct.is_some());
+        Ok(BOOL(want as i32))
+    }
+
+    fn on_key_up_inner(&self, wparam: WPARAM) -> Result<BOOL> {
+        let vk = VIRTUAL_KEY(wparam.0 as u16);
+        let is_shift = vk == VK_SHIFT || vk == VK_LSHIFT || vk == VK_RSHIFT;
+
+        let mut new_ascii: Option<bool> = None;
+        let act = {
+            let mut s = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            let st = &mut s.st;
+            if is_shift && st.shift_armed {
+                // Shift 单击（其后无其他键）: 切换中/英文模式；
+                // 编码中先原样上屏字母再转英文（对齐常见输入法手感）
+                st.shift_armed = false;
+                st.cancel_add_word(); // 切换模式即退出加词
+                if !st.buffer.is_empty() {
+                    let letters = std::mem::take(&mut st.buffer);
+                    st.last_cls = 2;
+                    st.reverse = false;
+                    st.ascii = true; // 编码中必为中文态: 定向转英文
+                    new_ascii = Some(true);
+                    crate::log("switch to EN (in coding)");
+                    Act::Commit(letters)
+                } else {
+                    let out = std::mem::take(&mut st.pending);
+                    if !out.is_empty() {
+                        st.pending_code.clear(); // 挂起字随模式切换落地
+                    }
+                    st.auto_buf.clear(); // 切英文模式 = 断链
+                    st.auto_codes.clear();
+                    st.reverse = false;
+                    st.last_cls = 0;
+                    st.ascii = !st.ascii;
+                    new_ascii = Some(st.ascii);
+                    crate::log(&format!("switch to {}", if st.ascii { "EN" } else { "CN" }));
+                    Act::Commit(out)
+                }
+            } else if st.pending_punct.is_some()
+                && (vk.0 == 0x34 || vk == VK_OEM_5)
+            {
+                // $/|: 按下时已选次选候选，抬键补标点（对齐 rime Release+dollar/bar）。
+                // 兼容先松 Shift 的情况（此时 VK 变回 4 / backslash）。
+                // 注意此处仍持锁: 只能返回 Act 放锁后统一执行，绝不能在这里
+                // 调 exec_act（request_session 里会再次 lock —— 死锁）
+                let punct = st.pending_punct.take();
+                st.auto_buf.clear(); // 标点 = 断链
+                st.auto_codes.clear();
+                st.last_cls = 0;
+                punct
+                    .map(|p| Act::Commit(p.to_owned()))
+                    .unwrap_or(Act::Pass)
+            } else {
+                Act::Pass
+            }
+        };
+        if let Some(ascii) = new_ascii {
+            // 模式切换视觉反馈（对齐 fcitx5 托盘图标变化）
+            crate::status::flash(ascii);
+            // 同步系统模式格 + 刷新任务栏「中/EN」图标
+            {
+                let s = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                crate::langbar::set_conversion(&s, ascii);
+            }
+            crate::langbar::notify_mode_changed();
+        }
+        Ok(self.exec_act(act))
+    }
+
+    fn on_comp_terminated_inner(&self) -> Result<()> {
+        // 对齐 weasel: 正常 EndComposition（尤其空 composition）也会触发本回调
+        // （"Silly M$"）。只丢 composition 句柄；仍在 composing（有输入缓冲/
+        // 挂起字）时保留全部输入状态，下个按键重建 composition。只有真正空闲
+        // 才清状态——否则第二字母就"全没了"。
+        let mut shared = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        shared.composition = None;
+        let composing = !shared.st.buffer.is_empty() || !shared.st.pending.is_empty();
+        if composing {
+            crate::log("comp terminated (external), keep composing state");
+        } else {
+            if let Some(e) = shared.engine.as_mut() {
+                e.reset();
+            }
+            shared.st.reset();
+            shared.cand_win.hide();
+            crate::log("comp terminated (idle), reset");
+        }
+        Ok(())
+    }
+
+    fn deactivate_inner(&self) -> Result<()> {
+        let mut shared = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        // 停掉 IME 关联体检定时器
+        {
+            let mut heals = HEALS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            if let Some(pos) = heals.iter().position(|(_, s)| Arc::ptr_eq(&s.0, &self.shared)) {
+                let (t, _) = heals.swap_remove(pos);
+                unsafe {
+                    let _ = KillTimer(None, t);
+                }
+            }
+        }
+        if let Some(tm) = &shared.thread_mgr {
+            unsafe {
+                let keystroke: ITfKeystrokeMgr = tm.cast()?;
+                let _ = keystroke.UnadviseKeyEventSink(shared.client_id);
+            }
+        }
+        // 移除语言栏托盘项
+        if !shared.langbar.is_empty() {
+            if let Some(tm) = &shared.thread_mgr {
+                if let Ok(mgr) = tm.cast::<ITfLangBarItemMgr>() {
+                    for it in &shared.langbar {
+                        unsafe {
+                            let _ = mgr.RemoveItem(it);
+                        }
+                    }
+                }
+            }
+            shared.langbar.clear();
+        }
+        crate::langbar::clear_sink();
+        // 用户词典落盘（与 fcitx5 析构 lufly_user_flush 对齐）
+        shared.flush_user(true);
+        shared.thread_mgr = None;
+        shared.composition = None;
+        if let Some(e) = shared.engine.as_mut() {
+            e.reset();
+        }
+        shared.st.reset();
+        // 销毁 UI 窗口而非仅隐藏——窗口存活时消息仍派发到 wndproc，
+        // 历史上 DLL 被系统中途卸载后这里是 explorer/UU 崩溃的元凶
+        shared.cand_win.destroy();
+        crate::status::shutdown();
+        Ok(())
+    }
 }
 
 impl ITfTextInputProcessorEx_Impl for LuflyTsf_Impl {
     fn ActivateEx(&self, ptim: Ref<'_, ITfThreadMgr>, tid: u32, dwflags: u32) -> Result<()> {
-        self.activate_ex(ptim, tid, dwflags)
+        crate::ffi_guard("ActivateEx", || self.activate_ex(ptim, tid, dwflags))
     }
 }
 
@@ -1207,7 +1455,7 @@ impl LuflyTsf_Impl {
         let sink: ITfCompositionSink = self.to_interface();
         let key_sink: ITfKeyEventSink = self.to_interface();
         {
-            let mut shared = self.shared.lock().unwrap();
+            let mut shared = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             shared.thread_mgr = Some(tm.clone());
             shared.client_id = tid;
             shared.composition_sink = Some(sink);
@@ -1256,7 +1504,7 @@ impl LuflyTsf_Impl {
                         }
                     }
                 }
-                self.shared.lock().unwrap().langbar = items;
+                self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner).langbar = items;
             }
             Err(e) => crate::log(&format!("langbar mgr: {e}")),
         }
@@ -1282,12 +1530,12 @@ impl LuflyTsf_Impl {
         // 抓线程默认 HIMC（CUAS 托管）供自愈重挂；ImmCreateContext 新造的
         // 上下文 CUAS 不认，0.5.5 实测无效
         let default_himc = unsafe { capture_default_himc() };
-        self.shared.lock().unwrap().default_himc = default_himc.0 as isize;
+        self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner).default_himc = default_himc.0 as isize;
         crate::log(&format!("default himc: 0x{:X}", default_himc.0 as usize));
 
         // 进程内 IME 关联体检（1s 周期，Deactivate 时停）
         let timer = unsafe { SetTimer(None, 0, 1000, Some(heal_tick)) };
-        HEALS.lock().unwrap().push((timer, HealShared(self.shared.clone())));
+        HEALS.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push((timer, HealShared(self.shared.clone())));
 
         // 后台预载主码表（不阻塞 Activate；首次按键由 ensure_engine 兜底）
         std::thread::spawn(|| {
@@ -1306,71 +1554,17 @@ impl ITfTextInputProcessor_Impl for LuflyTsf_Impl {
         // 对齐 weasel：Activate 一律委托 ActivateEx(0)。
         // TSF 不感知应用（CUAS 路径，如企业微信）由系统激活时可能直接走 Ex 入口，
         // 缺 Ex 实现会导致该类应用里激活不完整（键槽虽 Advise 但收不到键）
-        self.activate_ex(ptim, tid, 0)
+        crate::ffi_guard("Activate", || self.activate_ex(ptim, tid, 0))
     }
 
     fn Deactivate(&self) -> Result<()> {
-        let mut shared = self.shared.lock().unwrap();
-        // 停掉 IME 关联体检定时器
-        {
-            let mut heals = HEALS.lock().unwrap();
-            if let Some(pos) = heals.iter().position(|(_, s)| Arc::ptr_eq(&s.0, &self.shared)) {
-                let (t, _) = heals.swap_remove(pos);
-                unsafe {
-                    let _ = KillTimer(None, t);
-                }
-            }
-        }
-        if let Some(tm) = &shared.thread_mgr {
-            unsafe {
-                let keystroke: ITfKeystrokeMgr = tm.cast()?;
-                let _ = keystroke.UnadviseKeyEventSink(shared.client_id);
-            }
-        }
-        // 移除语言栏托盘项
-        if !shared.langbar.is_empty() {
-            if let Some(tm) = &shared.thread_mgr {
-                if let Ok(mgr) = tm.cast::<ITfLangBarItemMgr>() {
-                    for it in &shared.langbar {
-                        unsafe {
-                            let _ = mgr.RemoveItem(it);
-                        }
-                    }
-                }
-            }
-            shared.langbar.clear();
-        }
-        crate::langbar::clear_sink();
-        // 用户词典落盘（与 fcitx5 析构 lufly_user_flush 对齐）
-        shared.flush_user(true);
-        shared.thread_mgr = None;
-        shared.composition = None;
-        if let Some(e) = shared.engine.as_mut() {
-            e.reset();
-        }
-        shared.st.reset();
-        shared.cand_win.hide();
-        Ok(())
+        crate::ffi_guard("Deactivate", || self.deactivate_inner())
     }
 }
 
 impl ITfKeyEventSink_Impl for LuflyTsf_Impl {
     fn OnSetFocus(&self, pfocused: BOOL) -> Result<()> {
-        if !pfocused.as_bool() {
-            // 失焦（切窗口/切文档）: 关候选窗、清输入缓冲。
-            // 候选窗钉住后不会自己消失，必须在这里收尾
-            let mut shared = self.shared.lock().unwrap();
-            shared.composition = None;
-            if let Some(e) = shared.engine.as_mut() {
-                e.reset();
-            }
-            shared.st.reset();
-            shared.cand_win.hide();
-            crate::log("focus lost: reset");
-        } else {
-            crate::log("focus gained");
-        }
-        Ok(())
+        crate::ffi_guard("OnSetFocus", || self.on_set_focus_inner(pfocused))
     }
 
     fn OnPreservedKey(&self, _pic: Ref<'_, ITfContext>, _rguid: *const GUID) -> Result<BOOL> {
@@ -1383,25 +1577,7 @@ impl ITfKeyEventSink_Impl for LuflyTsf_Impl {
         wparam: WPARAM,
         _lparam: LPARAM,
     ) -> Result<BOOL> {
-        // TSF 按键协议: Test 返回 TRUE 才会回调 OnKeyDown。
-        // 决策+执行在 Test 阶段一次完成（对齐 weasel: Test 时跑完整状态机），
-        // OnKeyDown 只回放缓存判定。绝不能「Test 声明、OnKeyDown 放行」——
-        // 该类键在 CUAS 应用（企业微信）被系统吃掉后不回注，凭空消失
-        // （Edge 等 TSF 感知应用会回注，故那边一直正常）；空缓冲退格/空格
-        // 由此返回 FALSE，键原生直达应用
-        let vk = VIRTUAL_KEY(wparam.0 as u16);
-        let cached = self.shared.lock().unwrap().test_eaten;
-        let eaten = match cached {
-            Some(e) => e, // 同键多次 Test（WORD 2010 x64 类应用）: 只决策一次
-            None => {
-                let e = self.process_key(vk).as_bool();
-                // 只缓存 TRUE: FALSE 的键不会被路由 OnKeyDown，键会自然到应用
-                self.shared.lock().unwrap().test_eaten = if e { Some(true) } else { None };
-                e
-            }
-        };
-        crate::log(&format!("TestKeyDown vk=0x{:02X} eaten={}", vk.0, eaten as i32));
-        Ok(BOOL(eaten as i32))
+        crate::ffi_guard("OnTestKeyDown", || self.on_test_key_down_inner(wparam))
     }
 
     fn OnKeyDown(
@@ -1410,16 +1586,7 @@ impl ITfKeyEventSink_Impl for LuflyTsf_Impl {
         wparam: WPARAM,
         _lparam: LPARAM,
     ) -> Result<BOOL> {
-        let vk = VIRTUAL_KEY(wparam.0 as u16);
-        // Test 阶段已决策: 只回放判定（不重复执行管线）
-        let cached = self.shared.lock().unwrap().test_eaten.take();
-        let eaten = match cached {
-            Some(e) => e,
-            // 无 Test 直来的键（QQ2012 类应用只发 OnKeyDown）: 现场决策
-            None => self.process_key(vk).as_bool(),
-        };
-        crate::log(&format!("OnKeyDown vk=0x{:02X} eaten={}", vk.0, eaten as i32));
-        Ok(BOOL(eaten as i32))
+        crate::ffi_guard("OnKeyDown", || self.on_key_down_inner(wparam))
     }
 
     fn OnTestKeyUp(
@@ -1428,16 +1595,7 @@ impl ITfKeyEventSink_Impl for LuflyTsf_Impl {
         wparam: WPARAM,
         _lparam: LPARAM,
     ) -> Result<BOOL> {
-        // Shift 单击（切中英）与 $/| 抬键补标点需要在 OnKeyUp 里收尾。
-        // Shift 不受 ascii 门控: 英文模式下单击 Shift 切回中文
-        let vk = VIRTUAL_KEY(wparam.0 as u16);
-        let is_shift = vk == VK_SHIFT || vk == VK_LSHIFT || vk == VK_RSHIFT;
-        let ascii = self.shared.lock().unwrap().st.ascii;
-        let want = is_shift
-            || (!ascii
-                && (vk.0 == 0x34 || vk == VK_OEM_5)
-                && self.shared.lock().unwrap().st.pending_punct.is_some());
-        Ok(BOOL(want as i32))
+        crate::ffi_guard("OnTestKeyUp", || self.on_test_key_up_inner(wparam))
     }
 
     fn OnKeyUp(
@@ -1446,65 +1604,7 @@ impl ITfKeyEventSink_Impl for LuflyTsf_Impl {
         wparam: WPARAM,
         _lparam: LPARAM,
     ) -> Result<BOOL> {
-        let vk = VIRTUAL_KEY(wparam.0 as u16);
-        let is_shift = vk == VK_SHIFT || vk == VK_LSHIFT || vk == VK_RSHIFT;
-
-        let mut new_ascii: Option<bool> = None;
-        let act = {
-            let mut s = self.shared.lock().unwrap();
-            let st = &mut s.st;
-            if is_shift && st.shift_armed {
-                // Shift 单击（其后无其他键）: 切换中/英文模式；
-                // 编码中先原样上屏字母再转英文（对齐常见输入法手感）
-                st.shift_armed = false;
-                st.cancel_add_word(); // 切换模式即退出加词
-                if !st.buffer.is_empty() {
-                    let letters = std::mem::take(&mut st.buffer);
-                    st.last_cls = 2;
-                    st.reverse = false;
-                    st.ascii = true; // 编码中必为中文态: 定向转英文
-                    new_ascii = Some(true);
-                    crate::log("switch to EN (in coding)");
-                    Act::Commit(letters)
-                } else {
-                    let out = std::mem::take(&mut st.pending);
-                    if !out.is_empty() {
-                        st.pending_code.clear(); // 挂起字随模式切换落地
-                    }
-                    st.auto_buf.clear(); // 切英文模式 = 断链
-                    st.auto_codes.clear();
-                    st.reverse = false;
-                    st.last_cls = 0;
-                    st.ascii = !st.ascii;
-                    new_ascii = Some(st.ascii);
-                    crate::log(&format!("switch to {}", if st.ascii { "EN" } else { "CN" }));
-                    Act::Commit(out)
-                }
-            } else if st.pending_punct.is_some()
-                && (vk.0 == 0x34 || vk == VK_OEM_5)
-            {
-                // $/|: 按下时已选次选候选，抬键补标点（对齐 rime Release+dollar/bar）。
-                // 兼容先松 Shift 的情况（此时 VK 变回 4 / backslash）
-                let punct = st.pending_punct.take().unwrap();
-                st.auto_buf.clear(); // 标点 = 断链
-                st.auto_codes.clear();
-                st.last_cls = 0;
-                Act::Commit(punct.to_owned())
-            } else {
-                Act::Pass
-            }
-        };
-        if let Some(ascii) = new_ascii {
-            // 模式切换视觉反馈（对齐 fcitx5 托盘图标变化）
-            crate::status::flash(ascii);
-            // 同步系统模式格 + 刷新任务栏「中/EN」图标
-            {
-                let s = self.shared.lock().unwrap();
-                crate::langbar::set_conversion(&s, ascii);
-            }
-            crate::langbar::notify_mode_changed();
-        }
-        Ok(self.exec_act(act))
+        crate::ffi_guard("OnKeyUp", || self.on_key_up_inner(wparam))
     }
 }
 
@@ -1514,23 +1614,6 @@ impl ITfCompositionSink_Impl for LuflyTsf_Impl {
         _ecwrite: u32,
         _pcomposition: Ref<'_, ITfComposition>,
     ) -> Result<()> {
-        // 对齐 weasel: 正常 EndComposition（尤其空 composition）也会触发本回调
-        // （"Silly M$"）。只丢 composition 句柄；仍在 composing（有输入缓冲/
-        // 挂起字）时保留全部输入状态，下个按键重建 composition。只有真正空闲
-        // 才清状态——否则第二字母就"全没了"。
-        let mut shared = self.shared.lock().unwrap();
-        shared.composition = None;
-        let composing = !shared.st.buffer.is_empty() || !shared.st.pending.is_empty();
-        if composing {
-            crate::log("comp terminated (external), keep composing state");
-        } else {
-            if let Some(e) = shared.engine.as_mut() {
-                e.reset();
-            }
-            shared.st.reset();
-            shared.cand_win.hide();
-            crate::log("comp terminated (idle), reset");
-        }
-        Ok(())
+        crate::ffi_guard("OnCompositionTerminated", || self.on_comp_terminated_inner())
     }
 }

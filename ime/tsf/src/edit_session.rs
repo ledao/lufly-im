@@ -107,7 +107,13 @@ fn update_cand_win(shared: &mut Shared, ec: u32, ctx: &ITfContext) {
 
 impl ITfEditSession_Impl for EditSession_Impl {
     fn DoEditSession(&self, ec: u32) -> Result<()> {
-        let mut shared = self.shared.lock().unwrap();
+        crate::ffi_guard("DoEditSession", || self.do_edit_session(ec))
+    }
+}
+
+impl EditSession_Impl {
+    fn do_edit_session(&self, ec: u32) -> Result<()> {
+        let mut shared = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         let tm = shared
             .thread_mgr
             .as_ref()
@@ -172,12 +178,16 @@ impl ITfEditSession_Impl for EditSession_Impl {
                     let mut fetched = 0u32;
                     unsafe { ctx.GetSelection(ec, TF_DEFAULT_SELECTION, &mut sels, &mut fetched)? };
                     if fetched > 0 {
-                        let range =
-                            ManuallyDrop::into_inner(std::mem::take(&mut sels[0].range)).unwrap();
-                        let wide = utf16(&text);
-                        unsafe {
-                            range.SetText(ec, 0, &wide)?;
-                            collapse_and_select(&ctx, ec, &range)?;
+                        // fetched>0 时 range 必有值（TSF 契约）；仍用 if let 防
+                        // 意外形状 —— FFI 内 unwrap panic = 崩溃宿主进程
+                        if let Some(range) =
+                            ManuallyDrop::into_inner(std::mem::take(&mut sels[0].range))
+                        {
+                            let wide = utf16(&text);
+                            unsafe {
+                                range.SetText(ec, 0, &wide)?;
+                                collapse_and_select(&ctx, ec, &range)?;
+                            }
                         }
                     }
                     crate::log(&format!("session commit (no comp), text={:?}", text));

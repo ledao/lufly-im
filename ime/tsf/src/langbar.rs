@@ -68,7 +68,7 @@ impl LangItem {
         match self.kind {
             Kind::Logo => ICON_LOGO,
             Kind::Mode => {
-                let en = self.shared.lock().unwrap().st.ascii;
+                let en = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner).st.ascii;
                 if en {
                     ICON_EN
                 } else {
@@ -81,31 +81,33 @@ impl LangItem {
 
 impl ITfLangBarItemButton_Impl for LangItem_Impl {
     fn OnClick(&self, click: TfLBIClick, _pt: &POINT, _prcarea: *const RECT) -> Result<()> {
-        if click != TF_LBI_CLK_LEFT || self.kind != Kind::Mode {
-            return Ok(()); // logo 点击暂无动作；右键忽略
-        }
-        // 与 Shift 单击同款切换（空闲路径）：断链、翻转、闪浮窗、刷新图标
-        let new_ascii = {
-            let mut s = self.shared.lock().unwrap();
-            s.st.pending.clear();
-            s.st.auto_buf.clear();
-            s.st.auto_codes.clear();
-            s.st.reverse = false;
-            s.st.last_cls = 0;
-            s.st.ascii = !s.st.ascii;
-            s.st.ascii
-        };
-        crate::status::flash(new_ascii);
-        crate::log(&format!(
-            "langbar switch to {}",
-            if new_ascii { "EN" } else { "CN" }
-        ));
-        {
-            let s = self.shared.lock().unwrap();
-            set_conversion(&s, new_ascii);
-        }
-        notify_mode_changed();
-        Ok(())
+        crate::ffi_guard("langbar OnClick", || {
+            if click != TF_LBI_CLK_LEFT || self.kind != Kind::Mode {
+                return Ok(()); // logo 点击暂无动作；右键忽略
+            }
+            // 与 Shift 单击同款切换（空闲路径）：断链、翻转、闪浮窗、刷新图标
+            let new_ascii = {
+                let mut s = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                s.st.pending.clear();
+                s.st.auto_buf.clear();
+                s.st.auto_codes.clear();
+                s.st.reverse = false;
+                s.st.last_cls = 0;
+                s.st.ascii = !s.st.ascii;
+                s.st.ascii
+            };
+            crate::status::flash(new_ascii);
+            crate::log(&format!(
+                "langbar switch to {}",
+                if new_ascii { "EN" } else { "CN" }
+            ));
+            {
+                let s = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                set_conversion(&s, new_ascii);
+            }
+            notify_mode_changed();
+            Ok(())
+        })
     }
 
     fn InitMenu(&self, _pmenu: windows_core::Ref<'_, ITfMenu>) -> Result<()> {
@@ -191,14 +193,14 @@ impl ITfSource_Impl for LangItem_Impl {
             .ok_or_else(|| Error::from_hresult(E_POINTER))?
             .cast()?;
         if self.kind == Kind::Mode {
-            *MODE_SINK.lock().unwrap() = Some(SendSink(sink));
+            *MODE_SINK.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = Some(SendSink(sink));
         }
         Ok(ITEM_COOKIE)
     }
 
     fn UnadviseSink(&self, dwcookie: u32) -> Result<()> {
         if dwcookie == ITEM_COOKIE && self.kind == Kind::Mode {
-            *MODE_SINK.lock().unwrap() = None;
+            *MODE_SINK.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = None;
         }
         Ok(())
     }
@@ -206,7 +208,7 @@ impl ITfSource_Impl for LangItem_Impl {
 
 /// Shift 切换后刷新任务栏模式图标
 pub fn notify_mode_changed() {
-    let sink = MODE_SINK.lock().unwrap().as_ref().map(|w| w.0.clone());
+    let sink = MODE_SINK.lock().unwrap_or_else(std::sync::PoisonError::into_inner).as_ref().map(|w| w.0.clone());
     if let Some(s) = sink {
         unsafe {
             let _ = s.OnUpdate(TF_LBI_ICON | TF_LBI_STATUS);
@@ -216,7 +218,7 @@ pub fn notify_mode_changed() {
 
 /// 反注册时清掉全局 sink，避免悬挂
 pub fn clear_sink() {
-    *MODE_SINK.lock().unwrap() = None;
+    *MODE_SINK.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = None;
 }
 
 /// 同步 GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION（对齐 weasel）：

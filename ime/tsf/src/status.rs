@@ -23,7 +23,7 @@ static HWND_SLOT: Mutex<isize> = Mutex::new(0);
 static FONT: Mutex<isize> = Mutex::new(0);
 
 fn font() -> HFONT {
-    let mut f = FONT.lock().unwrap();
+    let mut f = FONT.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if *f == 0 {
         unsafe {
             let h = CreateFontW(
@@ -49,7 +49,7 @@ fn font() -> HFONT {
 }
 
 fn ensure_window() -> Option<HWND> {
-    let cached = *HWND_SLOT.lock().unwrap();
+    let cached = *HWND_SLOT.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if cached != 0 {
         let h = HWND(cached as *mut _);
         if !h.is_invalid() {
@@ -85,7 +85,7 @@ fn ensure_window() -> Option<HWND> {
         // 圆角
         let rgn = CreateRoundRectRgn(0, 0, WND_SIZE + 1, WND_SIZE + 1, 12, 12);
         let _ = SetWindowRgn(hwnd, Some(rgn), true);
-        *HWND_SLOT.lock().unwrap() = hwnd.0 as isize;
+        *HWND_SLOT.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = hwnd.0 as isize;
         Some(hwnd)
     }
 }
@@ -96,9 +96,15 @@ pub fn flash(ascii: bool) {
         return;
     };
     unsafe {
-        // 底色深灰、白字，文本存进窗口属性（SetProp 字符串键）
+        // 底色深灰、白字，文本存进窗口属性（SetProp 字符串键）。
+        // 旧属性指针先取回释放——每次 flash 泄漏一个 Box 会慢慢攒
         let text: &str = if ascii { "EN" } else { "中" };
         let prop_name = w!("luflyText");
+        let old = GetPropW(hwnd, prop_name);
+        if !old.is_invalid() {
+            drop(Box::from_raw(old.0 as *mut Vec<u16>));
+            let _ = RemovePropW(hwnd, prop_name);
+        }
         let vec: Vec<u16> = text.encode_utf16().collect();
         let _ = SetPropW(hwnd, prop_name, Some(HANDLE(Box::into_raw(Box::new(vec)) as *mut _)));
 
@@ -126,6 +132,28 @@ pub fn flash(ascii: bool) {
         );
         let _ = InvalidateRect(Some(hwnd), None, true);
         let _ = SetTimer(Some(hwnd), TIMER_ID, SHOW_MS, None);
+    }
+}
+
+/// Deactivate 收尾: 杀计时器 + 销毁浮窗（含释放窗口属性里的文本）。
+/// flash 的 1s 自动隐藏 timer 到点走 WM_TIMER → wndproc，DLL 若在此期间
+/// 被卸载就是访问违例——禁止卸载之外，Deactivate 仍须不留存活窗口
+pub fn shutdown() {
+    let hwnd = *HWND_SLOT.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    if hwnd == 0 {
+        return;
+    }
+    *HWND_SLOT.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = 0;
+    let hwnd = HWND(hwnd as *mut _);
+    unsafe {
+        let _ = KillTimer(Some(hwnd), TIMER_ID);
+        let prop_name = w!("luflyText");
+        let old = GetPropW(hwnd, prop_name);
+        if !old.is_invalid() {
+            drop(Box::from_raw(old.0 as *mut Vec<u16>));
+            let _ = RemovePropW(hwnd, prop_name);
+        }
+        let _ = DestroyWindow(hwnd);
     }
 }
 

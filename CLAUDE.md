@@ -21,7 +21,8 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 - 任务栏「中/EN」模式图标：ITfLangBarItemButton 且 **guidItem 必须用系统保留的 `GUID_LBI_INPUTMODE`**——任务栏只收纳这一项，自定义 GUID 只会进默认隐藏的经典浮动语言栏（参考 weasel `WeaselTSF/LanguageBar.cpp`）；图标变化时 `ITfLangBarItemSink::OnUpdate(TF_LBI_ICON)`。搜狗那种「logo+模式」双图标里的 logo 是其私有托盘（Shell_NotifyIcon），非 TSF 能力。
 - **32 位应用读 WOW6432Node 视图**：微信/企业微信（WXWork.exe）/QQ 主程序多为 32 位，只注册 x64 视图时 TIP 在这些进程根本装不进去（无任何报错，仅 64 位子进程能加载）；必须 x86/x64 双 DLL，各自用对应位数的 regsvr32 注册（32 位安装器里 x64 走 `$WINDIR\Sysnative`，x86 走 `SysWOW64`），DeleteRegKey/ReadRegStr 要 `SetRegView` 切视图。
 - **CUAS 应用自愈要挂「线程默认 HIMC」而不是 ImmCreateContext 新造的**：新建上下文 CUAS 不认、fOpen=false，挂上后按键照样绕过 TIP；默认上下文用临时窗口 `ImmGetContext` 取（无显式关联的窗口返回的就是它，TIP 激活后由 CUAS 托管）。企业微信 5.x（Flutter）会断开焦点窗口的 IME 关联，只能进程内定时体检重挂。
-- 诊断日志写 `%APPDATA%\lufly\tsf.log`（每行带 pid 前缀——多进程共写，无 pid 无法归因）；「有/无 OnKeyDown」是定位按键链路问题的关键证据。
+- **FFI 内 panic = 杀死宿主进程**（2026-09-05 修复）：TIP DLL 注入所有有输入焦点的进程，任何 Rust panic 冲出 `extern "system"` 边界 = abort 宿主——「任务栏崩溃重启」（explorer 搜索框加载了 TIP）、「UU 远程原地崩」都是它，不是 TSF 架构问题。已知触发形态：**激活后码表后台预载未完成（几百 ms 窗口）**，此间 Deactivate→flush_user 或 Shift 切换→request_session 走到 `engine.unwrap()` 即崩。三层防线：① `main_engine`/`active_engine` 返回 `Option`，调用方降级；② 所有 `lock().unwrap()` 一律 `unwrap_or_else(PoisonError::into_inner)`（一处 panic 持锁 → 中毒 → 后续每键连环 panic）；③ 全部 COM 入口（KeyEventSink/CompositionSink/Activate/Deactivate/EditSession/langbar OnClick）包 `crate::ffi_guard`（catch_unwind→记日志转 E_FAIL）。新加 COM 入口必须同样包 guard。
+- 诊断日志写 `%APPDATA%\lufly\tsf.log`（每行带 pid 前缀——多进程共写，无 pid 无法归因）；「有/无 OnKeyDown」是定位按键链路问题的关键证据。宿主进程崩溃归因：事件查看器→Windows 日志→应用程序→Application Error 的「故障模块名称」若是 lufly_tsf.dll 即为我们的问题。
 
 ## 打包（NSIS，lufly.nsi）
 

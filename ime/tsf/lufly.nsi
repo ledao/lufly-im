@@ -1,5 +1,5 @@
 ﻿; 小鹭音形输入法 Windows 安装包（NSIS / MUI2）
-; 构建: makensis lufly.nsi  →  ..\dist\LuflyIME-Setup-0.5.8.exe
+; 构建: makensis lufly.nsi  →  ..\dist\LuflyIME-Setup-0.5.10.exe
 ; 双架构: 微信/企业微信/QQ 等主程序是 32 位，读 WOW6432Node 视图 —— x64/x86
 ; 两个 DLL 各自用对应位数的 regsvr32 注册（x64 经 Sysnative 直达真实 System32）。
 ; 升级安装: DLL 装在版本号子目录，跨版本新目录永无文件锁；同版本重跑时
@@ -16,7 +16,7 @@ SetCompressor /SOLID lzma
 ; --- 常量 ---
 !define PRODUCT_NAME "小鹭音形输入法"
 !define PRODUCT_PUBLISHER "小鹭音形开发组"
-!define VER "0.5.8"
+!define VER "0.5.10"
 !define PROFILE_GUID "{7C3A1E92-5D4F-4B68-9A2C-E1F0B3D4A5C6}"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\LuflyIME"
 !define CLSID_STR "{2E168808-0490-43E1-9481-F2662BB32954}"
@@ -91,6 +91,10 @@ Section "Install"
   ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.5.6\lufly_tsf32.dll"'
   ExecWait '"$R7" /u /s "$INSTDIR\0.5.7\lufly_tsf.dll"'
   ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.5.7\lufly_tsf32.dll"'
+  ExecWait '"$R7" /u /s "$INSTDIR\0.5.8\lufly_tsf.dll"'
+  ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.5.8\lufly_tsf32.dll"'
+  ExecWait '"$R7" /u /s "$INSTDIR\0.5.9\lufly_tsf.dll"'
+  ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.5.9\lufly_tsf32.dll"'
   ; 旧 DLL 可能已删除导致 regsvr32 /u 无效 —— 直接清掉自己的残留键
   ; (含手写时代的脏数据)。64 位与 32 位应用读不同注册表视图，两边都清
   SetRegView 64
@@ -100,7 +104,9 @@ Section "Install"
   DeleteRegKey HKLM "SOFTWARE\Microsoft\CTF\TIP\${CLSID_STR}"
   DeleteRegKey HKLM "SOFTWARE\Classes\CLSID\${CLSID_STR}"
   SetRegView lastused
-  ExecWait 'taskkill /f /im ctfmon.exe'
+  ; nsExec 用隐藏控制台跑命令（ExecWait 跑控制台程序会闪黑窗）
+  nsExec::Exec 'taskkill /f /im ctfmon.exe'
+  Pop $0
   Sleep 800
 
   ; 2. 写入新版本子目录（跨版本升级 = 新路径永无文件锁；同版本重跑时旧 DLL
@@ -172,6 +178,8 @@ Section "Install"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.5"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.6"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.7"
+  RMDir /r /REBOOTOK "$INSTDIR\0.5.8"
+  RMDir /r /REBOOTOK "$INSTDIR\0.5.9"
   RMDir /REBOOTOK "$INSTDIR\bin"
 
   ; 5. 卸载器与控制面板卸载项
@@ -204,7 +212,8 @@ Section "Uninstall"
   DeleteRegKey HKLM "SOFTWARE\Microsoft\CTF\TIP\${CLSID_STR}"
   DeleteRegKey HKLM "SOFTWARE\Classes\CLSID\${CLSID_STR}"
   SetRegView lastused
-  ExecWait 'taskkill /f /im ctfmon.exe'
+  nsExec::Exec 'taskkill /f /im ctfmon.exe'
+  Pop $0
   Sleep 500
   ; 卸载器默认在 %TEMP% 运行副本，可自删目录；占用时重启后清
   RMDir /r /REBOOTOK "$INSTDIR"

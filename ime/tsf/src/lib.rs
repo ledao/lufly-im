@@ -34,11 +34,11 @@ static DLL_INSTANCE: AtomicPtr<c_void> = AtomicPtr::new(std::ptr::null_mut());
 static PRELOAD: Mutex<Option<lufly_engine::Engine>> = Mutex::new(None);
 
 pub fn take_preload() -> Option<lufly_engine::Engine> {
-    PRELOAD.lock().unwrap().take()
+    PRELOAD.lock().unwrap_or_else(std::sync::PoisonError::into_inner).take()
 }
 
 pub fn store_preload(e: Option<lufly_engine::Engine>) {
-    *PRELOAD.lock().unwrap() = e;
+    *PRELOAD.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = e;
 }
 
 /// 诊断日志（%APPDATA%\lufly\tsf.log）：定位激活/按键链路问题用
@@ -63,6 +63,22 @@ pub fn log(msg: &str) {
         // 同一日志文件多进程共写（ctfmon/各应用进程都加载本 DLL），pid 前缀必须
         let _ = writeln!(f, "[{ts} pid={}] {msg}", std::process::id());
     }
+}
+
+/// FFI 边界兜底: COM 回调内的 panic 一律转错误码并记日志。
+/// 本 DLL 注入所有有输入焦点的进程（explorer/UU 远程/微信……），
+/// panic 跨 extern "system" 边界 = abort 宿主进程——表现即「任务栏崩溃
+/// 重启」「远程软件原地崩」。unwrap/中毒等已逐点消灭，这里是最后防线。
+pub fn ffi_guard<T>(what: &str, f: impl FnOnce() -> Result<T>) -> Result<T> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).unwrap_or_else(|p| {
+        let msg = p
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| p.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "?".into());
+        log(&format!("PANIC (guarded) in {what}: {msg}"));
+        Err(Error::from_hresult(E_FAIL))
+    })
 }
 
 #[no_mangle]
@@ -98,7 +114,13 @@ extern "system" fn DllGetClassObject(
 
 #[no_mangle]
 extern "system" fn DllCanUnloadNow() -> HRESULT {
-    S_OK
+    // 恒 S_FALSE: 禁止系统中途卸载本 DLL。候选窗/状态浮窗的 wndproc、
+    // 全局静态都挂在本模块上，Deactivate 只隐藏不销毁窗口——若允许卸载，
+    // 后续窗口消息会跳进已 unmap 的映像，c0000005 杀死宿主进程
+    // （事件查看器实证: Faulting module = lufly_tsf.dll_unloaded，
+    // explorer/UU 远程崩溃根因）。DLL 常驻到进程退出（本来也按进程缓存），
+    // 代价仅 44MB 虚拟映射（码表为共享只读文件页，物理可回收）
+    S_FALSE
 }
 
 fn dll_path() -> Vec<u16> {

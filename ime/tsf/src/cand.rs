@@ -88,7 +88,7 @@ fn make_font(size: i32) -> HFONT {
 }
 
 fn font_word() -> HFONT {
-    let mut f = FONT_WORD.lock().unwrap();
+    let mut f = FONT_WORD.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if *f == 0 {
         *f = make_font(17).0 as isize;
     }
@@ -96,7 +96,7 @@ fn font_word() -> HFONT {
 }
 
 fn font_label() -> HFONT {
-    let mut f = FONT_LABEL.lock().unwrap();
+    let mut f = FONT_LABEL.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if *f == 0 {
         *f = make_font(13).0 as isize;
     }
@@ -104,7 +104,7 @@ fn font_label() -> HFONT {
 }
 
 fn font_suffix() -> HFONT {
-    let mut f = FONT_SUFFIX.lock().unwrap();
+    let mut f = FONT_SUFFIX.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     if *f == 0 {
         *f = make_font(12).0 as isize;
     }
@@ -232,7 +232,7 @@ impl CandWindow {
                 + PAD_X * 2;
             let height = word_h + BASELINE_EXTRA + VPAD * 2;
             {
-                let mut data = DATA.lock().unwrap();
+                let mut data = DATA.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                 *data = rows;
             }
 
@@ -290,6 +290,17 @@ impl CandWindow {
             }
         }
     }
+
+    /// 销毁窗口（Deactivate 用）。只 hide 不够: 窗口存活期间系统仍会派发
+    /// 消息到 wndproc，若此后 DLL 被卸载就是访问违例（虽已禁止卸载，
+    /// Deactivate 仍应彻底收尾，不留无主窗口）
+    pub fn destroy(&mut self) {
+        if let Some(hwnd) = self.hwnd.take() {
+            unsafe {
+                let _ = DestroyWindow(hwnd);
+            }
+        }
+    }
 }
 
 /// 选入字体并取 TEXTMETRIC (height, ascent)
@@ -306,7 +317,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
         WM_PAINT => {
             let mut ps = PAINTSTRUCT::default();
             let hdc = BeginPaint(hwnd, &mut ps);
-            let data = DATA.lock().unwrap();
+            let data = DATA.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             let mut rc_client = RECT::default();
             let _ = GetClientRect(hwnd, &mut rc_client);
 
@@ -320,9 +331,12 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             SetBkMode(hdc, TRANSPARENT);
 
             // 首位浅灰圆角底纹：覆盖整行高（上下到边内 1px）、左右越界 HL_OVERHANG
-            // （对齐 macOS draw()，防边缘漏底）；RoundRect 配 NULL_PEN 只填不描
+            // （对齐 macOS draw()，防边缘漏底）；RoundRect 配 NULL_PEN 只填不描。
+            // RoundRect 用「当前选入 DC 的刷子」填充——hl_brush 必须 SelectObject，
+            // 否则走 DC 默认 WHITE_BRUSH，白底上画白块（曾因此底纹不可见）
             let hl_brush = CreateSolidBrush(COLOR_HL);
             let old_pen = SelectObject(hdc, GetStockObject(NULL_PEN).into());
+            let old_brush = SelectObject(hdc, hl_brush.into());
             let mut x = PAD_X;
             for r in data.iter() {
                 let w = r.label_w + r.word_w + r.suffix_w;
@@ -339,6 +353,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                 }
                 x += w + GAP;
             }
+            SelectObject(hdc, old_brush);
             SelectObject(hdc, old_pen);
             let _ = DeleteObject(hl_brush.into());
 
