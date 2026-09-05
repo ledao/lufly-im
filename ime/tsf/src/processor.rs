@@ -292,23 +292,39 @@ impl Shared {
 
     /// 自动造词: 用户连续以 4 键全码打字上屏时，把这些字拼成自动词。
     /// 例: 连续全码打「乐」「乐」→ 造出 lelemb → 乐乐。断链 = 任何非
-    /// 「单字+4码」的上屏。词长上限 4 字。
+    /// 「单字+4码」的上屏。词长上限 4 字。组码直接用逐字记录的全码
+    /// （不再 derive——多音字会踩码表行序）。
     fn note_auto_commit(&mut self, code: &str, text: &str) {
         if code.len() != 4 || text.chars().count() != 1 {
             self.st.auto_buf.clear();
+            self.st.auto_codes.clear();
             return;
         }
+        // 防御: 链头不齐（断链路径漏清 auto_codes）时重置，宁退回旧行为
+        if self.st.auto_codes.len() != self.st.auto_buf.chars().count() {
+            self.st.auto_buf.clear();
+            self.st.auto_codes.clear();
+        }
         self.st.auto_buf.push_str(text);
+        self.st.auto_codes.push(code.to_owned());
         let n = self.st.auto_buf.chars().count();
         if n < 2 {
             return;
         }
         if n > 4 {
             self.st.auto_buf.clear();
+            self.st.auto_codes.clear();
             return;
         }
         let word = self.st.auto_buf.clone();
-        if let Ok(d) = self.main_engine().derive_word_code(&word) {
+        let codes = self.st.auto_codes.clone();
+        let segs: Vec<(String, String)> = codes
+            .into_iter()
+            .zip(word.chars())
+            .map(|(c, t)| (c, t.to_string()))
+            .collect();
+        let refs: Vec<(&str, &str)> = segs.iter().map(|(c, t)| (c.as_str(), t.as_str())).collect();
+        if let Ok(d) = self.main_engine().compose_word_code(&refs) {
             if self.main_engine().add_user_word(&d, &word).is_ok() {
                 self.maybe_flush_user();
             }
@@ -371,19 +387,28 @@ impl Shared {
         self.rev.is_some()
     }
 
-    /// ojc 加词·选字: 选中候选追加进词槽，留在选字阶段继续选下一个字
-    fn append_add_word(&mut self, text: &str) {
+    /// ojc 加词·选字: 选中候选追加进词槽，留在选字阶段继续选下一个字。
+    /// code = 所选候选的码（反查选字码无效传空串），记录供组词码
+    /// （所见即所得，多音字不踩码表行序）
+    fn append_add_word(&mut self, text: &str, code: &str) {
         self.st.add_word.push_str(text);
+        self.st.add_segs.push((code.to_owned(), text.to_owned()));
         self.st.buffer.clear();
         self.st.reverse = false;
         self.st.add_stage = 1;
         self.replay("");
     }
 
-    /// 选字完成 → 编码阶段: derive 固定查主码表（反查态的 eng 是 fuzhu）
+    /// 选字完成 → 编码阶段: 先用选字记录的码段组码（所见即所得），失败
+    /// 回退 derive（固定查主码表，反查态的 eng 是 fuzhu）
     fn finish_add_word(&mut self) {
         let word = self.st.add_word.clone();
-        self.st.add_code = self.main_engine().derive_word_code(&word).unwrap_or_default();
+        let segs: Vec<(String, String)> = self.st.add_segs.clone();
+        let refs: Vec<(&str, &str)> = segs.iter().map(|(c, t)| (c.as_str(), t.as_str())).collect();
+        self.st.add_code = match self.main_engine().compose_word_code(&refs) {
+            Ok(c) => c,
+            Err(_) => self.main_engine().derive_word_code(&word).unwrap_or_default(),
+        };
         self.st.buffer.clear();
         self.st.reverse = false;
         self.st.add_stage = 2;
@@ -707,8 +732,10 @@ fn compute_action(
         if idx < n_cands {
             let text = cands[idx].0.clone();
             if s.st.add_stage == 1 {
-                // 加词·选字阶段: 选中的字进词槽，继续选下一个字
-                s.append_add_word(&text);
+                // 加词·选字阶段: 选中的字进词槽（记录所选码，反查码无效），
+                // 继续选下一个字
+                let code = if s.st.reverse { String::new() } else { cands[idx].1.clone() };
+                s.append_add_word(&text, &code);
                 return Act::Compose;
             }
             let code = s.st.buffer.clone();
@@ -732,7 +759,8 @@ fn compute_action(
         if idx < n_cands {
             let text = cands[idx].0.clone();
             if s.st.add_stage == 1 {
-                s.append_add_word(&text);
+                let code = if s.st.reverse { String::new() } else { cands[idx].1.clone() };
+                s.append_add_word(&text, &code);
                 return Act::Compose;
             }
             let code = s.st.buffer.clone();
@@ -753,8 +781,16 @@ fn compute_action(
             if !s.st.pending.is_empty() {
                 let (code, text) =
                     (s.st.pending_code.clone(), s.st.pending.clone());
+                // 挂起可能产自反查态（码无效），先取再清 reverse
+                let was_rev = s.st.reverse;
+                s.st.reverse = false;
                 if s.st.add_stage == 1 {
-                    s.st.add_word.push_str(&text); // 加词中: 挂起字进词槽
+                    // 加词中: 挂起字进词槽（不能漏进文档），记录所选码
+                    s.st.add_word.push_str(&text);
+                    s.st.add_segs.push((
+                        if was_rev { String::new() } else { code.clone() },
+                        text.clone(),
+                    ));
                 } else {
                     s.main_engine().learn(&code, &text);
                     s.note_auto_commit(&code, &text);
@@ -776,9 +812,9 @@ fn compute_action(
             return Act::Pass; // 空缓冲透传
         }
         if s.st.add_stage == 1 && has_menu {
-            let text = cands[0].0.clone();
-            // 加词·选字阶段: 空格选中首选进词槽，不提交
-            s.append_add_word(&text);
+            // 加词·选字阶段: 空格选中首选进词槽（记录所选码，反查码无效），不提交
+            let code = if s.st.reverse { String::new() } else { cands[0].1.clone() };
+            s.append_add_word(&cands[0].0, &code);
             return Act::Compose;
         }
         // 挂起字随空格一并上屏（顶功后接空格 = 确认挂起字 + 首选）
@@ -818,10 +854,12 @@ fn compute_action(
             }
             // 空缓冲回车 = 完成选字（挂起字一并入槽）→ 编码阶段
             if !s.st.pending.is_empty() {
+                let rev = s.st.reverse;
                 let t = s.st.pending.clone();
+                let code = std::mem::take(&mut s.st.pending_code);
                 s.st.add_word.push_str(&t);
+                s.st.add_segs.push((if rev { String::new() } else { code }, t));
                 s.st.pending.clear();
-                s.st.pending_code.clear();
             }
             if s.st.add_word.is_empty() {
                 s.st.cancel_add_word(); // 一个字都没选: 视为取消
@@ -836,6 +874,7 @@ fn compute_action(
                 let t = std::mem::take(&mut s.st.pending);
                 s.st.pending_code.clear();
                 s.st.auto_buf.clear(); // 回车换行 = 断链
+                s.st.auto_codes.clear();
                 return Act::CommitAndCompose(t); // 挂起字先送出，Enter 本身透传
             }
             return Act::Pass; // 换行照常
@@ -876,6 +915,20 @@ fn compute_action(
                 if !s.st.add_word.is_empty() {
                     // 删词槽最后一个字（String::pop 按 UTF-8 边界弹出）
                     s.st.add_word.pop();
+                    // segs 同步: 末段减一字；段码不足 2k（简码）时整段码作废
+                    if let Some(seg) = s.st.add_segs.last_mut() {
+                        let n = seg.1.chars().count();
+                        if n <= 1 {
+                            s.st.add_segs.pop();
+                        } else {
+                            seg.1.pop();
+                            seg.0 = if seg.0.len() >= 2 * n {
+                                seg.0[..2 * (n - 1)].to_owned()
+                            } else {
+                                String::new()
+                            };
+                        }
+                    }
                 } else {
                     s.st.cancel_add_word(); // 退无可退: 退出加词
                 }
@@ -920,7 +973,12 @@ fn compute_action(
             // 挂起字必须真正写入文档（Commit），不能只留在回显里
             let (code, text) = (s.st.pending_code.clone(), s.st.pending.clone());
             if s.st.add_stage == 1 {
-                s.st.add_word.push_str(&text); // 加词中顶进词槽而非上屏
+                // 加词中顶进词槽而非上屏（记录所选码，反查码无效）
+                s.st.add_word.push_str(&text);
+                s.st.add_segs.push((
+                    if s.st.reverse { String::new() } else { code },
+                    text,
+                ));
             } else {
                 s.note_auto_commit(&code, &text);
                 pushed_out = text;
@@ -943,7 +1001,11 @@ fn compute_action(
         if s.st.buffer == "ojc" {
             s.st.buffer.clear();
             s.st.reverse = false;
+            // 每次输入 ojc = 全新加词（清残留，防上一轮反悔的词混入）
             s.st.add_stage = 1;
+            s.st.add_word.clear();
+            s.st.add_code.clear();
+            s.st.add_segs.clear();
             s.replay("");
         }
         if pushed_out.is_empty() {
@@ -994,6 +1056,7 @@ fn compute_action(
         s.st.page = 0;
         out.push_str(&p);
         s.st.auto_buf.clear(); // 标点 = 断链
+        s.st.auto_codes.clear();
         s.st.last_cls = 0;
         return Act::Commit(out);
     }
@@ -1017,6 +1080,7 @@ fn compute_action(
             s.st.reverse = false;
             s.st.last_cls = 2;
             s.st.auto_buf.clear(); // 英文 = 断链
+            s.st.auto_codes.clear();
             s.replay(""); // 同步清引擎缓冲
             return Act::CommitThenPass(letters); // 英文上屏，原字符放行
         }
@@ -1036,6 +1100,7 @@ fn compute_action(
         s.st.reverse = false;
         s.st.last_cls = 0;
         s.st.auto_buf.clear(); // 透传的原字符插在字间 = 断链
+        s.st.auto_codes.clear();
         s.replay("");
         return Act::CommitThenPass(text); // 顶出首选，原字符放行
     }
@@ -1407,6 +1472,7 @@ impl ITfKeyEventSink_Impl for LuflyTsf_Impl {
                         st.pending_code.clear(); // 挂起字随模式切换落地
                     }
                     st.auto_buf.clear(); // 切英文模式 = 断链
+                    st.auto_codes.clear();
                     st.reverse = false;
                     st.last_cls = 0;
                     st.ascii = !st.ascii;
@@ -1421,6 +1487,7 @@ impl ITfKeyEventSink_Impl for LuflyTsf_Impl {
                 // 兼容先松 Shift 的情况（此时 VK 变回 4 / backslash）
                 let punct = st.pending_punct.take().unwrap();
                 st.auto_buf.clear(); // 标点 = 断链
+                st.auto_codes.clear();
                 st.last_cls = 0;
                 Act::Commit(punct.to_owned())
             } else {

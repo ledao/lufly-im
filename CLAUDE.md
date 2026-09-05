@@ -56,7 +56,7 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 - fcitx5（Linux）：`src/lufly.cpp` 标点分支已同步（punctErased 原有，作用范围收窄到数字），未重新构建——下次构建即生效。
 - TSF（Windows）：`src/processor.rs` 已同步（已过 x86_64-pc-windows-msvc cargo check，未出 DLL）——发版时注意更新说明。
 
-## ojc 加词组码改为「选字记录码」（2026-09-03，macOS/fcitx5 已同步，TSF 未同步）
+## ojc 加词组码改为「选字记录码」（2026-09-03，三端代码已同步；fcitx5/TSF 待构建）
 
 加词/自动造词的词码来源从 `derive_word_code`（按码表行序猜多音字读音，曾把「提」推成 dī 的
 `dijntvss`）改为 ojc 选字阶段逐段记录所选候选的码，`compose_word_code`（engine）按记录码组词：
@@ -67,9 +67,10 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 （noteAutoCommit）同样直接用逐字记录的 4 键全码组码，不再 derive。
 
 - macOS/fcitx5：已实现，fcitx5 未重新构建（下次 Linux 构建即生效）。
-- TSF（Windows）：processor.rs/state.rs 的同款 ojc/自动造词流程**尚未同步**，仍走 derive。
-  同步时挂起字（顶功 pending）的**全部出口**都要动：空格确认、回车合并、字母顶出（最常用、
-  两端都曾在此漏记 segs/漏 addStage 分支）、标点顶出、退格撤销，缺一即组码段数与词不符。
+- TSF（Windows）：processor.rs/state.rs 已同步（2026-09-04，过 cargo check 未出 DLL）——
+  挂起字全部出口（空格确认/回车合并/字母顶出/标点顶出/退格撤销）均记/清 segs；
+  顺带对齐 fcitx5 一处旧偏差：空格确认挂起时清除 reverse（挂起可能产自反查态，segs 按清除前
+  的 reverse 判码有效性）；候选码无 capi 借用问题（cands 是 Rust 侧快照）。
 - 弹窗管线（lufly-cli addword/derive）不经过选字，仍走 derive——多音字踩行序的坑在那条路径仍在。
 
 

@@ -89,6 +89,7 @@ impl ITfLangBarItemButton_Impl for LangItem_Impl {
             let mut s = self.shared.lock().unwrap();
             s.st.pending.clear();
             s.st.auto_buf.clear();
+            s.st.auto_codes.clear();
             s.st.reverse = false;
             s.st.last_cls = 0;
             s.st.ascii = !s.st.ascii;

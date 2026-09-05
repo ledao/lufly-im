@@ -70,9 +70,14 @@ pub struct State {
     pub add_stage: u8,
     pub add_word: String,
     pub add_code: String,
+    /// ojc 选字记录: 每段 (码, 文本)，码空 = 无效（反查选字）。组词码用
+    /// （所见即所得，多音字不踩码表行序）
+    pub add_segs: Vec<(String, String)>,
     /// 自动造词: 连续全码(4键)上屏的单字链（UTF-8 拼接），≥2 字即成词。
     /// 任何非「单字+4码」的上屏（简码/选词/标点/英文/回车原样）都断链。
     pub auto_buf: String,
+    /// 与 auto_buf 逐字对应的 4 键全码（组词码直接用，不再 derive）
+    pub auto_codes: Vec<String>,
     /// 候选当前页（翻页键用）
     pub page: usize,
 }
@@ -97,6 +102,8 @@ impl State {
         self.add_stage = 0;
         self.add_word.clear();
         self.add_code.clear();
+        self.add_segs.clear();
         self.auto_buf.clear();
+        self.auto_codes.clear();
     }
 }
