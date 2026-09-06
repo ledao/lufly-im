@@ -16,21 +16,25 @@ SS = 4  # 超采样倍数
 PANEL = 96          # 1x 画布
 PANEL_MARGIN = 24   # 9-patch 边距（= 影环16 + 圆角4 + 余量4）
 RING = 16           # 卡片外围透明影环宽度（须等于 ShadowMargin）
-RADIUS = 4          # 小圆角: 锐利、速度感
+RADIUS = 6          # 对齐 macOS CandidateWindow r6
 
 # ---------- highlight.png: 首选底纹药丸 ----------
 PILL = 48
-PILL_MARGIN = 8     # 须与 theme.conf 的 Highlight/Margin 一致
-PILL_RADIUS = 3     # 与卡片同级的锐利小圆角
+PILL_RADIUS = 4     # macOS 首选底纹 r4
+# 注意: 全出血圆角矩形（无透明边）。fcitx5 把整张贴图九宫格拉伸到
+# (文本宽+左右 margin)x(行高+上下 margin)，theme.conf 的 Highlight/Margin
+# 就是外扩量（L=R=6 对齐 macOS 的 ±6pt 越界，T=B=4 近整行高）。
+# 旧画法（8px 透明边 + conf 声明 8/8/2/2）上下固定区只有 2px，圆角弧线
+# 落进竖向拉伸区被拉糊，且可见药丸比文字行矮 12px——悬浮小灰条，已废。
 
 # ---------- 配色 ----------
-# 首选 = 轻轻的灰色底纹 + 深色文字（与后面候选仅一层底纹之差）
-LIGHT = dict(fill="#ffffff", border="#d9dee7",
+# 首选 = 轻轻的灰色底纹（macOS systemGray 15% 叠底色，light ≈ #ececec）
+LIGHT = dict(fill="#ffffff", border="#dcdcdc",
              shadow_alpha=64, shadow_blur=11, shadow_dy=3,
-             pill="#eef0f3")
-DARK = dict(fill="#24272e", border="#3d434e",
+             pill="#ececec")
+DARK = dict(fill="#242426", border="#3a3a3c",
             shadow_alpha=96, shadow_blur=13, shadow_dy=3,
-            pill="#31353c")
+            pill="#313131")
 
 
 def rounded(draw, box, radius, **kw):
@@ -67,8 +71,7 @@ def make_pill(path, spec):
     size = PILL * SS
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    m = PILL_MARGIN * SS
-    rounded(d, (m, m, size - m, size - m), PILL_RADIUS * SS, fill=spec["pill"])
+    rounded(d, (0, 0, size - 1, size - 1), PILL_RADIUS * SS, fill=spec["pill"])
     img = img.resize((PILL, PILL), Image.LANCZOS)
     img.save(path)
     print("ok", path)
