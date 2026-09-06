@@ -85,7 +85,7 @@ impl ITfLangBarItemButton_Impl for LangItem_Impl {
             if click != TF_LBI_CLK_LEFT || self.kind != Kind::Mode {
                 return Ok(()); // logo 点击暂无动作；右键忽略
             }
-            // 与 Shift 单击同款切换（空闲路径）：断链、翻转、闪浮窗、刷新图标
+            // 与 Shift 单击同款切换（空闲路径）：断链、翻转、刷新图标
             let new_ascii = {
                 let mut s = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                 s.st.pending.clear();
@@ -96,7 +96,6 @@ impl ITfLangBarItemButton_Impl for LangItem_Impl {
                 s.st.ascii = !s.st.ascii;
                 s.st.ascii
             };
-            crate::status::flash(new_ascii);
             crate::log(&format!(
                 "langbar switch to {}",
                 if new_ascii { "EN" } else { "CN" }

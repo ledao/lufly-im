@@ -1368,8 +1368,6 @@ impl LuflyTsf {
             }
         };
         if let Some(ascii) = new_ascii {
-            // 模式切换视觉反馈（对齐 fcitx5 托盘图标变化）
-            crate::status::flash(ascii);
             // 同步系统模式格 + 刷新任务栏「中/EN」图标
             {
                 let s = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -1444,7 +1442,6 @@ impl LuflyTsf {
         // 销毁 UI 窗口而非仅隐藏——窗口存活时消息仍派发到 wndproc，
         // 历史上 DLL 被系统中途卸载后这里是 explorer/UU 崩溃的元凶
         shared.cand_win.destroy();
-        crate::status::shutdown();
         Ok(())
     }
 }

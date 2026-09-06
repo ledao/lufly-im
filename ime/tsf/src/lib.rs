@@ -6,7 +6,6 @@ mod guids;
 mod langbar;
 mod processor;
 mod state;
-mod status;
 
 use std::ffi::c_void;
 use std::sync::Mutex;
