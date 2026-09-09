@@ -1,5 +1,5 @@
 ﻿; 小鹭音形输入法 Windows 安装包（NSIS / MUI2）
-; 构建: makensis lufly.nsi  →  ..\dist\LuflyIME-Setup-0.5.11.exe
+; 构建: makensis lufly.nsi  →  ..\dist\LuflyIME-Setup-0.5.12.exe
 ; 双架构: 微信/企业微信/QQ 等主程序是 32 位，读 WOW6432Node 视图 —— x64/x86
 ; 两个 DLL 各自用对应位数的 regsvr32 注册（x64 经 Sysnative 直达真实 System32）。
 ; 升级安装: DLL 装在版本号子目录，跨版本新目录永无文件锁；同版本重跑时
@@ -16,7 +16,7 @@ SetCompressor /SOLID lzma
 ; --- 常量 ---
 !define PRODUCT_NAME "小鹭音形输入法"
 !define PRODUCT_PUBLISHER "小鹭音形开发组"
-!define VER "0.5.11"
+!define VER "0.5.12"
 !define PROFILE_GUID "{7C3A1E92-5D4F-4B68-9A2C-E1F0B3D4A5C6}"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\LuflyIME"
 !define CLSID_STR "{2E168808-0490-43E1-9481-F2662BB32954}"
@@ -86,6 +86,8 @@ Section "Install"
   ExecWait '"$R7" /u /s "$INSTDIR\0.5.0\lufly_tsf.dll"'
   ExecWait '"$R7" /u /s "$INSTDIR\0.5.1\lufly_tsf.dll"'
   ExecWait '"$R7" /u /s "$INSTDIR\0.5.2\lufly_tsf.dll"'
+  ExecWait '"$R7" /u /s "$INSTDIR\0.5.3\lufly_tsf.dll"'
+  ExecWait '"$R7" /u /s "$INSTDIR\0.5.4\lufly_tsf.dll"'
   ExecWait '"$R7" /u /s "$INSTDIR\0.5.5\lufly_tsf.dll"'
   ExecWait '"$R7" /u /s "$INSTDIR\0.5.6\lufly_tsf.dll"'
   ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.5.6\lufly_tsf32.dll"'
@@ -97,6 +99,8 @@ Section "Install"
   ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.5.9\lufly_tsf32.dll"'
   ExecWait '"$R7" /u /s "$INSTDIR\0.5.10\lufly_tsf.dll"'
   ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.5.10\lufly_tsf32.dll"'
+  ExecWait '"$R7" /u /s "$INSTDIR\0.5.11\lufly_tsf.dll"'
+  ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.5.11\lufly_tsf32.dll"'
   ; 旧 DLL 可能已删除导致 regsvr32 /u 无效 —— 直接清掉自己的残留键
   ; (含手写时代的脏数据)。64 位与 32 位应用读不同注册表视图，两边都清
   SetRegView 64
@@ -181,15 +185,24 @@ Section "Install"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.0"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.1"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.2"
+  RMDir /r /REBOOTOK "$INSTDIR\0.5.3"
+  RMDir /r /REBOOTOK "$INSTDIR\0.5.4"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.5"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.6"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.7"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.8"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.9"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.10"
+  RMDir /r /REBOOTOK "$INSTDIR\0.5.11"
   RMDir /REBOOTOK "$INSTDIR\bin"
 
   ; 5. 卸载器与控制面板卸载项
+  ;    旧版安装器曾把卸载项写进 32 位视图（WOW6432Node）—— 两视图都清旧，
+  ;    再显式写 64 位视图；只写不清会让列表出现两条、旧那条指向已删目录
+  SetRegView 32
+  DeleteRegKey HKLM "${UNINST_KEY}"
+  SetRegView 64
+  DeleteRegKey HKLM "${UNINST_KEY}"
   WriteUninstaller "$INSTDIR\${VER}\uninstall.exe"
   WriteRegStr HKLM "${UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
   WriteRegStr HKLM "${UNINST_KEY}" "DisplayVersion" "${VER}"
@@ -199,6 +212,7 @@ Section "Install"
   WriteRegStr HKLM "${UNINST_KEY}" "UninstallString" "$INSTDIR\${VER}\uninstall.exe"
   WriteRegDWORD HKLM "${UNINST_KEY}" "NoModify" 1
   WriteRegDWORD HKLM "${UNINST_KEY}" "NoRepair" 1
+  SetRegView lastused
 SectionEnd
 
 Section "Uninstall"
@@ -224,6 +238,11 @@ Section "Uninstall"
   Sleep 500
   ; 卸载器默认在 %TEMP% 运行副本，可自删目录；占用时重启后清
   RMDir /r /REBOOTOK "$INSTDIR"
+  ; 卸载项两视图都删（旧版写在 32 位视图，只删当前视图会留幽灵条目）
+  SetRegView 64
   DeleteRegKey HKLM "${UNINST_KEY}"
+  SetRegView 32
+  DeleteRegKey HKLM "${UNINST_KEY}"
+  SetRegView lastused
   Exec '"$SYSDIR\ctfmon.exe"'
 SectionEnd

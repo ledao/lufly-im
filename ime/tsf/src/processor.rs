@@ -236,6 +236,11 @@ pub struct Shared {
     /// Test 阶段已决策待 OnKeyDown 确认的吞键判定（只缓存 TRUE；
     /// 对齐 weasel _fTestKeyDownPending——防同键多次 Test 重复决策）
     pub test_eaten: Option<bool>,
+    /// 最近一次编辑会话的文档（失焦收尾清残留用——失焦后 GetFocus 已不可用，
+    /// weasel _EndComposition 用的也是保存的 _pEditSessionContext）
+    pub edit_ctx: Option<ITfContext>,
+    /// ITfThreadFocusSink 注册 cookie（0 = 未注册）
+    pub thread_focus_cookie: u32,
 }
 
 impl Shared {
@@ -482,7 +487,8 @@ fn build_preedit(st: &State, eng_input: &str) -> String {
     ITfTextInputProcessor,
     ITfTextInputProcessorEx,
     ITfKeyEventSink,
-    ITfCompositionSink
+    ITfCompositionSink,
+    ITfThreadFocusSink
 )]
 pub struct LuflyTsf {
     pub shared: Arc<Mutex<Shared>>,
@@ -513,6 +519,8 @@ impl LuflyTsf {
             langbar: Vec::new(),
             default_himc: 0,
             test_eaten: None,
+            edit_ctx: None,
+            thread_focus_cookie: 0,
         };
 
         Self {
@@ -538,6 +546,17 @@ impl LuflyTsf {
     }
 
     fn request_session_kind(&self, text: &str, kind: SessionKind) -> Result<()> {
+        self.request_session_kind_in(text, kind, None)
+    }
+
+    /// ctx: None = 当前焦点文档；Some = 请求时绑定的文档
+    /// （失焦收尾会话必须绑定原文档——失焦后 GetFocus 已不可用）
+    fn request_session_kind_in(
+        &self,
+        text: &str,
+        kind: SessionKind,
+        ctx: Option<ITfContext>,
+    ) -> Result<()> {
         {
             let mut s = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             s.pending_commit = text.to_owned();
@@ -546,7 +565,7 @@ impl LuflyTsf {
             let input = s.active_engine().map(|e| e.input().to_string()).unwrap_or_default();
             s.preedit = build_preedit(&s.st, &input);
         }
-        self.request_session(kind)
+        self.request_session_in(kind, ctx)
     }
 
     fn request_compose(&self) -> Result<()> {
@@ -575,6 +594,10 @@ impl LuflyTsf {
     }
 
     fn request_session(&self, kind: SessionKind) -> Result<()> {
+        self.request_session_in(kind, None)
+    }
+
+    fn request_session_in(&self, kind: SessionKind, ctx: Option<ITfContext>) -> Result<()> {
         // 注意: 不能持锁调 RequestEditSession —— 同步编辑会话回调里会再次
         // 加锁（DoEditSession），否则死锁。
         let (tm, cid) = {
@@ -586,9 +609,16 @@ impl LuflyTsf {
                 .clone();
             (tm, s.client_id)
         };
-        let dim = unsafe { tm.GetFocus() }?;
-        let ctx = unsafe { dim.GetBase() }?;
-        let session: ITfEditSession = EditSession::new(self.shared.clone(), kind).into();
+        // ctx 未绑定时取当前焦点文档（正常按键路径）
+        let ctx = match ctx {
+            Some(c) => c,
+            None => {
+                let dim = unsafe { tm.GetFocus() }?;
+                unsafe { dim.GetBase() }?
+            }
+        };
+        let session: ITfEditSession = EditSession::new(self.shared.clone(), kind, Some(ctx.clone()))
+            .into();
         // 对齐 weasel: ASYNCDONTCARE|READWRITE（纯 READWRITE 无同步语义，
         // 部分应用会拒绝请求）
         let hr = unsafe { ctx.RequestEditSession(cid, &session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE)? };
@@ -1258,6 +1288,7 @@ impl LuflyTsf {
                 e.reset();
             }
             shared.st.reset();
+            shared.test_eaten = None; // 陈旧的 Test 判定会吞掉回焦后第一个键
             shared.cand_win.hide();
             crate::log("focus lost: reset");
         } else {
@@ -1387,6 +1418,10 @@ impl LuflyTsf {
         shared.composition = None;
         let composing = !shared.st.buffer.is_empty() || !shared.st.pending.is_empty();
         if composing {
+            // 输入状态保留、下键重建 composition（对齐 weasel）；但候选窗必须
+            // 收掉——宿主强杀 composition 常伴失焦（如任务栏搜索框点了桌面），
+            // 置顶的候选窗不收就是孤悬桌面的「幽灵候选框」
+            shared.cand_win.hide();
             crate::log("comp terminated (external), keep composing state");
         } else {
             if let Some(e) = shared.engine.as_mut() {
@@ -1395,6 +1430,47 @@ impl LuflyTsf {
             shared.st.reset();
             shared.cand_win.hide();
             crate::log("comp terminated (idle), reset");
+        }
+        Ok(())
+    }
+
+    fn on_kill_thread_focus_inner(&self) -> Result<()> {
+        // 线程失焦（点桌面/切走窗口）: 复位状态、收掉候选窗、清应用侧残留的
+        // 编码字母——对齐 weasel OnKillThreadFocus → _AbortComposition()。
+        // KeyEventSink::OnSetFocus(FALSE) 只在部分宿主触发（日志实证），这条
+        // 才是可靠收尾点；缺它时置顶候选窗孤悬桌面（幽灵候选框根因之一）
+        let (ctx, comp_alive) = {
+            let mut shared = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            if let Some(e) = shared.engine.as_mut() {
+                e.reset();
+            }
+            shared.st.reset();
+            // Test 阶段缓存了 TRUE 但 OnKeyDown 不再来（焦点已死），留着会让
+            // 回焦后的第一个键被陈旧判定吞掉（吃键不执行）
+            shared.test_eaten = None;
+            shared.cand_win.hide();
+            crate::log("thread focus killed: reset");
+            let comp_alive = shared.composition.is_some();
+            (shared.edit_ctx.clone(), comp_alive)
+            // composition 句柄不在此清：交给下面的清空会话 EndComposition
+        };
+        // 只在 composition 存活时发清空会话：空文本 Commit 走到无 comp 分支
+        // 是纯空转，而失焦是高频事件（点一下桌面就来一发）
+        if comp_alive {
+            if let Some(ctx) = ctx {
+                // 空文本 Commit = 清掉 composition 里残留的编码字母并结束
+                // （weasel _EndComposition(clear=TRUE)）；绑定原文档，失焦后
+                // GetFocus 已不可用。失败无妨：窗口已收，状态已复位
+                if self
+                    .request_session_kind_in("", SessionKind::Commit, Some(ctx))
+                    .is_err()
+                {
+                    // 清空会话被拒（如上下文已不可编辑）: 丢掉陈旧句柄，
+                    // 防下个键走 Update 分支写进已死的 composition range
+                    let mut shared = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+                    shared.composition = None;
+                }
+            }
         }
         Ok(())
     }
@@ -1416,6 +1492,16 @@ impl LuflyTsf {
                 let keystroke: ITfKeystrokeMgr = tm.cast()?;
                 let _ = keystroke.UnadviseKeyEventSink(shared.client_id);
             }
+            // 注销线程焦点 sink（activate_ex 里注册）
+            if shared.thread_focus_cookie != 0 {
+                if let Ok(src) = tm.cast::<ITfSource>() {
+                    unsafe {
+                        let _ = src.UnadviseSink(shared.thread_focus_cookie);
+                    }
+                }
+                shared.thread_focus_cookie = 0;
+            }
+            shared.edit_ctx = None;
         }
         // 移除语言栏托盘项
         if !shared.langbar.is_empty() {
@@ -1476,6 +1562,25 @@ impl LuflyTsf_Impl {
                 crate::log(&format!("AdviseKeyEventSink: {e}"));
                 return Err(e);
             }
+        }
+
+        // 线程焦点 sink（对齐 weasel _InitThreadFocusSink）：线程失焦（点桌面/
+        // 切窗口）时可靠收尾——KeyEventSink::OnSetFocus(FALSE) 只在部分宿主触发，
+        // 缺这条时候选窗孤悬桌面（幽灵候选框）
+        match tm.cast::<ITfSource>() {
+            Ok(src) => {
+                let tf_sink: ITfThreadFocusSink = self.to_interface();
+                unsafe {
+                    // windows-rs 0.61: cookie 是返回值而非出参
+                    match src.AdviseSink(&ITfThreadFocusSink::IID, &tf_sink) {
+                        Ok(cookie) => {
+                            self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner).thread_focus_cookie = cookie;
+                        }
+                        Err(e) => crate::log(&format!("AdviseThreadFocusSink: {e}")),
+                    }
+                }
+            }
+            Err(e) => crate::log(&format!("ITfSource: {e}")),
         }
 
         // 语言栏托盘项（对齐 weasel/微软拼音：logo + 中/EN 模式双图标）
@@ -1625,5 +1730,16 @@ impl ITfCompositionSink_Impl for LuflyTsf_Impl {
         _pcomposition: Ref<'_, ITfComposition>,
     ) -> Result<()> {
         crate::ffi_guard("OnCompositionTerminated", || self.on_comp_terminated_inner())
+    }
+}
+
+impl ITfThreadFocusSink_Impl for LuflyTsf_Impl {
+    fn OnSetThreadFocus(&self) -> Result<()> {
+        // weasel 在此刷新服务端状态/语言栏，本输入法无对应需求
+        Ok(())
+    }
+
+    fn OnKillThreadFocus(&self) -> Result<()> {
+        crate::ffi_guard("OnKillThreadFocus", || self.on_kill_thread_focus_inner())
     }
 }

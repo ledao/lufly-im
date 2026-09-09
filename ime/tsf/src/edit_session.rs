@@ -22,11 +22,14 @@ pub enum SessionKind {
 pub struct EditSession {
     pub shared: Arc<Mutex<Shared>>,
     pub kind: SessionKind,
+    /// 请求时绑定的文档；None = 回调时取当前焦点
+    /// （失焦收尾会话必须绑定原文档，GetFocus 已失效）
+    pub ctx: Option<ITfContext>,
 }
 
 impl EditSession {
-    pub fn new(shared: Arc<Mutex<Shared>>, kind: SessionKind) -> Self {
-        Self { shared, kind }
+    pub fn new(shared: Arc<Mutex<Shared>>, kind: SessionKind, ctx: Option<ITfContext>) -> Self {
+        Self { shared, kind, ctx }
     }
 }
 
@@ -118,9 +121,17 @@ impl EditSession_Impl {
             .thread_mgr
             .as_ref()
             .ok_or_else(|| Error::from_hresult(E_FAIL))?;
-        // focus 的单位是 document manager, 再取其 base context
-        let dim = unsafe { tm.GetFocus() }?;
-        let ctx = unsafe { dim.GetBase() }?;
+        // 失焦收尾会话用请求时绑定的文档；正常会话取当前焦点
+        let ctx = match &self.ctx {
+            Some(c) => c.clone(),
+            None => {
+                // focus 的单位是 document manager, 再取其 base context
+                let dim = unsafe { tm.GetFocus() }?;
+                unsafe { dim.GetBase() }?
+            }
+        };
+        // 记下文档供失焦收尾（OnKillThreadFocus 清残留用）
+        shared.edit_ctx = Some(ctx.clone());
 
         match self.kind {
             SessionKind::Start => {

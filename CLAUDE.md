@@ -24,6 +24,24 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 - **FFI 内 panic = 杀死宿主进程**（2026-09-05 修复）：TIP DLL 注入所有有输入焦点的进程，任何 Rust panic 冲出 `extern "system"` 边界 = abort 宿主——「任务栏崩溃重启」（explorer 搜索框加载了 TIP）、「UU 远程原地崩」都是它，不是 TSF 架构问题。已知触发形态：**激活后码表后台预载未完成（几百 ms 窗口）**，此间 Deactivate→flush_user 或 Shift 切换→request_session 走到 `engine.unwrap()` 即崩。三层防线：① `main_engine`/`active_engine` 返回 `Option`，调用方降级；② 所有 `lock().unwrap()` 一律 `unwrap_or_else(PoisonError::into_inner)`（一处 panic 持锁 → 中毒 → 后续每键连环 panic）；③ 全部 COM 入口（KeyEventSink/CompositionSink/Activate/Deactivate/EditSession/langbar OnClick）包 `crate::ffi_guard`（catch_unwind→记日志转 E_FAIL）。新加 COM 入口必须同样包 guard。
 - 诊断日志写 `%APPDATA%\lufly\tsf.log`（每行带 pid 前缀——多进程共写，无 pid 无法归因）；「有/无 OnKeyDown」是定位按键链路问题的关键证据。宿主进程崩溃归因：事件查看器→Windows 日志→应用程序→Application Error 的「故障模块名称」若是 lufly_tsf.dll 即为我们的问题。
 
+## 构建 Windows 安装包（命令与坑）
+
+```
+cd ime
+cargo build --release -p lufly-tsf                                # x64
+cargo build --release -p lufly-tsf --target i686-pc-windows-msvc   # x86（32 位宿主必需）
+cd tsf && "/c/Program Files (x86)/NSIS/Bin/makensis.exe" lufly.nsi # → ..\dist\LuflyIME-Setup-<VER>.exe
+```
+
+- x64 **不能加 `--target x86_64-pc-windows-msvc`**：NSIS 写死引用 `..\target\release\lufly_tsf.dll`，
+  带 target 会落到 `target\x86_64-pc-windows-msvc\release\` 而打进旧文件。
+- makensis 不在 PATH，装在 `C:\Program Files (x86)\NSIS\Bin\makensis.exe`。
+- **图标静默丢失**：`tsf/build.rs` 用 winresource 嵌 `lufly.ico`（任务栏/切换器图标），
+  winresource 靠 `reg query ...\Windows Kits\Installed Roots` 找 SDK，reg.exe 被拦截时报
+  `embed icon failed: 系统找不到指定的路径 (os error 3)`，编译照过但 DLL 无图标。
+  绕过：设 `RC_PATH="C:\Program Files (x86)\Windows Kits\10\bin\<ver>\x64\rc.exe"`
+  （winresource 优先读 RC_PATH，跳过 reg 查询）。验收看 DLL 体积：无图标 474624B、有图标 482304B（x64）。
+
 ## 打包（NSIS，lufly.nsi）
 
 - MUI2 向导 + `ManifestDPIAware`；编码坑：**.nsi 用 UTF-8 BOM，LicenseData 用 UTF-16 LE BOM**，否则 Bad text encoding / 中文乱码。
