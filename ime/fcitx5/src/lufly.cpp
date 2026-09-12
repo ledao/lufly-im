@@ -647,8 +647,13 @@ void LuflyIm::updateUI(InputContext *ic, LuflyState *state) {
             const std::string_view full(code);
             if (full.size() > typed.size() &&
                 full.compare(0, typed.size(), typed) == 0) {
-                text.append(" ");
-                text.append(std::string(full.substr(typed.size())));
+                // 剩余编码缀 HighLight 标志 → 主题 HighlightColor（品牌青绿，
+                // 对齐 macOS CandidateWindow accent；lufly 其余文本从不用
+                // HighLight，不冲突）。pango 背景走 HighlightBackgroundColor
+                // (全透明)，不会出底色块。
+                text.append(" ", TextFormatFlag::HighLight);
+                text.append(std::string(full.substr(typed.size())),
+                            TextFormatFlag::HighLight);
             }
         }
         list->insert(i, std::make_unique<LuflyCandidateWord>(
