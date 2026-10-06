@@ -1,0 +1,9 @@
+# TSF DLL 静态链接 CRT：默认的动态链接会把 VCRUNTIME140.dll 写进导入表，
+# 而它不是 Windows 自带组件（System32 里那份来自用户装过的 VC++ 运行库）。
+# 全新系统上 LoadLibrary 直接失败 —— regsvr32 注册报错、输入法装不上。
+# 静态链接后 DLL 零外部依赖（api-ms-win-crt-* 是 UCRT，Win10+ 系统组件，可留）
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.i686-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

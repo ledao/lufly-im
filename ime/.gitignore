@@ -1,5 +1,8 @@
 # mac 端本地 cargo 镜像配置（rsproxy；根 .gitignore 也有一份，双保险）
-.cargo/
+#   注意：.cargo/config.toml 是 TSF DLL 静态链接 CRT 的项目配置（见 CLAUDE.md），
+#   必须随仓库走；mac 的 rsproxy 镜像请写 ~/.cargo/config.toml，别覆盖这个文件
+.cargo/*
+!.cargo/config.toml
 
 # 构建时从 ../fcitx5/src/lufly_capi.h 同步生成，勿手改
 macos/include/
