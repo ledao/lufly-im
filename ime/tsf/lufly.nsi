@@ -1,9 +1,9 @@
 ﻿; 小鹭音形输入法 Windows 安装包（NSIS / MUI2）
-; 构建: makensis lufly.nsi  →  ..\dist\LuflyIME-Setup-0.5.12.exe
+; 构建: makensis lufly.nsi  →  ..\dist\LuflyIME-Setup-0.5.13.exe
 ; 双架构: 微信/企业微信/QQ 等主程序是 32 位，读 WOW6432Node 视图 —— x64/x86
 ; 两个 DLL 各自用对应位数的 regsvr32 注册（x64 经 Sysnative 直达真实 System32）。
 ; 升级安装: DLL 装在版本号子目录，跨版本新目录永无文件锁；同版本重跑时
-; 旧 DLL 改名腾位（被加载中删不掉、同卷可改名）；旧文件重启后清理
+; 旧 DLL 与码表改名腾位（被加载/被 mmap 时删不掉、同卷可改名）；旧文件重启后清理
 
 Unicode true
 ; 高分屏（150%/4K）下向导不模糊
@@ -12,11 +12,12 @@ SetCompressor /SOLID lzma
 
 !include "MUI2.nsh"
 !include "LogicLib.nsh"
+!include "x64.nsh"
 
 ; --- 常量 ---
 !define PRODUCT_NAME "小鹭音形输入法"
 !define PRODUCT_PUBLISHER "小鹭音形开发组"
-!define VER "0.5.12"
+!define VER "0.5.13"
 !define PROFILE_GUID "{7C3A1E92-5D4F-4B68-9A2C-E1F0B3D4A5C6}"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\LuflyIME"
 !define CLSID_STR "{2E168808-0490-43E1-9481-F2662BB32954}"
@@ -41,7 +42,7 @@ ShowUnInstDetails hide
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 
-!define MUI_FINISHPAGE_TEXT "安装完成。$\r$\n$\r$\n若输入法列表中尚未出现「小鹭音形」，请注销并重新登录（或重启电脑），然后按 Win+空格 切换。$\r$\n$\r$\n首次切换后请稍候 1~2 秒，码表正在后台加载。"
+!define MUI_FINISHPAGE_TEXT "安装完成。$\r$\n$\r$\n安装器不会自动把键盘加入输入法列表，请手动添加一次：$\r$\n    设置 → 时间和语言 → 语言和区域 → 中文(简体，中国) → 添加键盘 → 小鹭音形$\r$\n$\r$\n已打开的程序仍在使用旧版输入法，请重启这些程序后再使用。$\r$\n$\r$\n首次切换后请稍候 1~2 秒，码表正在后台加载。"
 !insertmacro MUI_PAGE_FINISH
 
 ; --- 卸载向导 ---
@@ -51,6 +52,19 @@ ShowUnInstDetails hide
 !insertmacro MUI_LANGUAGE "SimpChinese"
 
 Function .onInit
+  ; 只支持 64 位 x64 系统。
+  ;  - 32 位 Windows: x64 TIP 无从注册，装到一半才在回读校验处弹错
+  ;  - ARM64 Windows: ${RunningX64} 为真（x86 安装器跑在 WOW64 里），但 Sysnative
+  ;    落到的是 ARM64 的 regsvr32，加载不了 x64 DLL —— 注册同样必失败，而回读
+  ;    校验只会误导用户「请重启后重试」。需另出 aarch64 版本，故在此明确拒绝
+  ${If} ${IsNativeARM64}
+    MessageBox MB_ICONSTOP "「小鹭音形输入法」暂不支持 ARM64 架构的 Windows。$\r$\n$\r$\n请在 x64（Intel / AMD）电脑上安装。"
+    Abort
+  ${EndIf}
+  ${IfNot} ${RunningX64}
+    MessageBox MB_ICONSTOP "「小鹭音形输入法」需要 64 位 Windows。$\r$\n$\r$\n当前系统为 32 位，无法安装。"
+    Abort
+  ${EndIf}
   ; 已有安装则沿用目录
   ReadRegStr $R0 HKLM "${UNINST_KEY}" "InstallLocation"
   ${If} $R0 != ""
@@ -101,6 +115,8 @@ Section "Install"
   ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.5.10\lufly_tsf32.dll"'
   ExecWait '"$R7" /u /s "$INSTDIR\0.5.11\lufly_tsf.dll"'
   ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.5.11\lufly_tsf32.dll"'
+  ExecWait '"$R7" /u /s "$INSTDIR\0.5.12\lufly_tsf.dll"'
+  ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.5.12\lufly_tsf32.dll"'
   ; 旧 DLL 可能已删除导致 regsvr32 /u 无效 —— 直接清掉自己的残留键
   ; (含手写时代的脏数据)。64 位与 32 位应用读不同注册表视图，两边都清
   SetRegView 64
@@ -115,20 +131,32 @@ Section "Install"
   Pop $0
   Sleep 800
 
-  ; 2. 写入新版本子目录（跨版本升级 = 新路径永无文件锁；同版本重跑时旧 DLL
-  ;    仍被 msedge 等应用加载 —— 删不掉但同卷可改名：挪成带时戳的 .old 腾位，
-  ;    .old 安排重启后清理）
+  ; 2. 写入新版本子目录（跨版本升级 = 新路径永无文件锁；**同版本重跑**才是难点：
+  ;    旧 DLL 被 msedge 等应用加载、码表被引擎 mmap，两者都删不掉 —— 但同卷可改名，
+  ;    于是先挪成带时戳的 .old 腾位；.old 安排重启后清理。
+  ;    实测：被 mmap 的文件改名可行、就地覆盖写返回 ERROR_USER_MAPPED_FILE，
+  ;    而 NSIS 的 File 写失败是**静默跳过不报错**，结果会留下「新 DLL + 旧码表」
+  ;    的混合安装 —— 所以码表必须和 DLL 一样先腾位）
   SetOutPath "$INSTDIR\${VER}"
   System::Call 'kernel32::GetTickCount()i.R0'
   Delete /REBOOTOK "$INSTDIR\${VER}\lufly_tsf.*.old"
+  Delete /REBOOTOK "$INSTDIR\${VER}\lufly_tsf32.*.old"
+  Delete /REBOOTOK "$INSTDIR\${VER}\xiaolu_*.bin.*.old"
   Rename "$INSTDIR\${VER}\lufly_tsf.dll" "$INSTDIR\${VER}\lufly_tsf.$R0.old"
   ${If} ${FileExists} "$INSTDIR\${VER}\lufly_tsf.$R0.old"
     Delete /REBOOTOK "$INSTDIR\${VER}\lufly_tsf.$R0.old"
   ${EndIf}
-  Delete /REBOOTOK "$INSTDIR\${VER}\lufly_tsf32.*.old"
   Rename "$INSTDIR\${VER}\lufly_tsf32.dll" "$INSTDIR\${VER}\lufly_tsf32.$R0.old"
   ${If} ${FileExists} "$INSTDIR\${VER}\lufly_tsf32.$R0.old"
     Delete /REBOOTOK "$INSTDIR\${VER}\lufly_tsf32.$R0.old"
+  ${EndIf}
+  Rename "$INSTDIR\${VER}\xiaolu_he_he.bin" "$INSTDIR\${VER}\xiaolu_he_he.$R0.old"
+  ${If} ${FileExists} "$INSTDIR\${VER}\xiaolu_he_he.$R0.old"
+    Delete /REBOOTOK "$INSTDIR\${VER}\xiaolu_he_he.$R0.old"
+  ${EndIf}
+  Rename "$INSTDIR\${VER}\xiaolu_fuzhu.bin" "$INSTDIR\${VER}\xiaolu_fuzhu.$R0.old"
+  ${If} ${FileExists} "$INSTDIR\${VER}\xiaolu_fuzhu.$R0.old"
+    Delete /REBOOTOK "$INSTDIR\${VER}\xiaolu_fuzhu.$R0.old"
   ${EndIf}
   File /oname=lufly_tsf.dll "..\target\release\lufly_tsf.dll"
   File /oname=lufly_tsf32.dll "..\target\i686-pc-windows-msvc\release\lufly_tsf.dll"
@@ -194,6 +222,7 @@ Section "Install"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.9"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.10"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.11"
+  RMDir /r /REBOOTOK "$INSTDIR\0.5.12"
   RMDir /REBOOTOK "$INSTDIR\bin"
 
   ; 5. 卸载器与控制面板卸载项
