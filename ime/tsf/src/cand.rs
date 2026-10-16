@@ -312,8 +312,38 @@ unsafe fn text_metrics(hdc: HDC, f: HFONT) -> (i32, i32) {
     (tm.tmHeight, tm.tmAscent)
 }
 
+/// 命中测试: 与绘制同款横排布局走一遍 x 偏移，返回命中候选的页内下标
+fn hit_item(px: i32) -> Option<usize> {
+    let data = DATA.lock().unwrap();
+    let mut x = PAD_X;
+    for (i, r) in data.iter().enumerate() {
+        let w = r.label_w + r.word_w + r.suffix_w;
+        if px >= x && px < x + w {
+            return Some(i);
+        }
+        x += w + GAP;
+    }
+    None
+}
+
 unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) -> LRESULT {
     match msg {
+        // SampleIME 同款: 显式不激活。不能落到 DefWindowProc——它对可点击的
+        // 弹窗可能走系统默认激活路径，在部分应用（TSF 锁/CUAS）里引发卡死
+        WM_MOUSEACTIVATE => LRESULT(MA_NOACTIVATE as isize),
+        // 触屏/UWP（Pointer 输入路径）同款不激活: 本 TIP 注册了 IMMERSIVESUPPORT，
+        // 会加载进 UWP 应用，Pointer 激活同样不能落默认处理
+        WM_POINTERACTIVATE => LRESULT(PA_NOACTIVATE as isize),
+        // 鼠标消息全部自消化（SampleIME 同款，绝不透传 DefWindowProc）。
+        // 点击候选 = 等价按数字键选词；点空白处仅吞掉
+        WM_LBUTTONDOWN => {
+            let px = ((lp.0 & 0xFFFF) as u16) as i16 as i32;
+            if let Some(item) = hit_item(px) {
+                crate::processor::cand_click(item);
+            }
+            LRESULT(0)
+        }
+        WM_LBUTTONUP | WM_RBUTTONDOWN | WM_RBUTTONUP | WM_MBUTTONDOWN | WM_MBUTTONUP => LRESULT(0),
         WM_PAINT => {
             let mut ps = PAINTSTRUCT::default();
             let hdc = BeginPaint(hwnd, &mut ps);

@@ -684,6 +684,9 @@ void LuflyIm::commitCandidate(InputContext *ic, const std::string &text,
     }
     if (eng && !state->buffer.empty()) {
         lufly_learn(eng, state->buffer.c_str(), text.c_str());
+        // 与数字选词路径对齐: 全码单字进自动造词链，其余断链——
+        // 点击与敲数字必须同效，否则点击后链状态与键盘路径分叉
+        noteAutoCommit(state, state->buffer, text.c_str());
     }
     ic->commitString(text);
     state->lastCls = 0;

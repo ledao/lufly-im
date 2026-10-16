@@ -39,8 +39,9 @@ use windows::Win32::UI::Input::Ime::{HIMC, ImmAssociateContext, ImmGetContext, I
 use windows::Win32::UI::Input::KeyboardAndMouse::*;
 use windows::Win32::UI::TextServices::*;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, GetGUIThreadInfo, GetWindowThreadProcessId,
-    KillTimer, RegisterClassW, SetTimer, GUITHREADINFO, WINDOW_EX_STYLE, WNDCLASSW, WS_OVERLAPPED,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, GetClassNameW, GetGUIThreadInfo,
+    GetWindowThreadProcessId, KillTimer, RegisterClassW, SetTimer, GUITHREADINFO, WINDOW_EX_STYLE,
+    WNDCLASSW, WS_OVERLAPPED,
 };
 
 use lufly_engine::Engine;
@@ -109,6 +110,18 @@ unsafe fn capture_default_himc() -> HIMC {
     himc
 }
 
+/// 焦点窗口是否本 DLL 的工具窗口（候选窗/模式浮窗/体检窗）。
+/// 这些窗口永远不该被挂 HIMC（无编辑上下文，挂上后按键路由进死胡同）。
+unsafe fn is_own_tool_wnd(hwnd: HWND) -> bool {
+    let mut buf = [0u16; 24];
+    let n = GetClassNameW(hwnd, &mut buf) as usize;
+    let name = String::from_utf16_lossy(&buf[..n.min(buf.len())]);
+    matches!(
+        name.as_str(),
+        "LuflyCandWnd" | "LuflyStatusWnd" | "LuflyHealWnd"
+    )
+}
+
 /// 企业微信 5.x 类应用（Flutter/自绘框架）会断开窗口的 IME 关联，按键在
 /// ImmProcessKey 层被判「此窗口不走 IME」——字母直出，任何键都到不了 TIP。
 /// 注意 HIMC 是进程私有句柄，外部进程读到的恒为 0、外部进程挂的上下文本进程
@@ -134,7 +147,7 @@ fn heal_once(shared: &Arc<Mutex<Shared>>) {
             let focus = gi.hwndFocus;
             let mut pid = 0u32;
             let ftid = GetWindowThreadProcessId(focus, Some(&mut pid));
-            if pid == GetCurrentProcessId() {
+            if pid == GetCurrentProcessId() && !is_own_tool_wnd(focus) {
                 let himc = ImmGetContext(focus);
                 if himc.is_invalid() {
                     if !default_himc.is_invalid() {
@@ -542,91 +555,116 @@ impl LuflyTsf {
             let mut s = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             compute_action(&mut s, vk, shift, ctrl, alt, is_shift)
         };
-        self.exec_act(act)
+        exec_act(&self.shared, act)
     }
+}
 
-    fn request_session_kind(&self, text: &str, kind: SessionKind) -> Result<()> {
-        self.request_session_kind_in(text, kind, None)
+fn request_session_kind(shared: &Arc<Mutex<Shared>>, text: &str, kind: SessionKind) -> Result<()> {
+    request_session_kind_in(shared, text, kind, None)
+}
+
+/// ctx: None = 当前焦点文档；Some = 请求时绑定的文档
+/// （失焦收尾会话必须绑定原文档——失焦后 GetFocus 已不可用）
+fn request_session_kind_in(
+    shared: &Arc<Mutex<Shared>>,
+    text: &str,
+    kind: SessionKind,
+    ctx: Option<ITfContext>,
+) -> Result<()> {
+    {
+        let mut s = shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        s.pending_commit = text.to_owned();
+        // 预计算回显（Commit 会话也会按需隐藏候选窗）；
+        // 引擎未加载（预载中）时 input 取空串，不 panic
+        let input = s.active_engine().map(|e| e.input().to_string()).unwrap_or_default();
+        s.preedit = build_preedit(&s.st, &input);
     }
+    request_session_in(shared, kind, ctx)
+}
 
-    /// ctx: None = 当前焦点文档；Some = 请求时绑定的文档
-    /// （失焦收尾会话必须绑定原文档——失焦后 GetFocus 已不可用）
-    fn request_session_kind_in(
-        &self,
-        text: &str,
-        kind: SessionKind,
-        ctx: Option<ITfContext>,
-    ) -> Result<()> {
-        {
-            let mut s = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-            s.pending_commit = text.to_owned();
-            // 预计算回显（Commit 会话也会按需隐藏候选窗）；
-            // 引擎未加载（预载中）时 input 取空串，不 panic
-            let input = s.active_engine().map(|e| e.input().to_string()).unwrap_or_default();
-            s.preedit = build_preedit(&s.st, &input);
-        }
-        self.request_session_in(kind, ctx)
-    }
-
-    fn request_compose(&self) -> Result<()> {
-        // Start 或 Update 由 composition 是否存在决定
-        let kind = {
-            let mut s = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-            let input = s.active_engine().map(|e| e.input().to_string()).unwrap_or_default();
-            s.preedit = build_preedit(&s.st, &input);
-            // 候选快照（含反查引擎），供候选窗显示「词 剩余编码」
-            let has_buffer = !s.st.buffer.is_empty();
-            s.cands = match s.active_engine() {
-                Some(e) if has_buffer => e
-                    .candidates()
-                    .iter()
-                    .map(|c| (c.text.clone(), c.code.clone()))
-                    .collect(),
-                _ => Vec::new(),
-            };
-            if s.composition.is_some() {
-                SessionKind::Update
-            } else {
-                SessionKind::Start
-            }
+fn request_compose(shared: &Arc<Mutex<Shared>>) -> Result<()> {
+    // Start 或 Update 由 composition 是否存在决定
+    let kind = {
+        let mut s = shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let input = s.active_engine().map(|e| e.input().to_string()).unwrap_or_default();
+        s.preedit = build_preedit(&s.st, &input);
+        // 候选快照（含反查引擎），供候选窗显示「词 剩余编码」
+        let has_buffer = !s.st.buffer.is_empty();
+        s.cands = match s.active_engine() {
+            Some(e) if has_buffer => e
+                .candidates()
+                .iter()
+                .map(|c| (c.text.clone(), c.code.clone()))
+                .collect(),
+            _ => Vec::new(),
         };
-        self.request_session(kind)
-    }
-
-    fn request_session(&self, kind: SessionKind) -> Result<()> {
-        self.request_session_in(kind, None)
-    }
-
-    fn request_session_in(&self, kind: SessionKind, ctx: Option<ITfContext>) -> Result<()> {
-        // 注意: 不能持锁调 RequestEditSession —— 同步编辑会话回调里会再次
-        // 加锁（DoEditSession），否则死锁。
-        let (tm, cid) = {
-            let s = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-            let tm = s
-                .thread_mgr
-                .as_ref()
-                .ok_or_else(|| Error::from_hresult(E_FAIL))?
-                .clone();
-            (tm, s.client_id)
-        };
-        // ctx 未绑定时取当前焦点文档（正常按键路径）
-        let ctx = match ctx {
-            Some(c) => c,
-            None => {
-                let dim = unsafe { tm.GetFocus() }?;
-                unsafe { dim.GetBase() }?
-            }
-        };
-        let session: ITfEditSession = EditSession::new(self.shared.clone(), kind, Some(ctx.clone()))
-            .into();
-        // 对齐 weasel: ASYNCDONTCARE|READWRITE（纯 READWRITE 无同步语义，
-        // 部分应用会拒绝请求）
-        let hr = unsafe { ctx.RequestEditSession(cid, &session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE)? };
-        if hr.is_ok() {
-            Ok(())
+        if s.composition.is_some() {
+            SessionKind::Update
         } else {
-            crate::log(&format!("RequestEditSession failed: 0x{:08X}", hr.0 as u32));
-            Err(Error::from_hresult(hr))
+            SessionKind::Start
+        }
+    };
+    request_session(shared, kind)
+}
+
+fn request_session(shared: &Arc<Mutex<Shared>>, kind: SessionKind) -> Result<()> {
+    request_session_in(shared, kind, None)
+}
+
+fn request_session_in(shared: &Arc<Mutex<Shared>>, kind: SessionKind, ctx: Option<ITfContext>) -> Result<()> {
+    // 注意: 不能持锁调 RequestEditSession —— 同步编辑会话回调里会再次
+    // 加锁（DoEditSession），否则死锁。
+    let (tm, cid) = {
+        let s = shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let tm = s
+            .thread_mgr
+            .as_ref()
+            .ok_or_else(|| Error::from_hresult(E_FAIL))?
+            .clone();
+        (tm, s.client_id)
+    };
+    // ctx 未绑定时取当前焦点文档（正常按键路径）
+    let ctx = match ctx {
+        Some(c) => c,
+        None => {
+            let dim = unsafe { tm.GetFocus() }?;
+            unsafe { dim.GetBase() }?
+        }
+    };
+    let session: ITfEditSession = EditSession::new(shared.clone(), kind, Some(ctx.clone()))
+        .into();
+    // 对齐 weasel: ASYNCDONTCARE|READWRITE（纯 READWRITE 无同步语义，
+    // 部分应用会拒绝请求）
+    let hr = unsafe { ctx.RequestEditSession(cid, &session, TF_ES_ASYNCDONTCARE | TF_ES_READWRITE)? };
+    if hr.is_ok() {
+        Ok(())
+    } else {
+        crate::log(&format!("RequestEditSession failed: 0x{:08X}", hr.0 as u32));
+        Err(Error::from_hresult(hr))
+    }
+}
+
+/// 执行决策（按键按下/抬起、候选窗点选共用）
+fn exec_act(shared: &Arc<Mutex<Shared>>, act: Act) -> BOOL {
+    match act {
+        Act::Pass => BOOL(0),
+        Act::Eat => BOOL(1),
+        Act::Commit(text) => {
+            let _ = request_session_kind(shared, &text, SessionKind::Commit);
+            BOOL(1)
+        }
+        Act::Compose => {
+            let _ = request_compose(shared);
+            BOOL(1)
+        }
+        Act::CommitAndCompose(text) => {
+            let _ = request_session_kind(shared, &text, SessionKind::Commit);
+            let _ = request_compose(shared);
+            BOOL(1)
+        }
+        Act::CommitThenPass(text) => {
+            let _ = request_session_kind(shared, &text, SessionKind::Commit);
+            BOOL(0) // 原字符自然插入
         }
     }
 }
@@ -1249,32 +1287,39 @@ fn key_char(vk: VIRTUAL_KEY, shift: bool) -> Option<char> {
     }
 }
 
-impl LuflyTsf {
-    /// 执行决策（按键按下/抬起共用）
-    fn exec_act(&self, act: Act) -> BOOL {
-        match act {
-            Act::Pass => BOOL(0),
-            Act::Eat => BOOL(1),
-            Act::Commit(text) => {
-                let _ = self.request_session_kind(&text, SessionKind::Commit);
-                BOOL(1)
-            }
-            Act::Compose => {
-                let _ = self.request_compose();
-                BOOL(1)
-            }
-            Act::CommitAndCompose(text) => {
-                let _ = self.request_session_kind(&text, SessionKind::Commit);
-                let _ = self.request_compose();
-                BOOL(1)
-            }
-            Act::CommitThenPass(text) => {
-                let _ = self.request_session_kind(&text, SessionKind::Commit);
-                BOOL(0) // 原字符自然插入
-            }
-        }
-    }
+/// 候选窗点选分发槽（线程 id → 该线程激活实例的 Shared）。
+/// 候选窗 wnd_proc 按创建线程找回实例，把鼠标点击换算成数字键选词。
+/// 与 HEALS 同款包装：Shared 含 COM 指针（!Send），但只在其所属 STA 线程使用。
+struct CandSink(Arc<Mutex<Shared>>);
+unsafe impl Send for CandSink {}
+static CAND_SINKS: Mutex<Vec<(u32, CandSink)>> = Mutex::new(Vec::new());
 
+/// 候选窗点击选词: item = 页内下标（0 起），等价按数字键 1-5。
+/// 在候选窗 wnd_proc（= 创建线程 = 本 TIP 的 STA 线程）内调用，
+/// 与按键回调同一线程上下文，编辑会话请求方式一致。
+pub fn cand_click(item: usize) {
+    if item >= PAGE_SIZE {
+        return;
+    }
+    let tid = unsafe { GetCurrentThreadId() };
+    let shared = {
+        let sinks = CAND_SINKS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        sinks
+            .iter()
+            .find(|(t, _)| *t == tid)
+            .map(|(_, s)| s.0.clone())
+    };
+    let Some(shared) = shared else { return };
+    crate::log(&format!("cand click item={}", item + 1));
+    let vk = VIRTUAL_KEY(0x31 + item as u16); // '1'..'5'
+    let act = {
+        let mut s = shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        compute_action(&mut s, vk, false, false, false, false)
+    };
+    let _ = exec_act(&shared, act);
+}
+
+impl LuflyTsf {
     // ---- COM 入口的实现体（trait impl 只留 ffi_guard 包装: panic 一律
     // 转错误码，绝不冲出 extern "system" 边界杀死宿主进程）----
 
@@ -1406,7 +1451,7 @@ impl LuflyTsf {
             }
             crate::langbar::notify_mode_changed();
         }
-        Ok(self.exec_act(act))
+        Ok(exec_act(&self.shared, act))
     }
 
     fn on_comp_terminated_inner(&self) -> Result<()> {
@@ -1461,8 +1506,7 @@ impl LuflyTsf {
                 // 空文本 Commit = 清掉 composition 里残留的编码字母并结束
                 // （weasel _EndComposition(clear=TRUE)）；绑定原文档，失焦后
                 // GetFocus 已不可用。失败无妨：窗口已收，状态已复位
-                if self
-                    .request_session_kind_in("", SessionKind::Commit, Some(ctx))
+                if request_session_kind_in(&self.shared, "", SessionKind::Commit, Some(ctx))
                     .is_err()
                 {
                     // 清空会话被拒（如上下文已不可编辑）: 丢掉陈旧句柄，
@@ -1486,6 +1530,14 @@ impl LuflyTsf {
                     let _ = KillTimer(None, t);
                 }
             }
+        }
+        // 移除候选窗点选分发槽（本线程条目）
+        {
+            let tid = unsafe { GetCurrentThreadId() };
+            CAND_SINKS
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .retain(|(t, _)| *t != tid);
         }
         if let Some(tm) = &shared.thread_mgr {
             unsafe {
@@ -1650,6 +1702,14 @@ impl LuflyTsf_Impl {
         // 进程内 IME 关联体检（1s 周期，Deactivate 时停）
         let timer = unsafe { SetTimer(None, 0, 1000, Some(heal_tick)) };
         HEALS.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push((timer, HealShared(self.shared.clone())));
+
+        // 候选窗点选分发槽（同线程重复激活先清旧条目；Deactivate 时移除）
+        {
+            let tid = unsafe { GetCurrentThreadId() };
+            let mut sinks = CAND_SINKS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            sinks.retain(|(t, _)| *t != tid);
+            sinks.push((tid, CandSink(self.shared.clone())));
+        }
 
         // 后台预载主码表（不阻塞 Activate；首次按键由 ensure_engine 兜底）。
         // mmap 文件加载，路径先在当前线程解析好
