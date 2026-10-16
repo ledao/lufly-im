@@ -66,7 +66,11 @@ fn update_cand_win(shared: &mut Shared, ec: u32, ctx: &ITfContext) {
         return;
     }
 
-    // 光标矩形（composition 起始锚点 → 屏幕坐标；weasel 同款 START 锚）
+    // 光标矩形（composition 起始锚点 → 屏幕坐标；weasel 同款 START 锚）。
+    // GetTextExt 定位与随后的窗口量宽/摆放必须同处一个 DPI 坐标系（物理
+    // 像素，Per-Monitor V2）——否则高 DPI 屏上候选窗定位漂移、尺寸失真。
+    // 作用域结束自动还原宿主线程原感知。
+    let _pm = crate::cand::PmDpiGuard::enter();
     let caret = (|| -> Result<RECT> {
         let comp = shared.composition.as_ref().ok_or_else(|| Error::from_hresult(E_FAIL))?;
         let range = unsafe { comp.GetRange()? };

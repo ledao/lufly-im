@@ -16,7 +16,10 @@ use windows::Win32::Graphics::Dwm::{
     DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWM_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
 };
 use windows::Win32::Graphics::Gdi::*;
-use windows::Win32::System::LibraryLoader::GetModuleHandleW;
+use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
+use windows::Win32::UI::HiDpi::{
+    GetDpiForMonitor, MDT_EFFECTIVE_DPI, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+};
 use windows::Win32::UI::WindowsAndMessaging::*;
 
 const CLASS_NAME: PCWSTR = w!("LuflyCandWnd");
@@ -36,6 +39,84 @@ const COLOR_WORD: COLORREF = COLORREF(0x00000000); // 词：黑
 const COLOR_LABEL_DIM: COLORREF = COLORREF(0x00868686); // 非首位序号：secondaryLabel 近似
 const COLOR_SUFFIX: COLORREF = COLORREF(0x00698005); // 剩余编码品牌青绿 rgb(5,128,105)
 const COLOR_FRAME: COLORREF = COLORREF(0x00CCCCCC); // Win10 无 DWM 圆角时的自绘描边
+
+// ---- 高 DPI：布局按光标所在显示器的有效 DPI 缩放（96dpi 基准值 × dpi/96）----
+
+/// 当前绘制数据对应的 DPI（show() 写入，paint/hit_item 读取，保证同一坐标系）
+static DATA_DPI: Mutex<u32> = Mutex::new(96);
+
+/// 线程级 PMv2 切换是否可用（首次 enter() 判定）。
+/// 不可用（Win10 1607 前老系统）时必须禁用 DPI 缩放：窗口仍在系统
+/// 虚拟化渲染路径上（画进 96dpi 面再整体拉伸），此时再按显示器 DPI
+/// 放大内容 = 双重缩放，窗口会过大。
+static PMV2_OK: AtomicBool = AtomicBool::new(true);
+
+/// 96dpi 基准值按显示器 DPI 缩放
+fn sc(v: i32, dpi: u32) -> i32 {
+    v * dpi as i32 / 96
+}
+
+/// 光标点所在显示器的有效 DPI（跟随系统缩放设置）。
+/// PMv2 不可用时固定 96（见 PMV2_OK 注释）；取不到也按 96。
+fn dpi_for_point(pt: POINT) -> u32 {
+    if !PMV2_OK.load(Ordering::Relaxed) {
+        return 96;
+    }
+    unsafe {
+        let hmon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+        if hmon.is_invalid() {
+            return 96;
+        }
+        let (mut dx, mut dy) = (0u32, 0u32);
+        if GetDpiForMonitor(hmon, MDT_EFFECTIVE_DPI, &mut dx, &mut dy).is_ok() && dx > 0 {
+            dx
+        } else {
+            96
+        }
+    }
+}
+
+/// 临时把当前线程切到 Per-Monitor V2 DPI 感知（Drop 还原）。
+/// TIP 跑在宿主进程 UI 线程上，不能改进程级感知，只能线程级临时切换：
+/// 候选窗的 GetTextExt 定位、量宽、SetWindowPos 必须同处物理像素坐标系，
+/// 否则高 DPI 屏上坐标被虚拟化、窗口被系统拉伸（小/糊）。
+/// Win10 1607 前无此 API（GetProcAddress 兜底）：老系统维持旧行为。
+pub struct PmDpiGuard {
+    old: Option<isize>,
+}
+
+impl PmDpiGuard {
+    pub fn enter() -> Self {
+        unsafe {
+            // 返回值 = 切换前的旧上下文；NULL(0) = 切换失败（老系统无此 API、
+            // 或上下文非法）——没切成就无需还原，drop 直接跳过。
+            // 同时记入 PMV2_OK：失败时 dpi_for_point 固定 96，防双重缩放
+            let old = GetProcAddress(GetModuleHandleW(w!("user32.dll")).unwrap_or_default(), s!("SetThreadDpiAwarenessContext"))
+                .map(|f| {
+                    let f: unsafe extern "system" fn(isize) -> isize = std::mem::transmute(f);
+                    f(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2.0 as isize)
+                })
+                .filter(|old| *old != 0);
+            PMV2_OK.store(old.is_some(), Ordering::Relaxed);
+            Self { old }
+        }
+    }
+}
+
+impl Drop for PmDpiGuard {
+    fn drop(&mut self) {
+        let Some(old) = self.old else { return };
+        unsafe {
+            if let Some(f) = GetProcAddress(
+                GetModuleHandleW(w!("user32.dll")).unwrap_or_default(),
+                s!("SetThreadDpiAwarenessContext"),
+            ) {
+                let f: unsafe extern "system" fn(isize) -> isize = std::mem::transmute(f);
+                f(old);
+            }
+        }
+    }
+}
 
 /// 单条候选（edit_session 构造，三分段独立样式）
 pub struct CandItem {
@@ -61,10 +142,11 @@ static DATA: Mutex<Vec<CandRow>> = Mutex::new(Vec::new());
 /// DWM 圆角是否生效（决定 WM_PAINT 要不要自绘描边）
 static DWM_ROUNDED: AtomicBool = AtomicBool::new(false);
 
-/// HFONT 句柄存 isize（raw pointer 非 Send，不能直接放 static Mutex）
-static FONT_WORD: Mutex<isize> = Mutex::new(0);
-static FONT_LABEL: Mutex<isize> = Mutex::new(0);
-static FONT_SUFFIX: Mutex<isize> = Mutex::new(0);
+/// HFONT 句柄存 isize（raw pointer 非 Send，不能直接放 static Mutex）。
+/// 按 DPI 各缓存一枚：跨显示器拖动（DPI 变化）时删除重建。
+static FONT_WORD: Mutex<(u32, isize)> = Mutex::new((96, 0));
+static FONT_LABEL: Mutex<(u32, isize)> = Mutex::new((96, 0));
+static FONT_SUFFIX: Mutex<(u32, isize)> = Mutex::new((96, 0));
 
 fn make_font(size: i32) -> HFONT {
     unsafe {
@@ -87,28 +169,30 @@ fn make_font(size: i32) -> HFONT {
     }
 }
 
-fn font_word() -> HFONT {
-    let mut f = FONT_WORD.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    if *f == 0 {
-        *f = make_font(17).0 as isize;
+/// 取 DPI 对应的缓存字体（slot: (dpi, 句柄)，base = 96dpi 基准字号）
+fn cached_font(slot: &Mutex<(u32, isize)>, base: i32, dpi: u32) -> HFONT {
+    let mut s = slot.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    if s.0 != dpi || s.1 == 0 {
+        if s.1 != 0 {
+            unsafe {
+                let _ = DeleteObject(HFONT(s.1 as *mut _).into());
+            }
+        }
+        *s = (dpi, make_font(sc(base, dpi)).0 as isize);
     }
-    HFONT(*f as *mut _)
+    HFONT(s.1 as *mut _)
 }
 
-fn font_label() -> HFONT {
-    let mut f = FONT_LABEL.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    if *f == 0 {
-        *f = make_font(13).0 as isize;
-    }
-    HFONT(*f as *mut _)
+fn font_word(dpi: u32) -> HFONT {
+    cached_font(&FONT_WORD, 17, dpi)
 }
 
-fn font_suffix() -> HFONT {
-    let mut f = FONT_SUFFIX.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    if *f == 0 {
-        *f = make_font(12).0 as isize;
-    }
-    HFONT(*f as *mut _)
+fn font_label(dpi: u32) -> HFONT {
+    cached_font(&FONT_LABEL, 13, dpi)
+}
+
+fn font_suffix(dpi: u32) -> HFONT {
+    cached_font(&FONT_SUFFIX, 12, dpi)
 }
 
 /// Win11 DWM 系统圆角（自带系统描边）；Win10/失败返回 false，走自绘方角描边
@@ -198,6 +282,10 @@ impl CandWindow {
             return;
         };
         unsafe {
+            // 光标点所在显示器的有效 DPI；本次绘制/命中测试都按它缩放
+            let dpi = dpi_for_point(POINT { x: caret.left, y: caret.top });
+            *DATA_DPI.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = dpi;
+
             // 量每个分段宽度（各用各的字体），横排布局
             let hdc = GetDC(Some(hwnd));
             let mut rows: Vec<CandRow> = Vec::with_capacity(items.len());
@@ -211,16 +299,16 @@ impl CandWindow {
                     size.cx
                 };
                 rows.push(CandRow {
-                    label_w: measure(font_label(), &it.label),
-                    word_w: measure(font_word(), &it.word),
-                    suffix_w: measure(font_suffix(), &it.suffix),
+                    label_w: measure(font_label(dpi), &it.label),
+                    word_w: measure(font_word(dpi), &it.word),
+                    suffix_w: measure(font_suffix(dpi), &it.suffix),
                     label: it.label,
                     word: it.word,
                     suffix: it.suffix,
                     hl: it.hl,
                 });
             }
-            let (word_h, _) = text_metrics(hdc, font_word());
+            let (word_h, _) = text_metrics(hdc, font_word(dpi));
             let _ = ReleaseDC(Some(hwnd), hdc);
 
             // 行高 = 词字体高 + 基线富余 + 上下边距（对齐 macOS fittingSize）
@@ -228,9 +316,9 @@ impl CandWindow {
                 .iter()
                 .map(|r| r.label_w + r.word_w + r.suffix_w)
                 .sum::<i32>()
-                + GAP * (rows.len() as i32 - 1).max(0)
-                + PAD_X * 2;
-            let height = word_h + BASELINE_EXTRA + VPAD * 2;
+                + sc(GAP, dpi) * (rows.len() as i32 - 1).max(0)
+                + sc(PAD_X, dpi) * 2;
+            let height = word_h + sc(BASELINE_EXTRA, dpi) + sc(VPAD, dpi) * 2;
             {
                 let mut data = DATA.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
                 *data = rows;
@@ -240,7 +328,7 @@ impl CandWindow {
             // 已显示则钉住原位置：候选窗从出现起不随输入移动（对齐 fcitx5）
             let pinned = IsWindowVisible(hwnd).as_bool();
             let mut x = caret.left;
-            let mut y = caret.bottom + 2;
+            let mut y = caret.bottom + sc(2, dpi); // 与光标的间隙也按 DPI 缩放
             let mut mi = MONITORINFO {
                 cbSize: std::mem::size_of::<MONITORINFO>() as u32,
                 ..Default::default()
@@ -256,7 +344,7 @@ impl CandWindow {
                     x = wa.right - width;
                 }
                 if y + height > wa.bottom {
-                    y = caret.top - height - 2;
+                    y = caret.top - height - sc(2, dpi);
                 }
                 x = x.max(wa.left);
                 y = y.max(wa.top);
@@ -314,14 +402,15 @@ unsafe fn text_metrics(hdc: HDC, f: HFONT) -> (i32, i32) {
 
 /// 命中测试: 与绘制同款横排布局走一遍 x 偏移，返回命中候选的页内下标
 fn hit_item(px: i32) -> Option<usize> {
-    let data = DATA.lock().unwrap();
-    let mut x = PAD_X;
+    let data = DATA.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let dpi = *DATA_DPI.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let mut x = sc(PAD_X, dpi);
     for (i, r) in data.iter().enumerate() {
         let w = r.label_w + r.word_w + r.suffix_w;
         if px >= x && px < x + w {
             return Some(i);
         }
-        x += w + GAP;
+        x += w + sc(GAP, dpi);
     }
     None
 }
@@ -348,6 +437,7 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             let mut ps = PAINTSTRUCT::default();
             let hdc = BeginPaint(hwnd, &mut ps);
             let data = DATA.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            let dpi = *DATA_DPI.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             let mut rc_client = RECT::default();
             let _ = GetClientRect(hwnd, &mut rc_client);
 
@@ -356,8 +446,8 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             let _ = FillRect(hdc, &rc_client, bg);
             let _ = DeleteObject(bg.into());
 
-            let (_, word_asc) = text_metrics(hdc, font_word());
-            let baseline = VPAD + BASELINE_EXTRA + word_asc;
+            let (_, word_asc) = text_metrics(hdc, font_word(dpi));
+            let baseline = sc(VPAD, dpi) + sc(BASELINE_EXTRA, dpi) + word_asc;
             SetBkMode(hdc, TRANSPARENT);
 
             // 首位浅灰圆角底纹：覆盖整行高（上下到边内 1px）、左右越界 HL_OVERHANG
@@ -367,40 +457,40 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
             let hl_brush = CreateSolidBrush(COLOR_HL);
             let old_pen = SelectObject(hdc, GetStockObject(NULL_PEN).into());
             let old_brush = SelectObject(hdc, hl_brush.into());
-            let mut x = PAD_X;
+            let mut x = sc(PAD_X, dpi);
             for r in data.iter() {
                 let w = r.label_w + r.word_w + r.suffix_w;
                 if r.hl {
                     let _ = RoundRect(
                         hdc,
-                        x - HL_OVERHANG,
+                        x - sc(HL_OVERHANG, dpi),
                         1,
-                        x + w + HL_OVERHANG,
+                        x + w + sc(HL_OVERHANG, dpi),
                         rc_client.bottom - 1,
-                        HL_RADIUS * 2,
-                        HL_RADIUS * 2,
+                        sc(HL_RADIUS, dpi) * 2,
+                        sc(HL_RADIUS, dpi) * 2,
                     );
                 }
-                x += w + GAP;
+                x += w + sc(GAP, dpi);
             }
             SelectObject(hdc, old_brush);
             SelectObject(hdc, old_pen);
             let _ = DeleteObject(hl_brush.into());
 
             // 三分段文字：基线对齐，序号（首位黑/其余浅灰）、词黑、剩码青绿
-            let mut x = PAD_X;
+            let mut x = sc(PAD_X, dpi);
             for r in data.iter() {
-                let (_, label_asc) = text_metrics(hdc, font_label());
-                let (_, suffix_asc) = text_metrics(hdc, font_suffix());
+                let (_, label_asc) = text_metrics(hdc, font_label(dpi));
+                let (_, suffix_asc) = text_metrics(hdc, font_suffix(dpi));
 
-                let old = SelectObject(hdc, font_label().into());
+                let old = SelectObject(hdc, font_label(dpi).into());
                 SetTextColor(hdc, if r.hl { COLOR_WORD } else { COLOR_LABEL_DIM });
                 let _ = TextOutW(hdc, x, baseline - label_asc, &r.label.encode_utf16().collect::<Vec<u16>>());
-                SelectObject(hdc, font_word().into());
+                SelectObject(hdc, font_word(dpi).into());
                 SetTextColor(hdc, COLOR_WORD);
                 let _ = TextOutW(hdc, x + r.label_w, baseline - word_asc, &r.word.encode_utf16().collect::<Vec<u16>>());
                 if r.suffix_w > 0 {
-                    SelectObject(hdc, font_suffix().into());
+                    SelectObject(hdc, font_suffix(dpi).into());
                     SetTextColor(hdc, COLOR_SUFFIX);
                     let _ = TextOutW(
                         hdc,
@@ -410,12 +500,12 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
                     );
                 }
                 SelectObject(hdc, old);
-                x += r.label_w + r.word_w + r.suffix_w + GAP;
+                x += r.label_w + r.word_w + r.suffix_w + sc(GAP, dpi);
             }
 
             // Win10 无 DWM 圆角：自绘 1px 描边（Win11 由 DWM 系统描边，不叠加）
             if !DWM_ROUNDED.load(Ordering::Relaxed) {
-                draw_frame(hdc, rc_client);
+                draw_frame(hdc, rc_client, dpi);
             }
 
             let _ = EndPaint(hwnd, &ps);
@@ -426,14 +516,15 @@ unsafe extern "system" fn wnd_proc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM)
     }
 }
 
-/// 1px 方角描边（Win10 fallback）
-unsafe fn draw_frame(hdc: HDC, rc: RECT) {
+/// 自绘方角描边（Win10 fallback），线宽随 DPI
+unsafe fn draw_frame(hdc: HDC, rc: RECT, dpi: u32) {
+    let lw = sc(1, dpi).max(1);
     let brush = CreateSolidBrush(COLOR_FRAME);
     let edges = [
-        RECT { left: rc.left, top: rc.top, right: rc.right, bottom: rc.top + 1 },
-        RECT { left: rc.left, top: rc.bottom - 1, right: rc.right, bottom: rc.bottom },
-        RECT { left: rc.left, top: rc.top, right: rc.left + 1, bottom: rc.bottom },
-        RECT { left: rc.right - 1, top: rc.top, right: rc.right, bottom: rc.bottom },
+        RECT { left: rc.left, top: rc.top, right: rc.right, bottom: rc.top + lw },
+        RECT { left: rc.left, top: rc.bottom - lw, right: rc.right, bottom: rc.bottom },
+        RECT { left: rc.left, top: rc.top, right: rc.left + lw, bottom: rc.bottom },
+        RECT { left: rc.right - lw, top: rc.top, right: rc.right, bottom: rc.bottom },
     ];
     for e in edges {
         let _ = FillRect(hdc, &e, brush);

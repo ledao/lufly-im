@@ -46,6 +46,9 @@ want = {
     "DarkTheme": "lufly-dark",
     "UseDarkTheme": "True",
     "Font": "Noto Sans CJK SC 11",
+    # X11 混合 DPI 多屏: 每屏各自按本屏 DPI 算字号（classicui 选项，默认关；
+    # Wayland 不走此键，本来就走屏幕缩放系数。旧版 fcitx5 不认识则忽略）
+    "PerScreenDPI": "True",
 }
 lines = open(path, encoding="utf-8").read().splitlines() if os.path.exists(path) else []
 seen = set()
