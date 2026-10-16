@@ -12,6 +12,13 @@ if CommandLine.arguments.contains("--uninstall") {
     Installer.runUninstallCli() // 停用输入源 + 删本体后 exit，不进输入法流程
 }
 
+// 安装收尾完成器: 从已安装位置运行，替 dmg 里的安装实例弹载安装盘 + 清死注册
+// + 弹添加指引（dmg 实例弹不动自己脚下的盘，见 Installer.finishInstall）。
+if let i = CommandLine.arguments.firstIndex(of: "--finish-install") {
+    let vol = CommandLine.arguments.dropFirst(i + 1).first
+    Installer.finishInstall(volume: vol) // 内部 exit
+}
+
 if !Installer.isInstalledLocation {
     Installer.run() // 自安装/卸载流程，结束即 exit
 }

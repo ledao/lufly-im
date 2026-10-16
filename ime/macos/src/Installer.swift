@@ -29,16 +29,30 @@ enum Installer {
         alert.addButton(withTitle: "退出")
         switch alert.runModal() {
         case .alertFirstButtonReturn:
-            _ = install()
+            if install(), let vol = currentDmgVolume() {
+                // 从 dmg 安装: 收尾交给已落位真身（完成器）——我们自己弹不动
+                // 脚下的盘、也清不掉自己的注册（挂载中 lsregister -u 失败）
+                spawnFinisher(volume: vol)
+                exit(0)
+            }
         case .alertSecondButtonReturn:
             confirmUninstall() // 确认 → 卸载 → 结果弹窗，内部 exit
         default:
             exit(0)
         }
 
+        showDoneDialog()
+    }
+
+    /// 安装完成指引（「− 删 + ＋ 加」）。ejectFailed: 安装盘没能自动弹出时
+    /// 追加提醒先手动推出，避免添加键盘时 dmg 注册仍在场抢绑定。
+    private static func showDoneDialog(ejectFailed: Bool = false) -> Never {
         let done = NSAlert()
         done.messageText = "安装完成"
-        done.informativeText = "最后一步 —— 添加输入法（仅需一次）：\n\n"
+        done.informativeText = (ejectFailed
+            ? "安装盘未能自动弹出——请先手动推出安装盘，再执行下面步骤。\n\n"
+            : "")
+            + "最后一步 —— 添加输入法（仅需一次）：\n\n"
             + "① 系统设置 → 键盘 → 输入法 → 编辑…\n"
             + "② 若列表里已有「小鹭音形」，先选中点 − 删除\n"
             + "③ 点 ＋ → 简体中文 → 选「小鹭音形」→ 添加\n"
@@ -56,12 +70,74 @@ enum Installer {
         exit(0)
     }
 
+    /// 安装收尾完成器（已落位真身以 `--finish-install <卷路径>` 运行）:
+    /// ① 重试弹载安装盘（dmg 安装实例退出后卷即无人占用，至多 15s）
+    /// ② 擦掉刚消失的 /Volumes 死注册（实证: 路径消失后 lsregister -u 才有效，
+    ///    挂载中反而失败——所以这步只能在弹载之后、由不在卷上的进程做）
+    /// ③ 弹添加键盘指引。此刻 LaunchServices 只剩真身，用户添加即正确绑定。
+    static func finishInstall(volume: String?) -> Never {
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        var ejected = true
+        if let volume {
+            ejected = false
+            for _ in 0..<15 {
+                if runToolBool("/usr/bin/hdiutil", ["detach", volume]) {
+                    print("安装盘已弹出: \(volume)")
+                    ejected = true
+                    break
+                }
+                Thread.sleep(forTimeInterval: 1)
+            }
+            purgeStaleRegistrations(keeping: targetPath)
+        }
+        showDoneDialog(ejectFailed: !ejected)
+    }
+
+    /// 当前是否从 dmg（/Volumes）运行
+    private static var isRunningFromDmg: Bool { currentDmgVolume() != nil }
+
+    /// dmg 实例的安装盘卷根路径（非 /Volumes 运行返回 nil）
+    private static func currentDmgVolume() -> String? {
+        let path = Bundle.main.bundlePath
+        guard path.hasPrefix("/Volumes/") else { return nil }
+        guard let name = path.dropFirst("/Volumes/".count).split(separator: "/").first else {
+            return nil
+        }
+        return "/Volumes/\(name)"
+    }
+
+    /// 让已落位真身接管收尾（不等待——dmg 实例随即退出，完成器重试弹载）
+    private static func spawnFinisher(volume: String) {
+        let exe = URL(fileURLWithPath: targetPath).appendingPathComponent("Contents/MacOS/Lufly")
+        let p = Process()
+        p.executableURL = exe
+        p.arguments = ["--finish-install", volume]
+        p.standardOutput = Pipe()
+        p.standardError = Pipe()
+        do {
+            try p.run()
+        } catch {
+            print("完成器启动失败: \(error)（请手动推出安装盘）")
+        }
+    }
+
     private static var targetPath: String {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Input Methods/Lufly.app").path
     }
 
-    /// 落位 + 免注销注册。返回是否成功。
+    /// 落位 + 清理旧状态。返回是否成功。
+    /// 顺序纪律与 uninstall() 一致（2026-10-16 事故: 安装时未停 TIS/未终止旧
+    /// 进程就删 /Library 残留，正在服务的会话被斩断 + LaunchServices 僵尸注册
+    /// 抢绑定 → 装完打不出字）:
+    ///   ① TIS 停用（等同设置里按 −）→ ② 终止旧副本进程并等退出
+    ///   → ③ 原子替换落位（rm+cp 有空窗，系统恰在空窗校验会把输入法从启用
+    ///      列表剔除，deploy.sh 同教训）→ ④ 清 LaunchServices 僵尸注册并
+    ///      重注册真身（dmg 挂载/直接跑 build 版都会各攒一份同 Bundle ID
+    ///      注册，会话绑到死副本即打不出字）→ ⑤ 清 /Library 残留（此时已无
+    ///      会话无进程，安全）。弹载与 /Volumes 死注册清理由完成器在弹载后
+    ///      执行（见 finishInstall）——挂载中 lsregister -u 失败，必须先弹载。
+    /// 用户随后「− 删 + ＋ 加」重加一次即绑定到唯一真身。
     @discardableResult
     private static func install() -> Bool {
         let fm = FileManager.default
@@ -72,17 +148,23 @@ enum Installer {
         let src = fm.fileExists(atPath: embedded.path) ? embedded : Bundle.main.bundleURL
         print("安装源: \(src.path)")
         print("安装到: \(dst.path)")
+
+        disableInputSources()
+        terminateOtherCopies()
+
+        // 原子替换: 先拷到同目录临时名，再 rename 换入（无空窗）
+        let tmp = dst.deletingLastPathComponent()
+            .appendingPathComponent("Lufly.app.new-\(ProcessInfo.processInfo.processIdentifier)")
         do {
-            // 停掉已安装位置的旧进程（按路径精确匹配，别误杀 dmg 里正在跑的自己）
-            for running in NSWorkspace.shared.runningApplications
-            where running.bundleURL?.path.hasSuffix("Input Methods/Lufly.app") == true {
-                running.terminate()
-            }
+            try? fm.removeItem(at: tmp) // 上次失败残留
+            try fm.copyItem(at: src, to: tmp)
             if fm.fileExists(atPath: dst.path) {
-                try fm.removeItem(at: dst)
+                _ = try fm.replaceItemAt(dst, withItemAt: tmp)
+            } else {
+                try fm.moveItem(at: tmp, to: dst)
             }
-            try fm.copyItem(at: src, to: dst)
         } catch {
+            try? fm.removeItem(at: tmp)
             print("拷贝失败: \(error)")
             if NSApp.isActive {
                 let alert = NSAlert()
@@ -96,8 +178,95 @@ enum Installer {
         // 能出现在列表里但打不了字，用户仍须「− 删除 + 添加」手动来一遍，等于
         // 白注册还留了个要清理的坏条目（2026-09-02 用户实测裁定）。安装器只负责
         // 落位 + 弹指引让用户自己添加。
+        purgeStaleRegistrations(keeping: targetPath)
         removeSystemCopy(forInstall: true)
+        // 弹载与 /Volumes 死注册清理不在本进程做（从 dmg 运行时弹不动脚下的盘、
+        // 挂载中 lsregister -u 也失败）——GUI 流程由完成器接管（见 run()）；
+        // 脚本模式提示手动处理
+        if isRunningFromDmg {
+            print("提示: 从 dmg 运行的脚本安装请随后手动推出安装盘，"
+                + "或执行: \"\(targetPath)/Contents/MacOS/Lufly\" --finish-install <卷路径>")
+        }
         return true
+    }
+
+    /// 终止已安装位置（~/Library 与 /Library 都匹配后缀）运行的旧副本进程，
+    /// 排除自身，最多等 2s 确认退出——不等退出就删文件，旧进程还攥着会话与文件。
+    private static func terminateOtherCopies() {
+        let selfPid = ProcessInfo.processInfo.processIdentifier
+        for running in NSWorkspace.shared.runningApplications
+        where running.bundleURL?.path.hasSuffix("Input Methods/Lufly.app") == true
+            && running.processIdentifier != selfPid {
+            running.terminate()
+            let deadline = Date().addingTimeInterval(2)
+            while !running.isTerminated && Date() < deadline {
+                Thread.sleep(forTimeInterval: 0.05)
+            }
+        }
+    }
+
+    /// 清 LaunchServices 里同 Bundle ID 的僵尸注册（dmg 挂载、打包 staging、
+    /// 直接跑 build 版、/Library 残留都会各注册一份；会话绑到任一死副本 =
+    /// 打不出字无报错）。keeping 保留的路径（安装语境 = 真身，卸载语境传 nil
+    /// 全清），清完对保留路径强制重注册刷新记录。
+    private static func purgeStaleRegistrations(keeping keep: String?) {
+        let lsreg = "/System/Library/Frameworks/CoreServices.framework"
+            + "/Frameworks/LaunchServices.framework/Support/lsregister"
+        guard let dump = runTool(lsreg, ["-dump"]) else {
+            print("警告: 无法读取 LaunchServices 注册表，跳过僵尸清理")
+            return
+        }
+        var paths = Set<String>()
+        if let re = try? NSRegularExpression(pattern: "/[^\\n;()\"',<>]*Lufly\\.app") {
+            let ns = dump as NSString
+            re.enumerateMatches(in: dump, range: NSRange(location: 0, length: ns.length)) { m, _, _ in
+                guard let m else { return }
+                paths.insert(ns.substring(with: m.range))
+            }
+        }
+        for p in paths.sorted() where p != keep {
+            _ = runTool(lsreg, ["-u", p])
+            print("已清除僵尸注册: \(p)")
+        }
+        if let keep, !runToolBool(lsreg, ["-f", keep]) {
+            print("警告: 重注册 \(keep) 失败")
+        }
+    }
+
+    /// 跑外部工具拿 stdout（失败/非零退出返回 nil）。
+    /// 必须先 readDataToEndOfFile 再 waitUntilExit: lsregister -dump 有几 MB，
+    /// 先等退出后读会写满 64KB 管道缓冲 → 子进程阻塞在 write → 互等死锁。
+    @discardableResult
+    private static func runTool(_ path: String, _ args: [String]) -> String? {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: path)
+        p.arguments = args
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = Pipe()
+        do {
+            try p.run()
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            p.waitUntilExit()
+            guard p.terminationStatus == 0 else { return nil }
+            return String(data: data, encoding: .utf8)
+        } catch { return nil }
+    }
+
+    private static func runToolBool(_ path: String, _ args: [String]) -> Bool {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: path)
+        p.arguments = args
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = Pipe()
+        do {
+            try p.run()
+            // 同上: 必须先排干输出再等退出，防大输出撑爆管道缓冲死锁
+            _ = out.fileHandleForReading.readDataToEndOfFile()
+            p.waitUntilExit()
+            return p.terminationStatus == 0
+        } catch { return false }
     }
 
     /// 非交互卸载（`Lufly --uninstall`，装没装的位置运行都行）: 结果打 stdout。
@@ -151,12 +320,7 @@ enum Installer {
         let fm = FileManager.default
         disableInputSources()
         // 停掉已安装位置运行的进程（按路径精确匹配；别把跑卸载的自己杀了）
-        let selfPid = ProcessInfo.processInfo.processIdentifier
-        for running in NSWorkspace.shared.runningApplications
-        where running.bundleURL?.path.hasSuffix("Input Methods/Lufly.app") == true
-            && running.processIdentifier != selfPid {
-            running.terminate()
-        }
+        terminateOtherCopies()
         do {
             if fm.fileExists(atPath: targetPath) {
                 try fm.removeItem(atPath: targetPath)
@@ -173,6 +337,8 @@ enum Installer {
             return false
         }
         removeSystemCopy(forInstall: false)
+        // 本体已全删: LaunchServices 里的注册一并清空（含 dmg/build 等僵尸）
+        purgeStaleRegistrations(keeping: nil)
         return true
     }
 
