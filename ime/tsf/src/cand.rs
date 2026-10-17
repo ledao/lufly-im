@@ -143,10 +143,11 @@ static DATA: Mutex<Vec<CandRow>> = Mutex::new(Vec::new());
 static DWM_ROUNDED: AtomicBool = AtomicBool::new(false);
 
 /// HFONT 句柄存 isize（raw pointer 非 Send，不能直接放 static Mutex）。
-/// 按 DPI 各缓存一枚：跨显示器拖动（DPI 变化）时删除重建。
-static FONT_WORD: Mutex<(u32, isize)> = Mutex::new((96, 0));
-static FONT_LABEL: Mutex<(u32, isize)> = Mutex::new((96, 0));
-static FONT_SUFFIX: Mutex<(u32, isize)> = Mutex::new((96, 0));
+/// 按 (DPI, 字号) 各缓存一枚：跨显示器拖动（DPI 变化）、设置页改字号时
+/// 删除重建。字号 = 96dpi 基准值，来自设置（config.cand_font_size）。
+static FONT_WORD: Mutex<(u32, i32, isize)> = Mutex::new((96, 17, 0));
+static FONT_LABEL: Mutex<(u32, i32, isize)> = Mutex::new((96, 13, 0));
+static FONT_SUFFIX: Mutex<(u32, i32, isize)> = Mutex::new((96, 12, 0));
 
 fn make_font(size: i32) -> HFONT {
     unsafe {
@@ -169,30 +170,34 @@ fn make_font(size: i32) -> HFONT {
     }
 }
 
-/// 取 DPI 对应的缓存字体（slot: (dpi, 句柄)，base = 96dpi 基准字号）
-fn cached_font(slot: &Mutex<(u32, isize)>, base: i32, dpi: u32) -> HFONT {
+/// 取 (DPI, 字号) 对应的缓存字体（slot: (dpi, base, 句柄)，base = 96dpi 基准字号）
+fn cached_font(slot: &Mutex<(u32, i32, isize)>, base: i32, dpi: u32) -> HFONT {
     let mut s = slot.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
-    if s.0 != dpi || s.1 == 0 {
-        if s.1 != 0 {
+    if s.0 != dpi || s.1 != base || s.2 == 0 {
+        if s.2 != 0 {
             unsafe {
-                let _ = DeleteObject(HFONT(s.1 as *mut _).into());
+                let _ = DeleteObject(HFONT(s.2 as *mut _).into());
             }
         }
-        *s = (dpi, make_font(sc(base, dpi)).0 as isize);
+        *s = (dpi, base, make_font(sc(base, dpi)).0 as isize);
     }
-    HFONT(s.1 as *mut _)
+    HFONT(s.2 as *mut _)
 }
 
+/// 词字号（设置页可调）；序号/剩余编码按定稿差值同步缩放（17→13/12）
 fn font_word(dpi: u32) -> HFONT {
-    cached_font(&FONT_WORD, 17, dpi)
+    let base = crate::config::get().cand_font_size;
+    cached_font(&FONT_WORD, base, dpi)
 }
 
 fn font_label(dpi: u32) -> HFONT {
-    cached_font(&FONT_LABEL, 13, dpi)
+    let base = crate::config::get().cand_font_size - 4;
+    cached_font(&FONT_LABEL, base, dpi)
 }
 
 fn font_suffix(dpi: u32) -> HFONT {
-    cached_font(&FONT_SUFFIX, 12, dpi)
+    let base = crate::config::get().cand_font_size - 5;
+    cached_font(&FONT_SUFFIX, base, dpi)
 }
 
 /// Win11 DWM 系统圆角（自带系统描边）；Win10/失败返回 false，走自绘方角描边

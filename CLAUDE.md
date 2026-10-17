@@ -29,8 +29,8 @@ Linux fcitx5（`ime/fcitx5`）、Windows TSF（`ime/tsf`），macOS 为下一目
 
 ```
 cd ime
-cargo build --release -p lufly-tsf                                # x64
-cargo build --release -p lufly-tsf --target i686-pc-windows-msvc   # x86（32 位宿主必需）
+cargo build --release -p lufly-tsf -p lufly-settings                     # x64（DLL + 设置 exe）
+cargo build --release -p lufly-tsf --target i686-pc-windows-msvc   # x86（32 位宿主必需；settings 仅 x64）
 cd tsf && "/c/Program Files (x86)/NSIS/Bin/makensis.exe" lufly.nsi # → ..\dist\LuflyIME-Setup-<VER>.exe
 ```
 
@@ -42,6 +42,32 @@ cd tsf && "/c/Program Files (x86)/NSIS/Bin/makensis.exe" lufly.nsi # → ..\dist
   `embed icon failed: 系统找不到指定的路径 (os error 3)`，编译照过但 DLL 无图标。
   绕过：设 `RC_PATH="C:\Program Files (x86)\Windows Kits\10\bin\<ver>\x64\rc.exe"`
   （winresource 优先读 RC_PATH，跳过 reg 查询）。验收看 DLL 体积：无图标 474624B、有图标 482304B（x64）。
+
+## 设置系统（0.6.0 起）
+
+入口三处：① 任务栏「中/EN」图标**右键菜单**（`langbar.rs popup_menu`，weasel 同款
+`TF_LBI_STYLE_BTN_MENU` + `TrackPopupMenuEx(TPM_RETURNCMD)` 弹在焦点窗口上）；② 开始菜单
+程序组（NSIS 建，设置/用户词典 `--page=dict`/卸载）；③ 用户词典直接开设置页。**没有
+`ITfFnShowPreferences` 这个接口**（SDK 里不存在，勿再查）；`ITfFnConfigure` 只服务于埋得
+极深的老对话框，二期。
+
+- **设置 UI 住独立 `lufly-settings.exe`（crate `ime/settings`，wry/WebView2 + tao 壳，
+  HTML 内嵌 include_str!），绝不进 TIP DLL**——DLL 注入所有进程，UI 循环/panic 都会堵死
+  宿主。桥协议：`window.ipc.postMessage(JSON)` → `bridge.rs handle()` →
+  `evaluate_script("window.__bridge(json)")` 回包。
+- 配置 `%APPDATA%\lufly\config.json`：**schema 真源 = `tsf/src/config.rs`**（serde 全
+  default，缺文件/字段=现行为）；settings 端 `bridge.rs DEFAULTS` 必须与它同步（有单测
+  盯着）。TIP 端热生效走既有 1s mtime 轮询（`check_user_reload` 顺带 `config::check_reload`），
+  **flush_user 落盘前先 `reload_user_dict()`**（防设置端刚导入的词被引擎旧内存态覆盖）。
+- 用户词典清空：`load_user` 是合并语义，写空文件不够——TIP 端 reload 判定「空 = 
+  `clear_user()`」（engine 新方法），settings 端写空文件即触发。
+- **单实例坑（实测）**：CreateMutexW「已存在」也返回有效句柄，只能靠 GetLastError 区分，
+  但 SetLastError 清零后线程 last-error 仍会被 CRT/封装内部调用污染（全新名字也读到
+  183）——正确姿势是 `OpenMutexW` **按返回值**探测（打得开=已有实例），见
+  `settings/src/main.rs`。
+- workspace resolver 已升 **3**（MSRV-aware）：wry 0.57 的 cookie/icu 链 MSRV 1.88 > 
+  本机 1.85，resolver 2 会锁到编译不过的版本。
+- 键位速查表等教学内容全在 `settings/ui/index.html`（单文件 HTML+CSS+JS，无外部资源）。
 
 ## 打包（NSIS，lufly.nsi）
 

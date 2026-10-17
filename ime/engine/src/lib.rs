@@ -393,6 +393,16 @@ impl Engine {
         self.invalidate();
     }
 
+    /// 清空用户词典（学习记录 + 自定义词）。设置端「清空」用：
+    /// [`Engine::load_user`] 是合并语义，删文件/写空文件都移除不了内存态。
+    pub fn clear_user(&mut self) {
+        self.user.clear();
+        self.user_words.clear();
+        self.last_learned.clear();
+        self.user_ops = 0;
+        self.invalidate();
+    }
+
     /// 自定义词入列（rank 0 → 同码组内最前）。幂等。
     fn insert_user_word(&mut self, code: &str, word: &str) {
         let pair = (code.to_owned(), word.to_owned());
@@ -1456,5 +1466,23 @@ mod tests {
         assert!(String::from_utf8(e.save_user())
             .unwrap()
             .contains("dodoxx|多多|1|w"));
+    }
+
+    #[test]
+    fn clear_user_removes_all_state() {
+        // 设置端「清空词典」: load_user 是合并语义，只有 clear_user 能移除内存态
+        let mut e = demo_full_engine();
+        e.add_user_word("dodoxx", "多多").unwrap();
+        e.key('d');
+        e.key('e');
+        e.learn("de", "的");
+        e.load_user(b""); // 空数据合并不该清掉任何东西
+        assert_eq!(e.user_words.len(), 1);
+        e.clear_user();
+        assert!(e.user_words.is_empty());
+        assert!(e.user.is_empty());
+        assert!(e.last_learned.is_empty());
+        assert_eq!(e.user_ops(), 0);
+        assert!(!String::from_utf8(e.save_user()).unwrap().contains("多多"));
     }
 }

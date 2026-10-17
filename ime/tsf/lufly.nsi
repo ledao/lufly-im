@@ -17,7 +17,7 @@ SetCompressor /SOLID lzma
 ; --- 常量 ---
 !define PRODUCT_NAME "小鹭音形输入法"
 !define PRODUCT_PUBLISHER "小鹭音形开发组"
-!define VER "0.5.13"
+!define VER "0.6.0"
 !define PROFILE_GUID "{7C3A1E92-5D4F-4B68-9A2C-E1F0B3D4A5C6}"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\LuflyIME"
 !define CLSID_STR "{2E168808-0490-43E1-9481-F2662BB32954}"
@@ -117,6 +117,8 @@ Section "Install"
   ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.5.11\lufly_tsf32.dll"'
   ExecWait '"$R7" /u /s "$INSTDIR\0.5.12\lufly_tsf.dll"'
   ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.5.12\lufly_tsf32.dll"'
+  ExecWait '"$R7" /u /s "$INSTDIR\0.5.13\lufly_tsf.dll"'
+  ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.5.13\lufly_tsf32.dll"'
   ; 旧 DLL 可能已删除导致 regsvr32 /u 无效 —— 直接清掉自己的残留键
   ; (含手写时代的脏数据)。64 位与 32 位应用读不同注册表视图，两边都清
   SetRegView 64
@@ -142,6 +144,7 @@ Section "Install"
   Delete /REBOOTOK "$INSTDIR\${VER}\lufly_tsf.*.old"
   Delete /REBOOTOK "$INSTDIR\${VER}\lufly_tsf32.*.old"
   Delete /REBOOTOK "$INSTDIR\${VER}\xiaolu_*.bin.*.old"
+  Delete /REBOOTOK "$INSTDIR\${VER}\lufly-settings.*.old"
   Rename "$INSTDIR\${VER}\lufly_tsf.dll" "$INSTDIR\${VER}\lufly_tsf.$R0.old"
   ${If} ${FileExists} "$INSTDIR\${VER}\lufly_tsf.$R0.old"
     Delete /REBOOTOK "$INSTDIR\${VER}\lufly_tsf.$R0.old"
@@ -158,12 +161,18 @@ Section "Install"
   ${If} ${FileExists} "$INSTDIR\${VER}\xiaolu_fuzhu.$R0.old"
     Delete /REBOOTOK "$INSTDIR\${VER}\xiaolu_fuzhu.$R0.old"
   ${EndIf}
+  Rename "$INSTDIR\${VER}\lufly-settings.exe" "$INSTDIR\${VER}\lufly-settings.$R0.old"
+  ${If} ${FileExists} "$INSTDIR\${VER}\lufly-settings.$R0.old"
+    Delete /REBOOTOK "$INSTDIR\${VER}\lufly-settings.$R0.old"
+  ${EndIf}
   File /oname=lufly_tsf.dll "..\target\release\lufly_tsf.dll"
   File /oname=lufly_tsf32.dll "..\target\i686-pc-windows-msvc\release\lufly_tsf.dll"
   ; 码表独立文件（DLL 内不再嵌入; 引擎 mmap 文件页——跨进程共享、
   ; 内存压力下可回收; 0.5.9 及之前为 DLL 自包含）
   File "..\data\xiaolu_he_he.bin"
   File "..\data\xiaolu_fuzhu.bin"
+  ; 设置程序（独立进程 WebView2 壳，仅需 x64——不被注入，无 32 位宿主问题）
+  File /oname=lufly-settings.exe "..\target\release\lufly-settings.exe"
   File "lufly.ico"
   File "lufly-zh.ico"
   File "lufly-en.ico"
@@ -189,6 +198,15 @@ Section "Install"
 
   ; 4. 重启文本服务 UI，输入法立即可见
   Exec '"$SYSDIR\ctfmon.exe"'
+
+  ; 4.5 开始菜单程序组（按用户安装，不需要管理员语义；
+  ;     输入法无桌面图标惯例——设置入口托盘右键 + 开始菜单双保险）
+  SetShellVarContext current
+  CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
+  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\设置.lnk" "$INSTDIR\${VER}\lufly-settings.exe" "" "$INSTDIR\${VER}\lufly-settings.exe" 0
+  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\用户词典.lnk" "$INSTDIR\${VER}\lufly-settings.exe" "--page=dict" "$INSTDIR\${VER}\lufly-settings.exe" 0
+  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\卸载${PRODUCT_NAME}.lnk" "$INSTDIR\${VER}\uninstall.exe" "" "$INSTDIR\${VER}\uninstall.exe" 0
+  SetShellVarContext lastused
 
   ; 旧文件被占用删不掉时安排重启后清
   Delete /REBOOTOK "$INSTDIR\lufly_tsf.dll"
@@ -223,6 +241,7 @@ Section "Install"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.10"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.11"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.12"
+  RMDir /r /REBOOTOK "$INSTDIR\0.5.13"
   RMDir /REBOOTOK "$INSTDIR\bin"
 
   ; 5. 卸载器与控制面板卸载项
@@ -265,6 +284,13 @@ Section "Uninstall"
   nsExec::Exec 'taskkill /f /im ctfmon.exe'
   Pop $0
   Sleep 500
+  ; 关掉设置窗（若开着，占住版本目录里的 exe）
+  nsExec::Exec 'taskkill /f /im lufly-settings.exe'
+  Pop $0
+  ; 开始菜单程序组
+  SetShellVarContext current
+  RMDir /r "$SMPROGRAMS\${PRODUCT_NAME}"
+  SetShellVarContext lastused
   ; 卸载器默认在 %TEMP% 运行副本，可自删目录；占用时重启后清
   RMDir /r /REBOOTOK "$INSTDIR"
   ; 卸载项两视图都删（旧版写在 32 位视图，只删当前视图会留幽灵条目）

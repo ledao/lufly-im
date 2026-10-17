@@ -50,11 +50,13 @@ use crate::cand::CandWindow;
 use crate::edit_session::{EditSession, SessionKind};
 use crate::state::{chinese_punct, State};
 
-/// 候选页大小: 数字 1-5 选词，;'[] 选第 2-5 个
-pub const PAGE_SIZE: usize = 5;
-
 /// 用户词典落盘间隔（与 capi USER_FLUSH_INTERVAL 一致）
 const USER_FLUSH_INTERVAL: u32 = 64;
+
+/// 候选页大小（设置页可调 1-9；数字 1-N 选词，;'[] 固定选 2-5）
+pub fn page_size() -> usize {
+    crate::config::get().page_size
+}
 
 /// 活跃实例的 IME 自愈定时器（timer id → 该实例的 Shared）。
 /// TIMERPROC 无上下文，用全局槽把定时器与实例关联。
@@ -337,6 +339,9 @@ impl Shared {
     /// 「单字+4码」的上屏。词长上限 4 字。组码直接用逐字记录的全码
     /// （不再 derive——多音字会踩码表行序）。
     fn note_auto_commit(&mut self, code: &str, text: &str) {
+        if !crate::config::get().auto_word {
+            return; // 设置页关闭自动造词
+        }
         if code.len() != 4 || text.chars().count() != 1 {
             self.st.auto_buf.clear();
             self.st.auto_codes.clear();
@@ -385,6 +390,9 @@ impl Shared {
         let Some(path) = self.user_path.clone() else {
             return false;
         };
+        // 落盘前先吸收外部变更（设置端导入词典刚替换文件）: 合并进内存后
+        // 再全量落盘——否则 <1s 窗口内的 flush 会用旧内存态覆盖新导入
+        self.reload_user_dict();
         // 引擎未加载（激活后预载未完成即 Deactivate）: 无可落盘，直接返回
         // ——这里曾是 unwrap，切换输入法快了就崩宿主进程（explorer/UU）
         let Some(eng) = self.engine.as_mut() else {
@@ -404,15 +412,22 @@ impl Shared {
         ok
     }
 
-    /// 用户词典热重载: ojc/其他端追加词后文件变化时合并（1s 节流）
+    /// 用户词典热重载 + 设置热更新（1s 节流，共享一次 stat 周期）
     fn check_user_reload(&mut self) {
-        let Some(path) = self.user_path.clone() else {
-            return;
-        };
         if self.last_user_check.is_some_and(|t| t.elapsed().as_secs() < 1) {
             return;
         }
         self.last_user_check = Some(Instant::now());
+        crate::config::check_reload();
+        self.reload_user_dict();
+    }
+
+    /// 用户词典 mtime 变化时合并进引擎（ojc/设置端/其他端改文件后生效）。
+    /// 不节流——flush_user 落盘前也走这里（防导入词被内存态覆盖）。
+    fn reload_user_dict(&mut self) {
+        let Some(path) = self.user_path.clone() else {
+            return;
+        };
         let Ok(meta) = std::fs::metadata(&path) else {
             return;
         };
@@ -423,7 +438,12 @@ impl Shared {
         self.user_mtime = mtime;
         if let Ok(bytes) = std::fs::read(&path) {
             if let Some(eng) = self.main_engine() {
-                eng.load_user(&bytes);
+                // 文件被清空 = 清空语义（load_user 是合并，空数据移除不了内存态）
+                if String::from_utf8_lossy(&bytes).trim().is_empty() {
+                    eng.clear_user();
+                } else {
+                    eng.load_user(&bytes);
+                }
                 self.saved_ops = eng.user_ops();
             }
         }
@@ -509,6 +529,8 @@ pub struct LuflyTsf {
 
 impl LuflyTsf {
     pub fn new() -> Self {
+        // 设置加载（进程内首次 stat + 解析；后续走按键路径的 1s 轮询热更）
+        crate::config::init();
         // 用户词典: %APPDATA%\lufly\user_dict.txt（存在则加载）
         let user_path = std::env::var("APPDATA")
             .ok()
@@ -520,7 +542,11 @@ impl LuflyTsf {
             composition_sink: None,
             engine: None, // 懒加载（ensure_engine），避免构造时阻塞输入切换
             rev: None,
-            st: State::default(),
+            st: State {
+                // 默认启动模式（设置页「常用」）
+                ascii: crate::config::get().default_ascii,
+                ..State::default()
+            },
             pending_commit: String::new(),
             preedit: String::new(),
             cands: Vec::new(),
@@ -702,6 +728,11 @@ fn compute_action(
     if alt {
         return Act::Pass;
     }
+    // 用户词典热重载 + 设置热更新（升级码表/设置端改文件后自动生效）。
+    // 必须在 ascii gate 之前——英文模式下打字也要轮询配置/词典，
+    // 且码表缺失（ensure_engine 失败）时不影响设置生效
+    s.check_user_reload();
+
     // 英文模式: 一律透传，Shift 单击切回中文（OnKeyUp）
     if s.st.ascii {
         return Act::Pass;
@@ -711,8 +742,6 @@ fn compute_action(
     if !s.ensure_engine() {
         return Act::Pass;
     }
-    // 用户词典热重载（升级码表/其他端加词后自动生效）
-    s.check_user_reload();
 
     let ch = match key_char(vk, shift) {
         Some(c) => c,
@@ -790,7 +819,8 @@ fn compute_action(
     let has_menu = !s.st.buffer.is_empty() && n_cands > 0;
     let miss = !has_menu && !s.st.buffer.is_empty();
     let page = s.st.page;
-    let has_next_page = (page + 1) * PAGE_SIZE < n_cands;
+    let ps = page_size();
+    let has_next_page = (page + 1) * ps < n_cands;
     let has_prev_page = page > 0;
 
     // ---- 翻页: PageUp/Down、- 前翻 = 后翻、Tab 后翻 Shift+Tab 前翻 ----
@@ -825,10 +855,10 @@ fn compute_action(
         }
     }
 
-    // ---- 选词: 数字 1-5 与 ; ' [ ] = 第2/3/4/5（对齐 rime key_binder）----
+    // ---- 选词: 数字 1-N 与 ; ' [ ] = 第2/3/4/5（对齐 rime key_binder）----
     let mut sel: i32 = -1;
     let mut digit_sel = false;
-    if !shift && matches!(ch, '1'..='5') {
+    if !shift && ch.is_ascii_digit() && ch != '0' && ((ch as u8 - b'1') as usize) < ps {
         sel = (ch as u8 - b'1') as i32;
         digit_sel = true;
     } else if ch == ';' {
@@ -841,7 +871,7 @@ fn compute_action(
         sel = 4;
     }
     if sel >= 0 && !s.st.buffer.is_empty() && has_menu {
-        let idx = sel as usize + page * PAGE_SIZE;
+        let idx = sel as usize + page * ps;
         if idx < n_cands {
             let text = cands[idx].0.clone();
             if s.st.add_stage == 1 {
@@ -870,7 +900,7 @@ fn compute_action(
 
     // ---- $ / |: 选次选候选，抬键补 。 / ，（对齐 rime dollar/bar 绑定）----
     if (ch == '$' || ch == '|') && !s.st.buffer.is_empty() && has_menu {
-        let idx = 1 + page * PAGE_SIZE;
+        let idx = 1 + page * ps;
         if idx < n_cands {
             let text = cands[idx].0.clone();
             if s.st.add_stage == 1 {
@@ -1298,7 +1328,7 @@ static CAND_SINKS: Mutex<Vec<(u32, CandSink)>> = Mutex::new(Vec::new());
 /// 在候选窗 wnd_proc（= 创建线程 = 本 TIP 的 STA 线程）内调用，
 /// 与按键回调同一线程上下文，编辑会话请求方式一致。
 pub fn cand_click(item: usize) {
-    if item >= PAGE_SIZE {
+    if item >= page_size() {
         return;
     }
     let tid = unsafe { GetCurrentThreadId() };
@@ -1402,28 +1432,33 @@ impl LuflyTsf {
                 // Shift 单击（其后无其他键）: 切换中/英文模式；
                 // 编码中先原样上屏字母再转英文（对齐常见输入法手感）
                 st.shift_armed = false;
-                st.cancel_add_word(); // 切换模式即退出加词
-                if !st.buffer.is_empty() {
-                    let letters = std::mem::take(&mut st.buffer);
-                    st.last_cls = 2;
-                    st.reverse = false;
-                    st.ascii = true; // 编码中必为中文态: 定向转英文
-                    new_ascii = Some(true);
-                    crate::log("switch to EN (in coding)");
-                    Act::Commit(letters)
+                if !crate::config::get().shift_toggle {
+                    // 设置页关闭 Shift 切换: 不动作，Shift 只当修饰键
+                    Act::Pass
                 } else {
-                    let out = std::mem::take(&mut st.pending);
-                    if !out.is_empty() {
-                        st.pending_code.clear(); // 挂起字随模式切换落地
+                    st.cancel_add_word(); // 切换模式即退出加词
+                    if !st.buffer.is_empty() {
+                        let letters = std::mem::take(&mut st.buffer);
+                        st.last_cls = 2;
+                        st.reverse = false;
+                        st.ascii = true; // 编码中必为中文态: 定向转英文
+                        new_ascii = Some(true);
+                        crate::log("switch to EN (in coding)");
+                        Act::Commit(letters)
+                    } else {
+                        let out = std::mem::take(&mut st.pending);
+                        if !out.is_empty() {
+                            st.pending_code.clear(); // 挂起字随模式切换落地
+                        }
+                        st.auto_buf.clear(); // 切英文模式 = 断链
+                        st.auto_codes.clear();
+                        st.reverse = false;
+                        st.last_cls = 0;
+                        st.ascii = !st.ascii;
+                        new_ascii = Some(st.ascii);
+                        crate::log(&format!("switch to {}", if st.ascii { "EN" } else { "CN" }));
+                        Act::Commit(out)
                     }
-                    st.auto_buf.clear(); // 切英文模式 = 断链
-                    st.auto_codes.clear();
-                    st.reverse = false;
-                    st.last_cls = 0;
-                    st.ascii = !st.ascii;
-                    new_ascii = Some(st.ascii);
-                    crate::log(&format!("switch to {}", if st.ascii { "EN" } else { "CN" }));
-                    Act::Commit(out)
                 }
             } else if st.pending_punct.is_some()
                 && (vk.0 == 0x34 || vk == VK_OEM_5)

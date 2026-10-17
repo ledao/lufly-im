@@ -1,6 +1,7 @@
 //! DLL 导出：COM 类工厂入口 + regsvr32 注册/反注册
 mod cand;
 mod class_factory;
+mod config;
 mod edit_session;
 mod guids;
 mod langbar;
@@ -40,8 +41,12 @@ pub fn store_preload(e: Option<lufly_engine::Engine>) {
     *PRELOAD.lock().unwrap_or_else(std::sync::PoisonError::into_inner) = e;
 }
 
-/// 诊断日志（%APPDATA%\lufly\tsf.log）：定位激活/按键链路问题用
+/// 诊断日志（%APPDATA%\lufly\tsf.log）：定位激活/按键链路问题用。
+/// 默认关（设置页「高级」或 LUFLY_LOG=1 开启）
 pub fn log(msg: &str) {
+    if std::env::var_os("LUFLY_LOG").is_none() && !config::get().log {
+        return;
+    }
     let Ok(appdata) = std::env::var("APPDATA") else {
         return;
     };

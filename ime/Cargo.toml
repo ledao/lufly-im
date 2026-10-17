@@ -1,6 +1,8 @@
 [workspace]
-resolver = "2"
-members = ["engine", "capi", "cli", "tsf"]
+# resolver 3 = MSRV-aware：依赖图里自动避开超出本机 rustc 的版本
+# （wry 0.57 的 cookie/icu 链 MSRV 1.88 > 本机 1.85）
+resolver = "3"
+members = ["engine", "capi", "cli", "tsf", "settings"]
 
 [workspace.package]
 edition = "2021"

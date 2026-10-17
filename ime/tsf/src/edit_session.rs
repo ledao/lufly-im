@@ -9,7 +9,7 @@ use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::UI::TextServices::*;
 
-use crate::processor::{Shared, PAGE_SIZE};
+use crate::processor::Shared;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum SessionKind {
@@ -92,12 +92,16 @@ fn update_cand_win(shared: &mut Shared, ec: u32, ctx: &ITfContext) {
 
     // 当前页条目: 三分段「序号. 词 剩余编码」（fcitx5 横排风格；已敲前缀不重复；
     // 分段独立样式——皮肤对齐 macOS 定稿，绘制在 cand.rs）
-    let start = st_page * PAGE_SIZE;
-    let mut items = Vec::with_capacity(PAGE_SIZE);
-    for (i, (text, code)) in cands.iter().enumerate().skip(start).take(PAGE_SIZE) {
+    let ps = crate::processor::page_size();
+    let start = st_page * ps;
+    let mut items = Vec::with_capacity(ps);
+    for (i, (text, code)) in cands.iter().enumerate().skip(start).take(ps) {
         let label = format!("{}.", i - start + 1);
         let mut suffix = String::new();
-        if code.len() > buffer.len() && code.starts_with(&buffer) {
+        if crate::config::get().cand_show_suffix
+            && code.len() > buffer.len()
+            && code.starts_with(&buffer)
+        {
             suffix.push(' ');
             suffix.push_str(&code[buffer.len()..]);
         }
