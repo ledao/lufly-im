@@ -13,7 +13,7 @@ FCITX5_INC="/usr/include/Fcitx5"
 [ -d "$FCITX5_INC" ] || FCITX5_INC="/usr/include/fcitx5"
 
 mkdir -p build
-g++ -std=c++17 -shared -fPIC -fvisibility=hidden \
+g++ -std=c++17 -O2 -shared -fPIC -fvisibility=hidden \
     -I "$FCITX5_INC/Core" -I "$FCITX5_INC/Utils" -I "$FCITX5_INC/Config" \
     -I "$FCITX5_INC" -I src \
     -o build/liblufly.so \
