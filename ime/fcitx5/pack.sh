@@ -58,6 +58,7 @@ Priority: optional
 Architecture: $ARCH
 Maintainer: ledao <ledao@users.noreply.github.com>
 Depends: fcitx5, libc6, libstdc++6, libgcc-s1
+Recommends: fonts-noto-cjk
 Installed-Size: $INSTALLED_SIZE
 Description: 小鹭音形输入法（fcitx5 前端）
  定长音形输入法：双拼两键 + 形码两键，词组简语与全码。

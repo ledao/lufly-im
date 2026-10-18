@@ -1,22 +1,25 @@
 #!/bin/sh
 # deb postinst: 安装后零配置可用
-# 把「小鹭音形」追加进所有 fcitx5 用户的输入法分组。
-# fcitx5 监听 profile 文件变化，运行中即生效，无需重启。
+# 兼容性设计（单一 deb 适配全部发行版/全新系统）:
+#   1) 目标用户不依赖 SUDO_USER（GUI 软件中心安装时为空），扫描全部真实用户；
+#      也不要求用户已有 fcitx5 配置（全新 OS 上 profile 尚未生成也要能配置）。
+#   2) 已有 profile: 追加 lufly 进分组并设默认；无 profile: 直接创建含 lufly 的
+#      最小 profile（fcitx5 首启即可选到小鹭）。
+#   3) theme/classicui/config 的键名在 fcitx5 5.0.x ~ master 均稳定存在；
+#      主题缺失时 fcitx5 静默回退内置默认样式，所以 theme.conf 必须随包装好。
+# fcitx5 监听 profile 文件变化，运行中即生效；classicui 主题需重启 fcitx5。
 set -e
 
-# 找到目标用户: 优先本次安装的调用者，其次所有有 fcitx5 profile 的用户
+# 找到目标用户: 优先本次安装的调用者，其次所有真实用户（uid>=1000 且家目录在 /home）
 USERS=""
 if [ -n "${SUDO_USER:-}" ]; then
     USERS="$SUDO_USER"
 fi
-for h in /home/*; do
-    u=$(basename "$h")
+for u in $(getent passwd | awk -F: '$3 >= 1000 && $6 ~ /^\/home\// {print $1}'); do
     case " $USERS " in
         *" $u "*) continue ;;
     esac
-    if [ -f "$h/.config/fcitx5/profile" ]; then
-        USERS="$USERS $u"
-    fi
+    USERS="$USERS $u"
 done
 
 # 用户目录的主题是早期调试残留，XDG 用户目录优先级高于系统目录，
@@ -27,6 +30,7 @@ rm -rf /home/*/.local/share/fcitx5/themes/lufly \
 
 for u in $USERS; do
     HOME_DIR=$(getent passwd "$u" | cut -d: -f6)
+    [ -n "$HOME_DIR" ] || continue
     OWNER=$(stat -c '%U:%G' "$HOME_DIR" 2>/dev/null || echo "$u")
 
     # 1) 选中「小鹭」主题并跟随系统深浅色（classicui.conf 无节头，平铺键值）
@@ -46,9 +50,6 @@ want = {
     "DarkTheme": "lufly-dark",
     "UseDarkTheme": "True",
     "Font": "Noto Sans CJK SC 11",
-    # X11 混合 DPI 多屏: 每屏各自按本屏 DPI 算字号（classicui 选项，默认关；
-    # Wayland 不走此键，本来就走屏幕缩放系数。旧版 fcitx5 不认识则忽略）
-    "PerScreenDPI": "True",
 }
 lines = open(path, encoding="utf-8").read().splitlines() if os.path.exists(path) else []
 seen = set()
@@ -114,15 +115,40 @@ PYEOF
     if [ "$(stat -c '%U' "$G_DIR")" = "root" ]; then
         chown "$OWNER" "$G_DIR"
     fi
-    if [ "$(stat -c '%U' "$HOME_DIR/.config/fcitx5")" = "root" ]; then
-        chown "$OWNER" "$HOME_DIR/.config/fcitx5"
-    fi
 
+    # 3) 输入法分组: 已有 profile 则追加 lufly 并设默认；没有则创建最小 profile
+    #    （全新 OS 上 profile 尚不存在，旧逻辑直接跳过导致用户要手动加输入法）
     P="$HOME_DIR/.config/fcitx5/profile"
-    [ -f "$P" ] || continue
+    if [ ! -f "$P" ]; then
+        cat > "$P" <<EOF
+[Groups/0]
+# Name
+Name=Default
+# Layout
+Default Layout=us
+# Default Input Method
+DefaultIM=lufly
 
-    OWNER=$(stat -c '%U:%G' "$P")
-    python3 - "$P" <<'PYEOF' || true
+[Groups/0/Items/0]
+# Name
+Name=keyboard-us
+# Layout
+Layout=
+
+[Groups/0/Items/1]
+# Name
+Name=lufly
+# Layout
+Layout=
+
+[GroupOrder]
+0=Default
+EOF
+        chown "$OWNER" "$P"
+        echo "fcitx5-lufly: 已为 $u 创建默认输入法分组（含小鹭音形）"
+    else
+        OWNER_P=$(stat -c '%U:%G' "$P")
+        python3 - "$P" <<'PYEOF' || true
 import re, sys
 
 path = sys.argv[1]
@@ -175,8 +201,32 @@ if changed:
     open(path, "w", encoding="utf-8").write(text + "\n")
     print("fcitx5-lufly: 已把「小鹭音形」加入输入法列表并设为默认")
 PYEOF
+        chown "$OWNER_P" "$P"
+    fi
 
-    chown "$OWNER" "$P"
+    # classicui.conf 不是热加载，fcitx5 运行中装完需要重启才换肤
+    if pgrep -u "$u" -x fcitx5 >/dev/null 2>&1; then
+        echo "fcitx5-lufly: $u 的 fcitx5 正在运行，重启 fcitx5 后主题生效"
+    fi
+
+    # GNOME 的 kimpanel 扩展接管候选窗时（fcitx5 检测到 org.kde.kimpanel 总线即让位），
+    # ClassicUI 与小鹭主题完全不参与渲染，表现为黑底+系统强调色药丸的 GNOME 样式。
+    # 检测到就给出禁用指引（仅提示，不代用户改系统设置）。
+    # 注意 runuser 不会继承用户会话环境，必须显式给 DBUS_SESSION_BUS_ADDRESS，
+    # 否则 gnome-extensions 连不上总线静默失败（26.04 实测教训）。
+    if command -v runuser >/dev/null 2>&1 && command -v gnome-extensions >/dev/null 2>&1; then
+        UID_N=$(id -u "$u" 2>/dev/null || true)
+        if [ -n "$UID_N" ] && [ -S "/run/user/$UID_N/bus" ]; then
+            KIMPANEL=$(runuser -u "$u" -- env \
+                XDG_RUNTIME_DIR="/run/user/$UID_N" \
+                DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$UID_N/bus" \
+                gnome-extensions list --enabled 2>/dev/null | grep -i kimpanel || true)
+            if [ -n "$KIMPANEL" ]; then
+                echo "fcitx5-lufly: 检测到 GNOME kimpanel 扩展（$KIMPANEL）在接管候选窗渲染，"
+                echo "fcitx5-lufly: 如需使用小鹭主题，请执行: gnome-extensions disable \"$KIMPANEL\" 并重启 fcitx5"
+            fi
+        fi
+    fi
 done
 
 # 刷新图标缓存（失败不阻塞安装）
