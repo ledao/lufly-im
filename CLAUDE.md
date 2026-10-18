@@ -94,6 +94,39 @@ cd tsf && "/c/Program Files (x86)/NSIS/Bin/makensis.exe" lufly.nsi # → ..\dist
 - **dmg 安装的收尾必须是「完成器」模式**（Installer.finishInstall，`--finish-install <卷路径>` 由已落位真身运行）：dmg 安装实例装完即退出，真身重试 `hdiutil detach` 弹载 → **弹载后**再 `lsregister -u` 擦掉刚消失的 /Volumes 死注册 → 才弹「添加键盘」指引。实证（2026-10-16）：①挂载中 `-u` 恒失败（-10814），路径消失后 `-u` 反而能擦——清死注册只能在弹载之后、由不在卷上的进程做；②dmg 安装实例弹不动自己脚下的盘；③`-nobrowse` 挂载不注册，注册发生在从 dmg 启动 app / 可浏览挂载时；④TIS 运行态枚举出两个同 mode 实例（一活一死）时点死实例打不出字，plist/LS 全干净也可能残留该缓存，**注销重登即斩**。附带坑：`lsregister -dump` 输出几 MB，Process 必须先 `readDataToEndOfFile` 排干管道再 `waitUntilExit`，否则 64KB 缓冲互等死锁。
 - **卸载**（2026-09-04）：**主入口 = 输入法自己的菜单**（菜单栏点输入法图标 → 「卸载小鹭音形」，`LuflyInputController.menu()`，搜狗/百度 Mac 版惯例）——输入法不在 /Applications，用户没有「拖废纸篓」可做，dmg 不会被保留，别把卸载绑在 dmg/终端上。备选：dmg 双击 → 「卸载」按钮、任意位置 `Lufly --uninstall`（main.swift 里先于 isInstalledLocation 分支，已安装本体也能自卸载）。三条路径共用 `Installer.uninstall()`，顺序必须 **TIS 停用（deselect+disable，等价设置里按 −）→ terminate 旧进程（排除自身 pid，菜单内卸载时自己是运行中 IM）→ 删 `~/Library/Input Methods/Lufly.app`**——先删文件后停用会留幽灵条目（TIS 缓存）。用户词典 `~/Library/Application Support/lufly` 刻意保留，弹窗/输出里提示手动删；日志 `~/Library/Logs/lufly.log` 同理不动。
 
+## Linux RPM 打包与 Fedora KDE Wayland 部署（2026-10-18 实战）
+
+- RPM 出包脚本 `ime/fcitx5/pack_rpm.sh`：载荷与 deb（pack.sh）完全一致，lib 目录用
+  `rpm --eval '%{_libdir}'`（/usr/lib64 非 multiarch），libc/libstdc++/libgcc/libFcitx5Core
+  依赖由 elfdeps 自动生成，`%post` 直接复用 data/postinst（单一安装脚本 deb/rpm 共用）。
+  rpmbuild 五坑：① **%install 前会 `rm -rf` buildroot**——载荷必须布置在独立 payload 目录、
+  %install 里 `cp -a` 拷入；② spec 里 `%` 是宏引导符，嵌入 postinst 须 `sed 's/%/%%/g'`
+  （`stat -c '%U:%G'` 不转义会被宏展开静默吞掉）；③ %postun 的 `"$1"` 所在 heredoc 必须
+  引号版，changelog 单拆非引号 heredoc 且日期 `LC_ALL=C date`（中文 locale 的日期 rpm
+  解析不了）；④ `--define "debug_package %{nil}" + "__os_install_post %{nil}"` 不拆
+  debuginfo 不 strip，包内二进制与 deb 一致（elfdeps 自动依赖不受影响）；⑤ `kwriteconfig6`
+  写带标志键（`InputMethod[$e]`）会产出 `\x5b$e\x5d` 乱码键——直接编辑配置文件。
+- Fedora 构建环境：开发包名 **fcitx5-devel**（没有 libfcitx5-devel），运行库在 fcitx5-libs
+  （soname libFcitx5Core.so.7/libFcitx5Utils.so.2 与 build.sh 链接参数一致）；fcitx5 5.1.x
+  日志宏用 std::source_location → build.sh 已改 `-std=c++20`（GCC 11+/Ubuntu 22.04 兼容，
+  deb 侧不受影响）。RPM 的 soname 依赖绑定构建机的 fcitx5 大版本，**各发行版需各自构建**。
+- **KDE Wayland 致命坑（装完「所有输入法都打不了字」的根因，非 lufly 问题）**：fcitx5 必须
+  由 kwin 作为虚拟键盘拉起（kwinrc `[Wayland]`：`InputMethod[$e]=/usr/share/applications/
+  org.fcitx.Fcitx5.desktop` + `VirtualKeyboardEnabled=true`），**只有 kwin 亲生的进程能拿到
+  zwp_input_method_v2**；手动 `fcitx5 -r`、im-chooser/imsettings 拉起的实例协议为 0，所有
+  应用的键盘都进不了 fcitx5。判据：fcitx5 日志 `Using Wayland native input method protocol: 0/1`。
+  kwin 拉起失败（DBus 名被占：`Unable to request dbus name`）后**不再重试**——运行时
+  reconfigure/DBus property 都唤不醒，只能清场后注销重登冷启动。
+- **imsettings 抢跑**：zh_CN + 装了 fcitx5 → 登录时 imsettings-boot.sh 自动起 fcitx5 抢
+  DBus 名（正是它害死 kwin 的拉起）。钉死 = `~/.config/imsettings/xinputrc`（注意不是
+  ~/.xinputrc，50-xinput.sh 会迁移）写 `source /etc/X11/xinit/xinput.d/none.conf`。
+  Xwayland/X11 应用要 `XMODIFIERS=@im=fcitx`（XIM 服务名是 fcitx，imsettings 设的
+  @im=fcitx5 是错值）→ `~/.config/environment.d/90-fcitx5.conf`。
+- 这些是系统层手工步骤、**不在 RPM 里**：老 fcitx5 用户装包即用；全新 KDE Wayland 机器装完
+  仍跑不起来（待把上述集成做进 postinst）。诊断三板斧：`rpm -qp --scripts/--changelog`、
+  `gdbus call -d org.fcitx.Fcitx5 -o /controller -m …Controller1.FullInputMethodGroupInfo
+  "Default"`（看分组/成员）、`echo 'dijntv' | lufly-cli`（验引擎与码表，绕开桌面集成）。
+
 ## 标点半角规则变更（三端已同步，fcitx5/TSF 待发版）
 
 用户裁定：标点上下文半角只由数字触发——`lastCls == 1`（3.14 / 1,000）或 Ctrl+0 强制；
