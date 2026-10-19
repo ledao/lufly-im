@@ -15,7 +15,8 @@ FCITX5_INC="/usr/include/Fcitx5"
 [ -d "$FCITX5_INC" ] || FCITX5_INC="/usr/include/fcitx5"
 
 mkdir -p build
-g++ -std=c++17 -O2 -shared -fPIC -fvisibility=hidden \
+# fcitx5 5.1.x 日志宏用 std::source_location（C++20）；GCC 11+（Ubuntu 22.04 起）均支持
+g++ -std=c++20 -O2 -shared -fPIC -fvisibility=hidden \
     -I "$FCITX5_INC/Core" -I "$FCITX5_INC/Utils" -I "$FCITX5_INC/Config" \
     -I "$FCITX5_INC" -I src \
     -o build/liblufly.so \
