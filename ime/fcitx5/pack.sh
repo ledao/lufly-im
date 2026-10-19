@@ -12,6 +12,8 @@ MULTIARCH=$(dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || gcc -dumpmachi
 
 ./build.sh
 # lufly-cli 供 ojc 加词弹窗管线使用（usr/bin/lufly-cli）
+# 容器（pack-legacy.sh）里用独立 CARGO_TARGET_DIR，与宿主产物隔离
+TARGET_DIR="${CARGO_TARGET_DIR:-$(cd .. && pwd)/target}"
 cargo build --release -p lufly-cli --manifest-path ../Cargo.toml
 
 STAGE="pack/${PKG}_${VER}_${ARCH}"
@@ -29,7 +31,7 @@ mkdir -p "$STAGE/DEBIAN" \
 
 install -m 644 build/liblufly.so        "$STAGE/usr/lib/$MULTIARCH/fcitx5/liblufly.so"
 # ojc 加词命令管线: zenity 表单 → lufly-cli addword（查码表自动算码）
-install -m 755 ../target/release/lufly-cli "$STAGE/usr/bin/lufly-cli"
+install -m 755 "$TARGET_DIR/release/lufly-cli" "$STAGE/usr/bin/lufly-cli"
 install -m 644 data/lufly-addon.conf    "$STAGE/usr/share/fcitx5/addon/lufly.conf"
 install -m 644 data/lufly-im.conf       "$STAGE/usr/share/fcitx5/inputmethod/lufly.conf"
 install -m 644 data/lufly.png           "$STAGE/usr/share/icons/hicolor/48x48/apps/lufly.png"
@@ -57,7 +59,7 @@ Section: utils
 Priority: optional
 Architecture: $ARCH
 Maintainer: ledao <ledao@users.noreply.github.com>
-Depends: fcitx5, libc6, libstdc++6, libgcc-s1
+Depends: fcitx5, libc6, libstdc++6, libgcc-s1 | libgcc1
 Recommends: fonts-noto-cjk
 Installed-Size: $INSTALLED_SIZE
 Description: 小鹭音形输入法（fcitx5 前端）

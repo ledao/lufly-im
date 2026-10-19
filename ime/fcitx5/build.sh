@@ -4,6 +4,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 IME_ROOT="$(cd .. && pwd)"
+# 容器（pack-legacy.sh）里用独立 CARGO_TARGET_DIR，避免与宿主新基座的产物混用
+TARGET_DIR="${CARGO_TARGET_DIR:-$IME_ROOT/target}"
 
 cargo build --release -p lufly-capi --manifest-path "$IME_ROOT/Cargo.toml"
 
@@ -18,7 +20,7 @@ g++ -std=c++17 -O2 -shared -fPIC -fvisibility=hidden \
     -I "$FCITX5_INC" -I src \
     -o build/liblufly.so \
     src/lufly.cpp \
-    "$IME_ROOT/target/release/liblufly_capi.a" \
+    "$TARGET_DIR/release/liblufly_capi.a" \
     -l:libFcitx5Core.so.7 -l:libFcitx5Utils.so.2 \
     -lpthread -ldl -lm
 
