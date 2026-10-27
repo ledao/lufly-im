@@ -50,7 +50,17 @@ fn main() {
         let _ = proxy.send_event(req.body().clone());
     };
 
-    let webview = WebViewBuilder::new()
+    // WebView2 用户数据目录必须显式指到可写位置：默认是 exe 同目录的
+    // {exe}.WebView2\，装进 Program Files 后普通权限不可写 →
+    // CreateCoreWebView2Environment 报 0x80070005 拒绝访问（开发目录跑
+    // 不出、装机必炸的权限路径差异）
+    let data_dir = std::env::var("LOCALAPPDATA")
+        .map(|d| std::path::PathBuf::from(d).join("lufly").join("settings-data"))
+        .unwrap_or_else(|_| std::env::temp_dir().join("lufly-settings-data"));
+    let _ = std::fs::create_dir_all(&data_dir);
+    let mut web_context = wry::WebContext::new(Some(data_dir));
+
+    let webview = WebViewBuilder::new_with_web_context(&mut web_context)
         .with_html(html)
         .with_ipc_handler(ipc)
         .build(&window);
@@ -58,13 +68,18 @@ fn main() {
     let webview = match webview {
         Ok(v) => v,
         Err(e) => {
-            // 最常见原因：系统无 WebView2 运行时（老 LTSC/精简系统）
-            let msg = format!(
-                "设置界面无法启动（{}）。\n\n缺少 WebView2 运行时时，请从微软官网下载安装：\n\
-                 https://developer.microsoft.com/microsoft-edge/webview2/\n\n\
-                 输入法本身不受影响，仍可正常使用。",
-                e
-            );
+            // 按错误码分诊，别把权限问题误导成缺运行时
+            let es = format!("{e}");
+            let hint = if es.contains("0x80070005") {
+                "权限被拒绝：若安全软件拦截了 lufly-settings.exe，请放行后重试。".to_string()
+            } else if es.contains("0x80070002") {
+                "缺少 WebView2 运行时（老 LTSC/精简系统常见），请从微软官网下载安装：\n\
+                 https://developer.microsoft.com/microsoft-edge/webview2/"
+                    .to_string()
+            } else {
+                format!("未知错误。若安全软件拦截了 lufly-settings.exe，请放行后重试。\n错误详情：{es}")
+            };
+            let msg = format!("设置界面无法启动。\n\n{hint}\n\n输入法本身不受影响，仍可正常使用。");
             eprintln!("{msg}");
             bridge::message_box(&msg, "小鹭音形");
             return;

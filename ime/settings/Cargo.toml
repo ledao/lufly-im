@@ -1,7 +1,7 @@
 [package]
 name = "lufly-settings"
 # 与安装器 VER 保持一致（关于页经 CARGO_PKG_VERSION 展示）
-version = "0.6.0"
+version = "0.6.1"
 edition.workspace = true
 license.workspace = true
 description = "小鹭音形输入法 设置（WebView2 壳，独立进程——TIP DLL 不承载 UI）"

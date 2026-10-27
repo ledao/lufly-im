@@ -65,6 +65,12 @@ cd tsf && "/c/Program Files (x86)/NSIS/Bin/makensis.exe" lufly.nsi # → ..\dist
   但 SetLastError 清零后线程 last-error 仍会被 CRT/封装内部调用污染（全新名字也读到
   183）——正确姿势是 `OpenMutexW` **按返回值**探测（打得开=已有实例），见
   `settings/src/main.rs`。
+- **WebView2 数据目录坑（0.6.0 装机实测）**：WebView2 默认把用户数据目录放 exe 同目录
+  的 `{exe}.WebView2\`，装进 Program Files 后普通权限不可写 →
+  `CreateCoreWebView2Environment` 报 **0x80070005（拒绝访问）**——开发目录跑不出、装机
+  必炸。必须 `WebContext::new(Some(可写路径))` + `new_with_web_context` 显式指定
+  （现指 `%LOCALAPPDATA%\lufly\settings-data`）。错误弹窗按错误码分诊：
+  0x80070005=权限/杀软拦截，0x80070002=缺运行时——**0x80070005 不是缺运行时**，别误导。
 - workspace resolver 已升 **3**（MSRV-aware）：wry 0.57 的 cookie/icu 链 MSRV 1.88 > 
   本机 1.85，resolver 2 会锁到编译不过的版本。
 - 键位速查表等教学内容全在 `settings/ui/index.html`（单文件 HTML+CSS+JS，无外部资源）。
