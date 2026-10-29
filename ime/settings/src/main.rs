@@ -12,6 +12,10 @@
 //! 原子写。字段默认值的唯一真源是 tsf/src/config.rs（TIP 侧反序列化），
 //! 本文件的 DEFAULTS 必须与它同步。
 
+// release 按 GUI 子系统编译：否则每次从托盘菜单启动都闪一个 cmd 控制台
+// （console 子系统进程会被分配新终端）。debug 保留控制台方便看 eprintln。
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
 use tao::window::WindowBuilder;
@@ -25,6 +29,9 @@ fn main() {
     if single_instance() {
         return;
     }
+    // GUI 子系统无控制台，panic 默认只进 stderr（= 无输出）→ 用户看到程序
+    // 无声消失。兜底：写日志文件 + 弹框，至少留下可反馈的线索。
+    install_panic_hook();
     // --page=dict：从托盘「用户词典…」进入时直接落到词库页。
     // 白名单校验——值会被 replace 进 HTML 的 JS 字符串字面量，
     // 含引号的任意值 = 脚本注入面（虽然只是本地设置程序，仍然要堵）
@@ -38,12 +45,22 @@ fn main() {
 
     let event_loop = EventLoopBuilder::<String>::with_user_event().build();
     let proxy = event_loop.create_proxy();
-    let window = WindowBuilder::new()
+    let window = match WindowBuilder::new()
         .with_title("小鹭音形 · 设置")
         .with_inner_size(tao::dpi::LogicalSize::new(840.0, 580.0))
         .with_min_inner_size(tao::dpi::LogicalSize::new(720.0, 500.0))
         .build(&event_loop)
-        .expect("create window");
+    {
+        Ok(w) => w,
+        Err(e) => {
+            // GUI 子系统下 panic = 静默消失（用户零信息），必须显式提示
+            bridge::message_box(
+                &format!("设置窗口创建失败：{e}\n\n输入法本身不受影响，仍可正常使用。"),
+                "小鹭音形",
+            );
+            return;
+        }
+    };
 
     let ipc = move |req: Request<String>| {
         // JS 侧 payload 是 JSON 字符串；转发到主循环处理（handler 内拿不到 webview）
@@ -80,7 +97,10 @@ fn main() {
                 format!("未知错误。若安全软件拦截了 lufly-settings.exe，请放行后重试。\n错误详情：{es}")
             };
             let msg = format!("设置界面无法启动。\n\n{hint}\n\n输入法本身不受影响，仍可正常使用。");
-            eprintln!("{msg}");
+            // GUI 子系统下无 stderr 句柄——eprintln! 写失败会 panic（在
+            // message_box 之前，错误提示框就永远弹不出来了），必须容错写
+            use std::io::Write;
+            let _ = std::io::stderr().write_all(msg.as_bytes());
             bridge::message_box(&msg, "小鹭音形");
             return;
         }
@@ -108,6 +128,26 @@ fn main() {
             _ => {}
         }
     });
+}
+
+/// panic 兜底（GUI 子系统无控制台，默认 panic 用户零感知）。
+/// 写 %APPDATA%\lufly\settings-panic.log + 弹框；hook 内不再 panic。
+fn install_panic_hook() {
+    std::panic::set_hook(Box::new(|info| {
+        let msg = format!("设置程序内部错误：\n{info}\n\n输入法本身不受影响。");
+        if let Some(dir) = std::env::var("APPDATA").ok().map(std::path::PathBuf::from) {
+            let _ = std::fs::create_dir_all(dir.join("lufly"));
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(dir.join("lufly").join("settings-panic.log"))
+            {
+                use std::io::Write;
+                let _ = writeln!(f, "[{}] {info}", std::process::id());
+            }
+        }
+        bridge::message_box(&msg, "小鹭音形");
+    }));
 }
 
 /// 命名互斥体单实例。CreateMutexW「已存在」也返回有效句柄、只能靠

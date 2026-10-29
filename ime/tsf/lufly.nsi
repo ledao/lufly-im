@@ -17,7 +17,7 @@ SetCompressor /SOLID lzma
 ; --- 常量 ---
 !define PRODUCT_NAME "小鹭音形输入法"
 !define PRODUCT_PUBLISHER "小鹭音形开发组"
-!define VER "0.6.1"
+!define VER "0.6.2"
 !define PROFILE_GUID "{7C3A1E92-5D4F-4B68-9A2C-E1F0B3D4A5C6}"
 !define UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\LuflyIME"
 !define CLSID_STR "{2E168808-0490-43E1-9481-F2662BB32954}"
@@ -121,6 +121,8 @@ Section "Install"
   ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.5.13\lufly_tsf32.dll"'
   ExecWait '"$R7" /u /s "$INSTDIR\0.6.0\lufly_tsf.dll"'
   ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.6.0\lufly_tsf32.dll"'
+  ExecWait '"$R7" /u /s "$INSTDIR\0.6.1\lufly_tsf.dll"'
+  ExecWait '"$WINDIR\SysWOW64\regsvr32.exe" /u /s "$INSTDIR\0.6.1\lufly_tsf32.dll"'
   ; 旧 DLL 可能已删除导致 regsvr32 /u 无效 —— 直接清掉自己的残留键
   ; (含手写时代的脏数据)。64 位与 32 位应用读不同注册表视图，两边都清
   SetRegView 64
@@ -245,6 +247,7 @@ Section "Install"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.12"
   RMDir /r /REBOOTOK "$INSTDIR\0.5.13"
   RMDir /r /REBOOTOK "$INSTDIR\0.6.0"
+  RMDir /r /REBOOTOK "$INSTDIR\0.6.1"
   RMDir /REBOOTOK "$INSTDIR\bin"
 
   ; 5. 卸载器与控制面板卸载项

@@ -1154,7 +1154,7 @@ dependencies = [
 
 [[package]]
 name = "lufly-settings"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "rfd",
  "serde_json",
