@@ -330,20 +330,29 @@ window.__bridge = function (msg) {
   if (msg.config) { CFG = msg.config; META = msg.meta; fill(); }
   if (msg.dict) refreshDict(msg.dict);
   switch (msg.cmd) {
-    case "dict_import": toast("导入完成，共 " + msg.total + " 条"); break;
+    case "dict_import": {
+      let s = "导入完成，共 " + msg.total + " 条";
+      if (msg.skipped > 0) s += "（跳过 " + msg.skipped + " 行格式不符）";
+      toast(s);
+      break;
+    }
     case "dict_export": toast("已导出 " + fmtSize(msg.bytes)); break;
     case "set": case "restore": case "dict_clear": toast(); break;
   }
 };
 
 /* ---- 导航 ---- */
+function goPage(name) {
+  const item = document.querySelector('.nav-item[data-page="' + name + '"]');
+  if (!item) return;
+  document.querySelectorAll(".nav-item").forEach(i => i.classList.remove("active"));
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  item.classList.add("active");
+  document.getElementById("page-" + name).classList.add("active");
+}
+window.__go_page = goPage;
 document.querySelectorAll(".nav-item").forEach(item => {
-  item.onclick = () => {
-    document.querySelectorAll(".nav-item").forEach(i => i.classList.remove("active"));
-    document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
-    item.classList.add("active");
-    document.getElementById("page-" + item.dataset.page).classList.add("active");
-  };
+  item.onclick = () => goPage(item.dataset.page);
 });
 
 /* ---- 开关 ---- */
@@ -429,8 +438,10 @@ function fill() {
   }
 }
 send({ cmd: "get" });
+// 脚本已就绪（__go_page/__bridge 均已定义）：通知 Rust 补发加载期到达的切页请求
+send({ cmd: "ready" });
 if (["keys", "look", "dict", "adv"].includes(INITIAL_PAGE)) {
-  document.querySelector('.nav-item[data-page="' + INITIAL_PAGE + '"]').click();
+  goPage(INITIAL_PAGE);
 }
 </script>
 </body>

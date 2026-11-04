@@ -53,6 +53,7 @@ pub fn handle(msg: &str) -> Option<String> {
     let cmd = v.get("cmd")?.as_str()?.to_string();
     let out = match cmd.as_str() {
         "get" => cmd_get(),
+        "ready" => Some(json!({ "ok": true }).to_string()), // 页面脚本就绪（main 侧消费 pending_page）
         "set" => cmd_set(&v),
         "restore" => cmd_restore(),
         "dict_stats" => Some(json!({ "ok": true, "dict": dict_stats() }).to_string()),
@@ -212,75 +213,92 @@ fn cmd_dict_import() -> Option<String> {
         return Some(json!({ "ok": false, "cancelled": true }).to_string());
     };
     let Ok(imported) = std::fs::read_to_string(&src) else {
-        return Some(err_json("read import failed"));
+        return Some(err_json("读取导入文件失败"));
     };
+    // 关键：解析不出任何合法行时绝不落盘。空文件在 TIP 端 reload 是
+    // 「清空」语义（clear_user），会把用户已有词库全部抹掉。
+    let (imported_rows, bad) = parse_dict(&imported);
+    if imported_rows.is_empty() {
+        return Some(err_json(
+            "导入文件中没有可用的词条，已取消导入（原词库未改动）。\n\
+             词典格式为每行：编码|词|次数[|w]",
+        ));
+    }
     let existing = std::fs::read_to_string(dict_path()).unwrap_or_default();
-    let merged = merge_dict(&existing, &imported);
+    let (existing_rows, _) = parse_dict(&existing);
+    let merged = merge_rows(&existing_rows, &imported_rows);
     let path = dict_path();
     let _ = std::fs::create_dir_all(appdata());
     let tmp = path.with_extension("txt.tmp");
     // 原子替换：TIP 端 mtime 轮询（≤1s）自动合并进引擎
     if std::fs::write(&tmp, &merged).is_err() || std::fs::rename(&tmp, &path).is_err() {
-        return Some(err_json("write failed"));
+        return Some(err_json("写入词库文件失败"));
     }
     Some(
         json!({
             "ok": true,
-            "added": merged.lines().count().saturating_sub(valid_lines(&existing)),
+            "added": valid_lines(&merged).saturating_sub(existing_rows.len()),
             "total": valid_lines(&merged),
+            "skipped": bad,
             "dict": dict_stats(),
         })
         .to_string(),
     )
 }
 
-/// 词典行级合并：同 (code,text,flag) 取更大的 count；保留磁盘学习计数语义。
-/// 排序输出（与引擎 save_user 的确定性风格一致）。
-fn merge_dict(a: &str, b: &str) -> String {
-    #[derive(Hash, PartialEq, Eq, Clone)]
-    struct Key(String);
-    let mut map: HashMap<Key, (u32, bool)> = HashMap::new();
-    for line in a.lines().chain(b.lines()) {
+/// 解析词典行 → (合法行, 坏行数)。坏行跳过。
+/// 与引擎 `save_user`/`load_user` 的 code|text|n[|w] 格式严格对齐。
+type Row = (String, String, u32, bool);
+fn parse_dict(s: &str) -> (Vec<Row>, usize) {
+    let mut rows: Vec<Row> = Vec::new();
+    let mut bad = 0usize;
+    for line in s.lines() {
         let line = line.trim_end_matches('\r');
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
         let mut it = line.split('|');
         let (Some(code), Some(word), Some(cnt)) = (it.next(), it.next(), it.next()) else {
+            bad += 1;
             continue;
         };
         let flag = match it.next() {
             None => false,
             Some("w") => true,
-            _ => continue,
+            _ => { bad += 1; continue; }
         };
         if it.next().is_some() {
+            bad += 1;
             continue;
         }
         let Ok(n) = cnt.parse::<u32>() else {
+            bad += 1;
             continue;
         };
         if code.is_empty() || word.is_empty() || n == 0 {
+            bad += 1;
             continue;
         }
-        let key = Key(format!("{code}|{word}|{}", if flag { "w" } else { "" }));
-        let e = map.entry(key).or_insert((0, flag));
-        if n > e.0 {
-            e.0 = n;
+        rows.push((code.to_string(), word.to_string(), n, flag));
+    }
+    (rows, bad)
+}
+
+/// 词典行级合并：同 (code,text,flag) 取更大的 count；保留磁盘学习计数语义。
+/// 排序输出（与引擎 save_user 的确定性风格一致）。
+fn merge_rows(a: &[Row], b: &[Row]) -> String {
+    let mut map: HashMap<(String, String, bool), u32> = HashMap::new();
+    for (code, word, n, flag) in a.iter().chain(b.iter()) {
+        let e = map
+            .entry((code.clone(), word.clone(), *flag))
+            .or_insert(0);
+        if *n > *e {
+            *e = *n;
         }
     }
     let mut rows: Vec<(String, String, u32, bool)> = map
         .into_iter()
-        .map(|(k, (n, w))| {
-            // key 结构 "code|word|flag"，拆回三段
-            let mut parts = k.0.splitn(3, '|');
-            (
-                parts.next().unwrap_or("").to_string(),
-                parts.next().unwrap_or("").to_string(),
-                n,
-                w,
-            )
-        })
+        .map(|((c, t, w), n)| (c, t, n, w))
         .collect();
     rows.sort();
     let mut out = String::new();
@@ -346,9 +364,9 @@ mod tests {
 
     #[test]
     fn merge_takes_bigger_count_and_union() {
-        let a = "aa|词一|3\nbb|词二|1|w\n";
-        let b = "aa|词一|5\ncc|词三|2|w\n";
-        let m = merge_dict(a, b);
+        let (a, _) = parse_dict("aa|词一|3\nbb|词二|1|w\n");
+        let (b, _) = parse_dict("aa|词一|5\ncc|词三|2|w\n");
+        let m = merge_rows(&a, &b);
         assert!(m.contains("aa|词一|5"));
         assert!(m.contains("bb|词二|1|w"));
         assert!(m.contains("cc|词三|2|w"));
@@ -356,11 +374,67 @@ mod tests {
     }
 
     #[test]
-    fn defaults_match_tsf_field_set() {
-        // schema 真源是 tsf/src/config.rs：字段集变了这里会红，提醒同步
+    fn import_bad_file_never_produces_empty_dict() {
+        // P0 回归：格式不符的文件解析出 0 合法行，调用方必须拒绝落盘
+        // （空文件在 TIP 端 = clear_user，会抹掉整本词库）
+        let (rows, bad) = parse_dict("这不是词典\nhello world\n");
+        assert!(rows.is_empty());
+        assert_eq!(bad, 2);
+        let (existing, _) = parse_dict("aa|原词|3\n");
+        let merged = merge_rows(&existing, &rows);
+        assert!(merged.contains("aa|原词|3"), "原词库必须保留");
+    }
+
+    #[test]
+    fn parse_counts_skipped_bad_lines() {
+        let (rows, bad) = parse_dict("aa|好|1\nxx|坏|notnum\nbb|行|2|w\n");
+        assert_eq!(bad, 1);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0], ("aa".into(), "好".into(), 1, false));
+        assert_eq!(rows[1], ("bb".into(), "行".into(), 2, true));
+    }
+
+    /// schema 真源是 tsf/src/config.rs 的 `const DEFAULT`。编译期把源码
+    /// 文本嵌进来做双向比对：加字段/改默认值忘了同步 DEFAULTS 或
+    /// WRITABLE，这里立刻红（而不只是「字段存在」的弱检查）。
+    #[test]
+    fn defaults_match_tsf_schema() {
+        const TSF: &str = include_str!("../../tsf/src/config.rs");
+        let block = TSF
+            .split("const DEFAULT: Config = Config {")
+            .nth(1)
+            .and_then(|s| s.split("};").next())
+            .expect("tsf DEFAULT block not found");
+        let mut tsf: std::collections::BTreeMap<&str, &str> = Default::default();
+        for line in block.lines() {
+            let line = line.trim().trim_end_matches(',');
+            if let Some((k, v)) = line.split_once(':') {
+                let k = k.trim();
+                if !k.is_empty() && !k.starts_with('/') {
+                    tsf.insert(k, v.trim());
+                }
+            }
+        }
         let d: Value = serde_json::from_str(DEFAULTS).unwrap();
-        for k in WRITABLE {
-            assert!(d.get(k).is_some(), "missing default for {k}");
+        let obj = d.as_object().unwrap();
+
+        // 字段集双向相等（忽略 version 这个非设置项）
+        let tsf_keys: std::collections::BTreeSet<&str> = tsf.keys().copied().collect();
+        let bridge_keys: std::collections::BTreeSet<&str> =
+            obj.keys().map(|s| s.as_str()).filter(|k| *k != "version").collect();
+        assert_eq!(tsf_keys, bridge_keys, "schema 字段集不一致");
+        let writable: std::collections::BTreeSet<&str> = WRITABLE.iter().copied().collect();
+        assert_eq!(tsf_keys, writable, "WRITABLE 白名单与 schema 不一致");
+
+        // 默认值逐项相等
+        for (k, v) in &tsf {
+            let json_v = obj.get(*k).unwrap();
+            let expected: Value = match *v {
+                "true" => Value::Bool(true),
+                "false" => Value::Bool(false),
+                n => serde_json::from_str(n).unwrap_or_else(|_| panic!("无法解析 tsf 默认值 {k}={n}")),
+            };
+            assert_eq!(*json_v, expected, "默认值不一致: {k}");
         }
     }
 }
