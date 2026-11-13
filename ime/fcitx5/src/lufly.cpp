@@ -59,6 +59,15 @@ namespace fcitx {
 
 namespace {
 
+// ASCII 可打印字符键判定（至多带 Shift 状态——Ctrl/Alt/Super 等已在
+// keyEvent 开头被过滤）。fcitx5 自带 Key::isSimple() 要求完全无修饰状态，
+// 会把大写英文、Shift+数字符号漏掉——TSF/macOS 端同路径都允许 Shift，
+// 顶出语义须三端一致（挂起态/编码中按大写英文都要顶出）。
+bool printableAsciiKey(const Key &key) {
+    const auto sym = key.sym();
+    return sym >= FcitxKey_space && sym <= FcitxKey_asciitilde;
+}
+
 // 候选页大小: 对齐 rime menu/page_size，数字 1-5 对应本页 5 个候选。
 constexpr int kPageSize = 5;
 
@@ -844,8 +853,8 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
             event.accept();
             return;
         }
-        if (key.isSimple()) {
-            event.accept(); // 加词编辑中吞掉其他简单键，防误触
+        if (printableAsciiKey(key)) {
+            event.accept(); // 加词编辑中吞掉其他简单键（含大写/符号），防误触
         }
         return;
     }
@@ -853,6 +862,22 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
     // ---- ` 进入拼音反查（对齐 rime reverse_lookup prefix）----
     if (!state->reverse && sym == FcitxKey_grave && state->buffer.empty()) {
         if (ensureRev()) {
+            // 挂起字先顶出再进反查（同未映射键顶出；加词阶段进词槽）——
+            // 否则挂起字悬进反查态，回显混成 "`字"（同挂起态数字 bug 一族）
+            if (!state->pending.empty()) {
+                const std::string code = state->pendingCode;
+                const std::string text = state->pending;
+                if (state->addStage == 1) {
+                    state->addWord += text;
+                    state->addSegs.emplace_back(code, text);
+                } else {
+                    noteAutoCommit(state, code, text.c_str());
+                    ic->commitString(text);
+                }
+                state->pending.clear();
+                state->pendingCode.clear();
+                state->lastCls = 0;
+            }
             state->reverse = true;
             updateUI(ic, state);
             event.accept();
@@ -1304,7 +1329,7 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
     }
     // 未映射的简单键（含按上下文放行的半角标点）:
     // miss 时透传不清屏（英文继续）；编码中顶出首选后放行原字符。
-    if (composing && key.isSimple()) {
+    if (composing && printableAsciiKey(key)) {
         if (state->addStage == 1) {
             event.accept(); // 加词中(含 miss): 不上屏英文/符号，退格或 Esc 处理
             return;
@@ -1336,6 +1361,32 @@ void LuflyIm::keyEvent(const InputMethodEntry &, KeyEvent &event) {
     if (!composing && sym >= FcitxKey_0 && sym <= FcitxKey_9) {
         state->punctErased = false; // 继续打字: 退格翻转作废
         state->lastCls = 1;
+    }
+    // 挂起态的未映射简单键（数字/大写英文/符号）: 顶出挂起字再放行原键
+    // （同字母首键顶出）。此前直接透传，原键落在还开着的 preedit 前面，
+    // 挂起字被挤到原键之后（用户实测: 挂起时按数字，候选消失变数字，
+    // 再按空格字才出现在数字后面）。数字上下文已在上面临置（"字3"后接
+    // 标点按半角处理）。
+    if (!composing && !state->pending.empty()
+        && (printableAsciiKey(key) || sym == FcitxKey_Tab)) {
+        const bool wasRev = state->reverse;
+        const std::string code = state->pendingCode;
+        const std::string text = state->pending;
+        state->reverse = false;
+        state->pending.clear();
+        state->pendingCode.clear();
+        if (state->addStage == 1) {
+            // 加词选字阶段: 挂起字进词槽（同空格），杂键吞掉防误触
+            state->addWord += text;
+            state->addSegs.emplace_back(wasRev ? "" : code, text);
+            updateUI(ic, state);
+            event.accept();
+            return;
+        }
+        noteAutoCommit(state, code, text.c_str());
+        ic->commitString(text);
+        updateUI(ic, state);
+        // 不消费，让原字符（数字等）自然插在字后
     }
 }
 

@@ -182,6 +182,22 @@ final class LuflyInputController: IMKInputController {
         // ---- ` 进入拼音反查（对齐 lufly.cpp:779-787）----
         if !state.reverse, event.keyCode == kVK_ANSI_Grave, state.buffer.isEmpty {
             if LuflyEngine.shared.ensureRev() {
+                // 挂起字先顶出再进反查（同未映射键顶出；加词阶段进词槽）——
+                // 否则挂起字悬进反查态，回显混成 "`字"（同挂起态数字 bug 一族）
+                if !state.pending.isEmpty {
+                    let code = state.pendingCode
+                    let text = state.pending
+                    if state.addStage == 1 {
+                        state.addWord += text
+                        state.addSegs.append((code: code, text: text))
+                    } else {
+                        noteAutoCommit(code, text)
+                        commit(client, text)
+                    }
+                    state.pending = ""
+                    state.pendingCode = ""
+                    state.lastCls = 0
+                }
                 state.reverse = true
                 updateUI(client)
                 return true
@@ -562,6 +578,39 @@ final class LuflyInputController: IMKInputController {
         if let c = pc, c >= "0", c <= "9" {
             state.punctErased = false // 继续打字: 退格翻转作废
             state.lastCls = 1
+        }
+        // 挂起态的未映射简单键（数字/大写英文/符号）: 顶出挂起字再放行原键
+        // （同字母首键顶出）。此前直接透传，原键落在还开着的回显前面，
+        // 挂起字被挤到原键之后（用户实测: 挂起时按数字，候选消失变数字，
+        // 再按空格字才出现在数字后面）。数字上下文已临置（"字3"后接标点
+        // 按半角处理）。
+        // 守卫: 可打印 ASCII（0x20-0x7E）或 Tab——方向键/F 键的 characters 是
+        // 私有区字符（printableChar 非 nil），不限定会把「光标移动也顶出」；
+        // Tab 的 characters 是控制字符（pc=nil）但同属「非编码键先顶出」
+        // 语义（终端补全等场景）。TSF/fcitx5 均已覆盖，三端对齐。
+        let tabKey = event.keyCode == kVK_Tab
+        let printableAscii: Bool = {
+            guard let c = pc, c.isASCII, let a = c.asciiValue else { return false }
+            return a >= 0x20 && a <= 0x7e
+        }()
+        if !state.pending.isEmpty, tabKey || printableAscii {
+            let wasRev = state.reverse
+            let code = state.pendingCode
+            let text = state.pending
+            state.reverse = false
+            state.pending = ""
+            state.pendingCode = ""
+            if state.addStage == 1 {
+                // 加词选字阶段: 挂起字进词槽（同空格），杂键吞掉防误触
+                state.addWord += text
+                state.addSegs.append((code: wasRev ? "" : code, text: text))
+                updateUI(client)
+                return true
+            }
+            noteAutoCommit(code, text)
+            commit(client, text)
+            updateUI(client)
+            return false // 不消费，数字等原键自然插在字后
         }
         return false
     }

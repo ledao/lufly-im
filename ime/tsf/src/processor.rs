@@ -796,8 +796,28 @@ fn compute_action(
     // ---- ` 进入拼音反查（对齐 rime reverse_lookup prefix）----
     if !s.st.reverse && ch == '`' && s.st.buffer.is_empty() {
         if s.ensure_rev() {
+            // 挂起字先顶出再进反查（同未映射键顶出语义；加词阶段进词槽）——
+            // 否则挂起字悬进反查态，回显混成 "`字"（同挂起态数字 bug 一族）
+            let mut out = String::new();
+            if !s.st.pending.is_empty() {
+                let (code, text) = (s.st.pending_code.clone(), s.st.pending.clone());
+                if s.st.add_stage == 1 {
+                    s.st.add_word.push_str(&text);
+                    s.st.add_segs.push((code, text));
+                } else {
+                    s.note_auto_commit(&code, &text);
+                    out.push_str(&text);
+                }
+                s.st.pending.clear();
+                s.st.pending_code.clear();
+                s.st.last_cls = 0;
+            }
             s.st.reverse = true;
-            return Act::Compose;
+            return if out.is_empty() {
+                Act::Compose
+            } else {
+                Act::CommitAndCompose(out)
+            };
         }
         return Act::Pass; // 码表缺失: ` 透传
     }
@@ -849,6 +869,7 @@ fn compute_action(
         // Caps_Lock: 清空缓冲（rime send Escape）
         if vk == VK_CAPITAL {
             s.st.buffer.clear();
+            s.st.page = 0; // 页随缓冲清空归零（fcitx5 页在重建列表/macOS didSet 同义）
             s.st.reverse = false;
             s.st.cancel_add_word();
             return Act::Commit(String::new());
@@ -1052,6 +1073,7 @@ fn compute_action(
             if !s.st.pending.is_empty() {
                 // 撤销顶功挂起: 恢复原编码供继续编辑
                 s.st.buffer = s.st.pending_code.clone();
+                s.st.page = 0;
                 s.st.pending.clear();
                 s.st.pending_code.clear();
                 let b = s.st.buffer.clone();
@@ -1091,6 +1113,7 @@ fn compute_action(
             return Act::Pass;
         }
         s.st.buffer.pop();
+        s.st.page = 0;
         let b = s.st.buffer.clone();
         s.replay(&b);
         return Act::Compose;
@@ -1110,6 +1133,7 @@ fn compute_action(
             return Act::Pass;
         }
         s.st.buffer.clear();
+        s.st.page = 0;
         s.st.reverse = false;
         s.st.cancel_add_word();
         return Act::Commit(String::new());
@@ -1148,6 +1172,7 @@ fn compute_action(
             s.st.pending = text;
             s.st.pending_code = format!("{}{}", prev, ch);
         }
+        s.st.page = 0; // 编码变化即回第 1 页（对齐 fcit5 每键重建列表/macOS didSet）
         // ojc: 命令引导符 o + jc(加词声母) → 进入加词·选词阶段
         if s.st.buffer == "ojc" {
             s.st.buffer.clear();
@@ -1222,6 +1247,7 @@ fn compute_action(
         }
         if miss {
             let mut letters = std::mem::take(&mut s.st.buffer);
+            s.st.page = 0; // 缓冲清空即归零（同上，防下一会话从旧页开始）
             // 挂起字随英文一并上屏
             if !s.st.pending.is_empty() {
                 let (pcode, ptext) = (s.st.pending_code.clone(), s.st.pending.clone());
@@ -1263,6 +1289,31 @@ fn compute_action(
     if ch.is_ascii_digit() && !shift {
         s.st.punct_erased = false; // 继续打字: 退格翻转作废
         s.st.last_cls = 1;
+    }
+    // 挂起态的未映射简单键（数字/大写英文/未映射符号/Tab）: 顶出挂起字再放行
+    // 原键——与字母首键顶出同款语义。此前直接 Pass，原键直插进还开着的
+    // composition 前面，挂起字被挤到原键之后（用户实测: 挂起时按数字，
+    // 候选消失变数字，再按空格字才出现在数字后面）。数字上下文已在上面临
+    // 置（"字3"后接标点按半角处理，同 3.14）。
+    // 键集守卫 = 可打印 ASCII（≥' '）+ Tab，与 fcitx5 printableAsciiKey/
+    // macOS 守卫同集: 方向键/F 键（key_char→None 早退）与 CapsLock
+    // （'\u{14}'）不顶出——导航/锁定键不该改文档，三端一致。
+    if !s.st.pending.is_empty() && (ch == '\t' || (ch.is_ascii() && ch >= ' ')) {
+        let rev = s.st.reverse;
+        let (code, text) = (s.st.pending_code.clone(), s.st.pending.clone());
+        s.st.reverse = false;
+        if s.st.add_stage == 1 {
+            // 加词选字阶段: 挂起字进词槽（同空格），杂键吞掉防误触
+            s.st.add_word.push_str(&text);
+            s.st.add_segs.push((if rev { String::new() } else { code }, text));
+            s.st.pending.clear();
+            s.st.pending_code.clear();
+            return Act::Compose;
+        }
+        s.note_auto_commit(&code, &text);
+        s.st.pending.clear();
+        s.st.pending_code.clear();
+        return Act::CommitThenPass(text); // 挂起字上屏，数字等原键自然落在字后
     }
     Act::Pass
 }
@@ -1519,8 +1570,11 @@ impl LuflyTsf {
         // 编码字母——对齐 weasel OnKillThreadFocus → _AbortComposition()。
         // KeyEventSink::OnSetFocus(FALSE) 只在部分宿主触发（日志实证），这条
         // 才是可靠收尾点；缺它时置顶候选窗孤悬桌面（幽灵候选框根因之一）
-        let (ctx, comp_alive) = {
+        let (ctx, comp_alive, pending_text) = {
             let mut shared = self.shared.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            // 挂起字随失焦落地（fcitx5 reset / macOS deactivateServer 同款——
+            // 失焦直接丢挂起字是丢字 bug）：留存文本，交给下面的收尾会话提交
+            let pending_text = shared.st.pending.clone();
             if let Some(e) = shared.engine.as_mut() {
                 e.reset();
             }
@@ -1531,17 +1585,18 @@ impl LuflyTsf {
             shared.cand_win.hide();
             crate::log("thread focus killed: reset");
             let comp_alive = shared.composition.is_some();
-            (shared.edit_ctx.clone(), comp_alive)
-            // composition 句柄不在此清：交给下面的清空会话 EndComposition
+            (shared.edit_ctx.clone(), comp_alive, pending_text)
+            // composition 句柄不在此清：交给下面的收尾会话 EndComposition
         };
-        // 只在 composition 存活时发清空会话：空文本 Commit 走到无 comp 分支
-        // 是纯空转，而失焦是高频事件（点一下桌面就来一发）
+        // 只在 composition 存活时发收尾会话：无挂起字时空文本 Commit = 清掉
+        // composition 里残留的编码字母并结束；有挂起字则原样落地（回显里
+        // 显示的就是它，提交不会重复）。comp 已死时不补提交——宿主终止
+        // composition 时文本通常已由应用侧落地，再写反而重复
         if comp_alive {
             if let Some(ctx) = ctx {
-                // 空文本 Commit = 清掉 composition 里残留的编码字母并结束
-                // （weasel _EndComposition(clear=TRUE)）；绑定原文档，失焦后
-                // GetFocus 已不可用。失败无妨：窗口已收，状态已复位
-                if request_session_kind_in(&self.shared, "", SessionKind::Commit, Some(ctx))
+                // （weasel _EndComposition(clear=TRUE) 变体）；绑定原文档，
+                // 失焦后 GetFocus 已不可用。失败无妨：窗口已收，状态已复位
+                if request_session_kind_in(&self.shared, &pending_text, SessionKind::Commit, Some(ctx))
                     .is_err()
                 {
                     // 清空会话被拒（如上下文已不可编辑）: 丢掉陈旧句柄，

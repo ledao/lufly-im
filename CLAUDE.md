@@ -133,6 +133,31 @@ cd tsf && "/c/Program Files (x86)/NSIS/Bin/makensis.exe" lufly.nsi # → ..\dist
   `gdbus call -d org.fcitx.Fcitx5 -o /controller -m …Controller1.FullInputMethodGroupInfo
   "Default"`（看分组/成员）、`echo 'dijntv' | lufly-cli`（验引擎与码表，绕开桌面集成）。
 
+## 挂起态非编码键顶出 + 状态生命周期（2026-10-18，三端已同步；fcitx5/TSF 待构建）
+
+用户报告「挂起时按数字，候选消失变数字，空格后字才出现在数字后面」引出的修复簇（八项）。
+核心裁定：**顶功挂起态遇任何非编码输入先顶出挂起字、原键自然落在字后**（`字3`），与字母
+首键顶出同义。三端键集严格对齐（TSF 尾部分支 / fcitx5 keyEvent 尾部 `printableAsciiKey`
++Tab / macOS 尾部守卫）：
+
+- **顶出**：数字、大写英文、符号（可打印 ASCII 0x20-0x7E）、Tab/Shift+Tab、`` ` ``（顶出后进反查）
+- **不顶出**（导航/锁定键不改文档）：方向键、F 键、Home/End、PgUp/PgDn、CapsLock
+- ojc 加词选字阶段：挂起字进词槽、杂键吞掉；顶出路径不 learn（learn 留给空格/数字选词确认）
+
+实锚教训：
+
+- fcitx5 `Key::isSimple()` 要求**完全无修饰状态**（key.cpp:456），Shift+字母/数字不在内——
+  顶出判定自写 `printableAsciiKey`（可打印 ASCII，Ctrl/Alt/Super 已在 keyEvent 开头滤掉）。
+- macOS 方向键/F 键的 `characters` 是**私有区字符**（≥0x20 单字符），`printableChar` 非 nil——
+  顶出守卫须限定 `isASCII && 0x20...0x7E || Tab`，否则光标移动也会顶出。
+- TSF `st.page` 跨按键持久是分歧源（fcitx5 页在每键重建的 CommonCandidateList、macOS buffer
+  didSet 自动归零）——**编码每变即 `page = 0`**（字母/退格/Esc/Caps/miss 全部出口，共 10 处）。
+- TSF 线程失焦（on_kill_thread_focus_inner）**挂起字随失焦落地**（对齐 fcitx5 reset/macOS
+  deactivateServer，此前直接 reset 丢字）；composition 已死则不补提交（宿主终止时通常已落地，再写重复）。
+- 已知未修：TSF 挂起态按 PgUp 出「字！」（VK_PRIOR=0x21 与 '!' 码点撞车、key_char 刻意映射，
+  先于顶出簇存在）；OnSetFocus(FALSE)/Deactivate 路径的 pending 丢弃（线程失焦是可靠路径已修，
+  两处并发提交有双写风险）。
+
 ## 标点半角规则变更（三端已同步，fcitx5/TSF 待发版）
 
 用户裁定：标点上下文半角只由数字触发——`lastCls == 1`（3.14 / 1,000）或 Ctrl+0 强制；
